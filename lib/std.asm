@@ -167,7 +167,10 @@ VECTOR_RESET = $fffc
 VECTOR_IRQ   = $fffe
 
 !macro save_regs {
-    inc VIC_BORDER
+    ;inc VIC_BORDER
+    ;nop
+    ;nop
+    ;nop
     sta SAVE_A
     stx SAVE_X
     sty SAVE_Y
@@ -196,7 +199,10 @@ VECTOR_IRQ   = $fffe
 }
 
 !macro ack_restore_rti {
-    dec VIC_BORDER
+    ;dec VIC_BORDER
+    ;nop
+    ;nop
+    ;nop
     inc VIC_IRQ_STATUS
     +restore_regs
     rti
@@ -237,28 +243,59 @@ VECTOR_IRQ   = $fffe
 }
 
 !macro wait .w {
-    !if .w = 1 {
-        !error "does not work for an input value of 1"
+    !if .w = 0 {
+        ; do nothing
     } else {
-        !if .w % 2 = 0 {
-            !for .i, .w / 2 {
-                nop
-            }
+        !if .w = 1 {
+            !error "does not work for an input value of 1"
         } else {
-            !for .i, (.w-3) / 2 {
-                nop
+            !if .w % 2 = 0 {
+                !for .i, .w / 2 {
+                    nop
+                }
+            } else {
+                !for .i, (.w-3) / 2 {
+                    nop
+                }
+                bit $ea
             }
-            bit $ea
         }
+    }
+}
+
+!macro wait_loop .w {
+    !set .v = .w - 2 ; because of the ldy below
+    !set .num_iters = (.v+1) / 5
+    !set .rest = .v - ((.num_iters-1)* 5 + 4)
+
+    !if .rest = 1 {
+        !set .num_iters = .num_iters - 1
+        !set .rest = .rest + 5
+    } 
+
+    !if .num_iters > 255 {
+        !error "loop to large"
+    }
+
+    !if .num_iters < 2 {
+        +wait .w
+    } else {
+        ldy # .num_iters
+-       ; here are (num_iters-1)*5 + 4 cycles
+        dey
+        bne -
+
+        !set .rest = .v - ((.num_iters-1)* 5 + 4)
+        +wait .rest
     }
 }
 
 RAM_ROM_SELECTION            = $01
 RAM_ROM_DEFAULT	             = %00110111
-RAM_ROM_ALL_RAM_WITHIO       = %00100101
-RAM_ROM_ALL_RAM_WITHCHARROM  = %00100001
-RAM_ROM_ALL_RAM              = %00100000
-RAM_ROM_BASIC_CHAR_KERNAL    = %00100011
+RAM_ROM_ALL_RAM_WITHIO       = %00110101
+RAM_ROM_ALL_RAM_WITHCHARROM  = %00110001
+RAM_ROM_ALL_RAM              = %00110000
+RAM_ROM_BASIC_CHAR_KERNAL    = %00110011
 
 !macro set .value, .addr {
     lda #.value

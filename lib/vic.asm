@@ -1,4 +1,5 @@
 ; first raster line with backgroundcolor: 51
+; 12 cylces left border + 40 cylces screen + 11 cycles right border
 
 ; VIC constants
 
@@ -130,3 +131,5 @@ VIC_SPR_7_COLOR = $D02E
     and #%01111111
     sta VIC_CONTROL_1
 }
+
+COLOR_RAM = $D800

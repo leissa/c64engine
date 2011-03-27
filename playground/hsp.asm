@@ -7,11 +7,12 @@
 !source "../lib/cia.asm"
 !source "../lib/std.asm"
 
-LINE_0  = 48 ; firt possible bad line bar
+LINE_0  = 48 ; first possible bad line bar
 LINE_M  = LINE_0 - 1
 LINE_MM = LINE_0 - 2
 
-CRUNCH_LINE_START=56 ; second chance to tweak stuff
+;CRUNCH_LINE_START=56 ; second chance to tweak stuff
+CRUNCH_LINE_START=LINE_0+8
 WAIT_VALUE=39
 
 SCREEN0 = $4000
@@ -23,6 +24,8 @@ SCREEN1 = $4400
 ; Bit 4: Screen output enabled?
 ; Bit 3: 25 rows (24 otherwise)
 CONTROL_Y=%00011000
+CONTROL_Y_INVALID=%01111000
+;---------------^^^ must be zero
 
 +create_basic_starter $0c00
 *=$0c00; = 2304
@@ -105,6 +108,7 @@ START !zone {
     ldx #39
 -
     sta SCREEN0 + .i*40, x
+    sta COLOR_RAM + .i*40, x
     sta SCREEN1 - 24 + .i*40, x
     dex
     bpl -
@@ -186,7 +190,7 @@ MAIN_LOOP !zone {
     ldx LINE_CRUNCH
     dex
     bpl +
-    ldx #25
+    ldx #24
 +
     stx LINE_CRUNCH
 -
@@ -203,7 +207,7 @@ MAIN_LOOP !zone {
 
     ldx LINE_CRUNCH
     inx
-    cpx #26
+    cpx #25
     bne +
     ldx #0
 +
@@ -215,6 +219,7 @@ MAIN_LOOP !zone {
     jmp MAIN_LOOP
 }
 EMPTY_INTERRUPT
+    inc VIC_BORDER
     rti
 
 !macro init_stable_raster .stabilizing_label {
@@ -242,6 +247,16 @@ EMPTY_INTERRUPT
     cmp VIC_RASTER
     +bne
 }
+
+!macro inc_vic_control_y {
+    lda VIC_CONTROL_Y   ; 4
+    clc                 ; 2
+    adc #1              ; 2
+    and #%00000111      ; 2
+    clc                 ; 2
+    adc # CONTROL_Y_INVALID     ; 2
+    sta VIC_CONTROL_Y   ; 4
+}                       ; -> 18
 
 !align 255, 0
 IRQ_VSP !zone {
@@ -277,10 +292,10 @@ IRQ_VSP !zone {
 +
     stx .self_modifying_branch__lsb ;   +11 = 36/37 cycles
 
-    lda # CONTROL_Y + (LINE_0 + 1) % 8
+    lda # (CONTROL_Y_INVALID & %11111000) + (LINE_0 + 1) % 8
     sta VIC_CONTROL_Y ; make LINE_0 one row before a bad line
 
-    lda # CONTROL_Y + (LINE_0) % 8
+    lda # (CONTROL_Y_INVALID & %11111000) + (LINE_0) % 8
     tay ; this value causes a badline in LINE_0   +10 = 46/47 cycles
 
     +wait 11                        ;   +11 = 57/58 cycles
@@ -301,91 +316,85 @@ IRQ_VSP !zone {
     +bpl
 .nops_start
     +wait WAIT_VALUE-1              ; +3-41 = 10-49 cycles
-.nops_end
 
     ; now the store happens at the exact timing
     sty VIC_CONTROL_Y               ;    +4 = 14-53 cycles
-    ;jmp .skip_crunching
-    sty VIC_CONTROL_Y ; needed for some vodoo VIC-II stuff
 
-    ;lda # CONTROL_Y + (CRUNCH_LINE_START % 8)
-    ;sta VIC_CONTROL_Y ; bad line in CRUNCH_LINE_START
-
+    +wait_loop 63*7 + 5 - 31
     ; do we have to crunch?
-    ldy LINE_CRUNCH
-    beq .skip_crunching
+    ldx LINE_CRUNCH
+    beq .fld_loop_no_crunch
 
-    ldx #CRUNCH_LINE_START
+    +wait_loop 31 - 10
 
 .crunch_loop
-    lda CRUNCH_TABLE - CRUNCH_LINE_START, x
-    
--   ; wait for raster line
-    cpx VIC_RASTER
-    bne -
+    +inc_vic_control_y          ; 18
+    ; we are at cycle 8 here
 
+    dex
+    beq .fld_lines              ; 4
+
+    +wait_loop 63 - 18 - 4 - 3
+    jmp .crunch_loop            ; 3
+
+.fld_loop_no_crunch
+    +wait_loop 31 - 5 - 20
+    ldx #25
+    jmp .fld_loop
+
+.fld_lines
+    lda #25             ; 2
+    sec                 ; 2
+    sbc LINE_CRUNCH     ; 4
+    beq .skip_fld       ; 2
+    tax                 ; 2
+                        ; -> 12
+    ;ldx LINE_CRUNCH     ; 4
+    ;tax                 ; 2
+    ;sbx #25             ; 2
+    ;beq .skip_fld       ; 2
+                        ;; -> 10
+
+    +wait_loop 63 - 8 - 5 - 12 - 20
+
+.fld_loop
+    +inc_vic_control_y  ; -> 18
+
+    ;dex
+    ;beq .skip_fld
+
+    ;+wait_loop 63 - 18 - 4 - 3
+    ;jmp .fld_loop
+
+    +wait_loop 63 - 18 - 5
+
+    dex
+    bne .fld_loop
+
+.skip_fld
+
+    lda VIC_CONTROL_Y
+    and #%00000111
+    clc
+    adc # CONTROL_Y
     sta VIC_CONTROL_Y
-    inx
-    dey
-    bne .crunch_loop
-
-.skip_crunching
-
-    ; select SCREEN0
-    lda VIC_ADDR_SELECT
-    and #%00001111
-    sta VIC_ADDR_SELECT
 
     ; clean up
     dec LOCK
 
-    ;+set_raster_line_8 LINE_MM
-    ;+set16 IRQ_VSP, VECTOR_IRQ
+    +set_raster_line_8 LINE_MM
+    +set16 IRQ_VSP, VECTOR_IRQ
 
-    lda #25
-    sec
-    sbc LINE_CRUNCH
-    asl
-    asl
-    asl
-    clc
-    adc #48
-    sta VIC_RASTER
-
-    ;+set_raster_line_8 200
-    +set16 TWEAK_BUFFERS, VECTOR_IRQ
-+
     +ack_restore_rti
 }
 
 VSP_SCROLL
-    !by 0
+    !by 40 - 24
 LOCK
     !by 0
 LINE_CRUNCH
     !by 0
 
-CRUNCH_TABLE
-!for .j, 25 {
-!set .i = .j - 1
-    !by CONTROL_Y + ((CRUNCH_LINE_START + .i + 1) % 8)
-}
 !if >IRQ_VSP != >* {
     !error "different pages"
-}
-
-TWEAK_BUFFERS !zone {
-    +save_regs
-    ; ack interrupt
-
-    ; select SCREEN1
-    lda VIC_ADDR_SELECT
-    and #%00001111
-    ora #%00010000
-    sta VIC_ADDR_SELECT
-
-    +set_raster_line_8 LINE_MM
-    +set16 IRQ_VSP, VECTOR_IRQ
-+
-    +ack_restore_rti
 }
