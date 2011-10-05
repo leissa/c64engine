@@ -31,7 +31,23 @@ LINE_0        = FIRST_BADLINE-3
 LINE_SPLIT    = FIRST_BADLINE-3
 SCREEN=$0400
 
+SOFTCHARS   = $2000
+SOFTCHARS_0 = $2000
+SOFTCHARS_1 = $2400
+SOFTCHARS_2 = $2800
+SOFTCHARS_3 = $2c00
+SOFTCHARS_4 = $3000
+SOFTCHARS_5 = $3400
+SOFTCHARS_6 = $3800
+SOFTCHARS_7 = $3c00
+SOFTCHARS_C = $4000
+SOFTCHARS_S = $4400
+
 LINES_TO_CRUNCH = 31
+
+PTR_COLOR   = $30
+PTR_SCREEN  = $30
+PTR_HIRES   = $30
 
 !macro ntsc_wait {
     +wait 6
@@ -462,6 +478,33 @@ IRQ !zone {
     +set16 IRQ, VECTOR_IRQ
 
     +ack_restore_rti
+}
+
+!zone WRITE_SOFTCHARS {
+    ; x -> softchar index
+    
+    ; copy over soft char
+!for .j, 25 {
+!set .i = .j - 1
+    
+    !if .i = 0 {
+        ldy #7
+    } else {
+        dey
+    }
+    lda SOFTCHARS + .i * $100, x
+    sta (PTR_HIRES), y
+}
+
+    ; y = 0 here
+
+    ; copy over color infos
+    lda SOFTCHARS_C, x
+    sta (PTR_COLOR), y
+    lda SOFTCHARS_S, x
+    sta (PTR_SCREEN), y
+
+    rts
 }
 
 SOFT_X   !by 0
