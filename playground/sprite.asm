@@ -2,10 +2,10 @@
 !cpu 6510               ; for illegal opcodes
 !convtab scr            ; for conversion to c64 screen codes
 
-!source "lib/vic.asm"
-!source "lib/cia.asm"
-!source "lib/std.asm"
-!source "lib/zero.asm"
+!source "../lib/vic.asm"
+!source "../lib/cia.asm"
+!source "../lib/std.asm"
+!source "../lib/zero.asm"
 
 NUM_SPRITES       = 32
 SPRITE_FRAME_BASE = 2040
