@@ -320,6 +320,14 @@ RAM_ROM_BASIC_CHAR_KERNAL    = %00110011
         !warn "yeah"
     }
 }
+!macro inc16 .val {
+    inc .val
+    bcc +
+    inc .val + 1
++
+}
 
 BPL_OPCODE = $10
 BMI_OPCODE = $30
+BCS_OPCODE = $b0
+BCC_OPCODE = $90
