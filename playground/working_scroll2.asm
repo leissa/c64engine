@@ -3,6 +3,7 @@
 !convtab scr            ; for conversion to c64 screen codes
 
 !source "../lib/zero.asm"
+!source "../lib/mem.asm"
 !source "../lib/vic.asm"
 !source "../lib/cia.asm"
 !source "../lib/std.asm"
@@ -29,25 +30,8 @@ CONTROL_X        =%00000000
 FIRST_BADLINE = $33-3
 LINE_0        = FIRST_BADLINE-3
 LINE_SPLIT    = FIRST_BADLINE-3
-SCREEN=$0400
-
-SOFTCHARS   = $2000
-SOFTCHARS_0 = $2000
-SOFTCHARS_1 = $2400
-SOFTCHARS_2 = $2800
-SOFTCHARS_3 = $2c00
-SOFTCHARS_4 = $3000
-SOFTCHARS_5 = $3400
-SOFTCHARS_6 = $3800
-SOFTCHARS_7 = $3c00
-SOFTCHARS_C = $4000
-SOFTCHARS_S = $4400
 
 LINES_TO_CRUNCH = 31
-
-PTR_COLOR   = $30
-PTR_SCREEN  = $30
-PTR_HIRES   = $30
 
 !macro ntsc_wait {
     +wait 6
@@ -480,10 +464,56 @@ IRQ !zone {
     +ack_restore_rti
 }
 
-!zone WRITE_SOFTCHARS {
+!zone INC_SCROLL_PTRS {
+    lda PTR_HIRES
+    clc
+    adc #8
+    sta PTR_HIRES
+    bcc .out_safely_inc_others  
+
+    inc PTR_HIRES + 1   ; add carry to high byte
+
+    ; PTR_SCREEN and PTR_COLOR _may_ overflow
+    inc PTR_SCREEN
+    inc PTR_COLOR
+
+    ; do PTR_SCREEN and PTR_COLOR overflow, too?
+    bcc .out
+
+    inc PTR_SCREEN + 1
+    inc PTR_COLOR + 1
+
+    ; is here a wrap-around of the buffers?
+    lda PTR_COLOR + 1
+    cmp # >COLOR_RAM + $0400
+    bne .out
+
+    ; wrap around
+    lda # >COLOR_RAM
+    sta PTR_COLOR + 1
+
+    lda # > SCREEN
+    sta PTR_SCREEN + 1
+
+    lda # > HIRES
+    sta PTR_HIRES + 1
+    rts
+
+.out_safely_inc_others
+
+    ; PTR_SCREEN and PTR_COLOR _cannot_ overflow
+    inc PTR_SCREEN
+    inc PTR_COLOR
+
+.out
+    rts
+}
+
+!zone COPY_SOFTCHARS {
     ; x -> softchar index
     
-    ; copy over soft char
+    ; copy over soft char line by line
+    ; y is used to index the row
 !for .j, 25 {
 !set .i = .j - 1
     
@@ -492,7 +522,7 @@ IRQ !zone {
     } else {
         dey
     }
-    lda SOFTCHARS + .i * $100, x
+
     sta (PTR_HIRES), y
 }
 

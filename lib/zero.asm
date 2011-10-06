@@ -6,6 +6,10 @@ SAVE_Y             = $04
 
 MULTI_MAX_Y_IN_STRIP = $05
 
+PTR_HIRES           = $06;-$07
+PTR_COLOR           = $08;-$09
+PTR_SCREEN          = $0a;-$0b
+
 FRAME_COUNTER       = $06
 STRIP0_IN_FRAME     = $07
 STRIP1_IN_FRAME     = $08

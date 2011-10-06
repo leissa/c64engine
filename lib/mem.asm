@@ -1,0 +1,91 @@
+; 
+; zero page: $0000 - $00FF
+;
+
+RAM_ROM_SWITCH     = $01
+
+SAVE_A             = $02
+SAVE_X             = $03
+SAVE_Y             = $04
+
+MULTI_MAX_Y_IN_STRIP = $05
+
+FRAME_COUNTER       = $06
+STRIP0_IN_FRAME     = $07
+STRIP1_IN_FRAME     = $08
+STRIP2_IN_FRAME     = $09
+STRIP3_IN_FRAME     = $0a
+COLLISION_0_1       = $0b
+COLLISION_1_2       = $0c
+COLLISION_2_3       = $0d
+SPRITE_STRIP_X_MSB  = $0e
+SPRITE_STRIP_MULTI  = $0f
+SPRITE_STRIP_X      = $10
+SPRITE_STRIP_Y      = $18
+SPRITE_STRIP_COLOR  = $20
+SPRITE_STRIP_FRAME  = $28
+MULTI_INDEX_TABLE   = $30
+
+; is indexed by 
+; lda FRAME_COUNTER_TABLE, x
+; where x = {1, 3}
+FRAME_COUNTER_TABLE = $50-1
+
+; 
+; CPU stack: $0100 - $01FF
+;
+
+STACK   = $0100
+
+; 
+; VIC area: $4000 - $7FFF
+; 
+
+HIRES  = $4000; - $5fff
+SCREEN = $6000; - $63ff
+SPRITE_PTR_0 = SCREEN + $400 - 8
+SPRITE_PTR_1 = SCREEN + $400 - 7
+SPRITE_PTR_2 = SCREEN + $400 - 6
+SPRITE_PTR_3 = SCREEN + $400 - 5
+SPRITE_PTR_4 = SCREEN + $400 - 4
+SPRITE_PTR_5 = SCREEN + $400 - 3
+SPRITE_PTR_6 = SCREEN + $400 - 2
+SPRITE_PTR_7 = SCREEN + $400 - 1
+
+; TODO
+
+;
+; level data overlapping with upper unused VIC area
+;
+
+SOFTCHARS_C = $7800
+SOFTCHARS_S = $7c00
+
+SOFTCHARS_0 = $8000
+SOFTCHARS_1 = $8100
+SOFTCHARS_2 = $8200
+SOFTCHARS_3 = $8300
+SOFTCHARS_4 = $8400
+SOFTCHARS_5 = $8500
+SOFTCHARS_6 = $8600
+SOFTCHARS_7 = $8700
+
+TILE_00     = $9000
+TILE_10     = $9100
+TILE_20     = $9200
+TILE_30     = $9300
+TILE_01     = $9400
+TILE_11     = $9500
+TILE_21     = $9600
+TILE_31     = $9700
+TILE_02     = $9800
+TILE_12     = $9900
+TILE_22     = $9a00
+TILE_32     = $9b00
+TILE_03     = $9c00
+TILE_13     = $9d00
+TILE_23     = $9e00
+TILE_33     = $9f00
+
+; 64 x 64 tiles (6.4 x 10.24 full screens)
+LEVEL       = $a000; - $afff
