@@ -464,7 +464,7 @@ IRQ !zone {
     +ack_restore_rti
 }
 
-!zone INC_SCROLL_PTRS {
+INC_SCROLL_PTRS !zone {
     lda PTR_HIRES
     clc
     adc #8
@@ -509,24 +509,24 @@ IRQ !zone {
     rts
 }
 
-!zone COPY_SOFTCHARS {
+COPY_SOFTCHARS !zone {
     ; x -> softchar index
     
     ; copy over soft char line by line
     ; y is used to index the row
 
-!for .j, 25 {
-!set .i = .j - 1
-    
-    !if .i = 0 {
-        ldy #7
-    } else {
-        dey
-    }
+    !for .j, 25 {
+    !set .i = .j - 1
+        
+        !if .i = 0 {
+            ldy #7
+        } else {
+            dey
+        }
 
-    lda SOFTCHARS_0
-    sta (PTR_HIRES), y
-}
+        lda SOFTCHARS + .i * $100
+        sta (PTR_HIRES), y
+    }
 
     ; y = 0 here
 
@@ -535,6 +535,37 @@ IRQ !zone {
     sta (PTR_COLOR), y
     lda SOFTCHARS_S, x
     sta (PTR_SCREEN), y
+
+    rts
+}
+
+!macro copy_tile_elem .row, .col {
+    ; y -> tile index
+    ldx TILES + .col * $400 + .row * $100, y  ; load softchar index
+    jsr COPY_SOFTCHARS
+    jsr INC_SCROLL_PTRS
+}
+
+    ; y -> tile index
+COPY_TILE_ROW_0 !zone {
+    sty TMP_TILE_INDEX
+    +copy_tile_elem 0, 0
+    ldy TMP_TILE_INDEX
+
+COPY_TILE_ROW_1
+    sty TMP_TILE_INDEX
+    +copy_tile_elem 1, 0
+    ldy TMP_TILE_INDEX
+
+COPY_TILE_ROW_2
+    sty TMP_TILE_INDEX
+    +copy_tile_elem 2, 0
+    ldy TMP_TILE_INDEX
+
+COPY_TILE_ROW_3
+    sty TMP_TILE_INDEX
+    +copy_tile_elem 3, 0
+    ldy TMP_TILE_INDEX
 
     rts
 }
