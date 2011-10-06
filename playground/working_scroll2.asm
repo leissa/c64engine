@@ -514,6 +514,7 @@ IRQ !zone {
     
     ; copy over soft char line by line
     ; y is used to index the row
+
 !for .j, 25 {
 !set .i = .j - 1
     
@@ -523,6 +524,7 @@ IRQ !zone {
         dey
     }
 
+    lda SOFTCHARS_0
     sta (PTR_HIRES), y
 }
 
