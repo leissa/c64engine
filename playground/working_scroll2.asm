@@ -515,7 +515,7 @@ COPY_SOFTCHARS !zone {
     ; copy over soft char line by line
     ; y is used to index the row
 
-    !for .j, 25 {
+    !for .j, 8 {
     !set .i = .j - 1
         
         !if .i = 0 {
