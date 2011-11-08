@@ -10,6 +10,12 @@ SAVE_Y             = $04
 
 MULTI_MAX_Y_IN_STRIP = $05
 
+PTR_HIRES           = $06;-$07
+PTR_COLOR           = $08;-$09
+PTR_SCREEN          = $0a;-$0b
+
+TMP_TILE_INDEX      = $0c
+
 FRAME_COUNTER       = $06
 STRIP0_IN_FRAME     = $07
 STRIP1_IN_FRAME     = $08
@@ -61,7 +67,7 @@ SPR_PTR_STATUS_1= SCREEN_STATUS_1 + $400 - 8
 ; REMARK: there is still plenty of room within the dummy screen areas
 
 SOFT_SPR_FR     = $8000; - $8fff
-TILES           = $9000; - $9fff
+TILES           = $b000; - $9fff
 SOFTCHARS       = $a000; - $a800
 
 SOFTCHARS_C = $8800

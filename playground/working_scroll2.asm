@@ -2,7 +2,7 @@
 !cpu 6510               ; for illegal opcodes
 !convtab scr            ; for conversion to c64 screen codes
 
-!source "../lib/zero.asm"
+;!source "../lib/zero.asm"
 !source "../lib/mem.asm"
 !source "../lib/vic.asm"
 !source "../lib/cia.asm"
@@ -18,14 +18,15 @@ SPRITE_FRAME_BASE = 2040
     ; Bit 5: Bitmapmode      
     ; Bit 4: Screen output enabled?
     ; Bit 3: 25 rows (24 otherwise)
-CONTROL_Y        =%00010000
+CONTROL_Y        =%00110000
+CONTROL_Y_MASK   =%10111111
 CONTROL_Y_INVALID=%01110000
 
     ; Bit 7..5: unused
     ; Bit 4: Multicolormode
     ; Bit 3: 40 cols (on)/38 cols (off)
     ; Bit 2..0: Offset in Pixels starting from the left screen edge
-CONTROL_X        =%00000000
+CONTROL_X        =%00010000
 
 FIRST_BADLINE = $33-3
 LINE_0        = FIRST_BADLINE-3
@@ -39,6 +40,21 @@ LINES_TO_CRUNCH = 31
 }
 
 START !zone {
+
+    ; select VIC area: $4000 - $7FFF
+    lda CIA2_CONTROL_TIMER_A
+    and #%11111100
+    ora #%00000010
+    sta CIA2_DATA_PORT_A
+
+    ; select screen bank 
+    lda # ((SCREEN % $4000 / $0400) << 3) | ((HIRES % $4000 / $2000) << 2)
+    sta VIC_ADDR_SELECT
+
+    ; init pointers
+    +set16 HIRES, PTR_HIRES
+    +set16 COLOR_RAM, PTR_COLOR
+    +set16 SCREEN, PTR_SCREEN
 
 ;-------------------------------------------------------------------------------
 ;   disable all basic, kernal and irq crap
@@ -107,6 +123,7 @@ START !zone {
     ldx #39
 -
     sta SCREEN + .i*40, x
+    sta HIRES  + .i*40, x
     sta COLOR_RAM + .i*40, x
     ;sta SCREEN1 - 24 + .i*40, x
     dex
@@ -119,6 +136,7 @@ START !zone {
     lda ($ff), y
     lda ($ff, x)
     lda ($ff), y
+    inc HIRES
     sec     ; 2
     +bcs    ; 3
     jmp -
@@ -377,7 +395,6 @@ IRQ !zone {
     sta .load_soft_y+1                      ;  4
                                             ;--> 16
 
-
     ;wait till just before LINE_O + 3 == FIRST_BADLINE
     +wait_loop 63 - 13 - 6 - 16 - 20 - 4
 
@@ -449,7 +466,7 @@ IRQ !zone {
     ;+wait_loop 20
 ;+
     pla
-    and #%10011111
+    and #CONTROL_Y_MASK
     sta VIC_CONTROL_Y
 
 ;-------------------------------------------------------------------------------
@@ -457,6 +474,18 @@ IRQ !zone {
 ;-------------------------------------------------------------------------------
 
     jsr JOY
+
+; test soft char
+    inc VIC_BORDER
+    ;ldx #3
+    ;jsr COPY_SOFTCHARS
+    ldy #0
+    jsr COPY_TILE_ROW_0
+    ldy #1
+    jsr COPY_TILE_ROW_0
+    ldy #2
+    jsr COPY_TILE_ROW_0
+    dec VIC_BORDER
 
     +set_raster_line_8 LINE_0
     +set16 IRQ, VECTOR_IRQ
@@ -478,24 +507,24 @@ INC_SCROLL_PTRS !zone {
     inc PTR_COLOR
 
     ; do PTR_SCREEN and PTR_COLOR overflow, too?
-    bcc .out
+    bne .out
 
     inc PTR_SCREEN + 1
     inc PTR_COLOR + 1
 
     ; is here a wrap-around of the buffers?
     lda PTR_COLOR + 1
-    cmp # >COLOR_RAM + $0400
+    cmp #(>COLOR_RAM) + >($0400)
     bne .out
 
     ; wrap around
     lda # >COLOR_RAM
     sta PTR_COLOR + 1
 
-    lda # > SCREEN
+    lda # >SCREEN
     sta PTR_SCREEN + 1
 
-    lda # > HIRES
+    lda # >HIRES
     sta PTR_HIRES + 1
     rts
 
@@ -524,7 +553,7 @@ COPY_SOFTCHARS !zone {
             dey
         }
 
-        lda SOFTCHARS + .i * $100
+        lda SOFTCHARS + .i * $100, x
         sta (PTR_HIRES), y
     }
 
@@ -532,16 +561,18 @@ COPY_SOFTCHARS !zone {
 
     ; copy over color infos
     lda SOFTCHARS_C, x
-    sta (PTR_COLOR), y
+    lda #0
+    ;sta (PTR_COLOR), y
     lda SOFTCHARS_S, x
-    sta (PTR_SCREEN), y
+    lda #0
+    ;sta (PTR_SCREEN), y
 
     rts
 }
 
 !macro copy_tile_elem .row, .col {
     ; y -> tile index
-    ldx TILES + .col * $400 + .row * $100, y  ; load softchar index
+    ldx TILES + .col * $40 + .row * $0100, y  ; load softchar index
     jsr COPY_SOFTCHARS
     jsr INC_SCROLL_PTRS
 }
@@ -554,17 +585,17 @@ COPY_TILE_ROW_0 !zone {
 
 COPY_TILE_ROW_1
     sty TMP_TILE_INDEX
-    +copy_tile_elem 1, 0
+    +copy_tile_elem 0, 1
     ldy TMP_TILE_INDEX
 
 COPY_TILE_ROW_2
     sty TMP_TILE_INDEX
-    +copy_tile_elem 2, 0
+    +copy_tile_elem 0, 2
     ldy TMP_TILE_INDEX
 
 COPY_TILE_ROW_3
     sty TMP_TILE_INDEX
-    +copy_tile_elem 3, 0
+    +copy_tile_elem 0, 3
     ldy TMP_TILE_INDEX
 
     rts
@@ -584,3 +615,5 @@ EMPTY_INTERRUPT
 
 LOCK
     !by $ff
+
+!source "data.asm"
