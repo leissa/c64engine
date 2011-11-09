@@ -53,6 +53,7 @@ VIC_SPR_EXP_Y   = $D017
 
     ; Bit 7..4: Address bits 11..8 of the screen memory within the 16KB of the VIC
     ; Bit 3..1: Address bits 11..8 of char generator (bit 0 is unused)
+    ; Bit 3:    Bit 8 of Hires-Bitmap (in Bitmapmode)
 VIC_ADDR_SELECT = $D018
 
     ; read:

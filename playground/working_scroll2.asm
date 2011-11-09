@@ -1,8 +1,8 @@
 !to "scroll.prg", cbm   ; output program
+!sl "labels.l"          ; create label file for vice
 !cpu 6510               ; for illegal opcodes
 !convtab scr            ; for conversion to c64 screen codes
 
-;!source "../lib/zero.asm"
 !source "../lib/mem.asm"
 !source "../lib/vic.asm"
 !source "../lib/cia.asm"
@@ -26,18 +26,13 @@ CONTROL_Y_INVALID=%01110000
     ; Bit 4: Multicolormode
     ; Bit 3: 40 cols (on)/38 cols (off)
     ; Bit 2..0: Offset in Pixels starting from the left screen edge
-CONTROL_X        =%00010000
+CONTROL_X        =%00011000
 
 FIRST_BADLINE = $33-3
 LINE_0        = FIRST_BADLINE-3
 LINE_SPLIT    = FIRST_BADLINE-3
 
 LINES_TO_CRUNCH = 31
-
-!macro ntsc_wait {
-    +wait 6
-+
-}
 
 START !zone {
 
@@ -48,13 +43,13 @@ START !zone {
     sta CIA2_DATA_PORT_A
 
     ; select screen bank 
-    lda # ((SCREEN % $4000 / $0400) << 3) | ((HIRES % $4000 / $2000) << 2)
+    lda # ((SCREEN % $4000 / $0400) << 4) | ((HIRES % $4000 / $2000) << 2)
     sta VIC_ADDR_SELECT
 
     ; init pointers
-    +set16 HIRES, PTR_HIRES
+    +set16 HIRES,     PTR_HIRES
     +set16 COLOR_RAM, PTR_COLOR
-    +set16 SCREEN, PTR_SCREEN
+    +set16 SCREEN,    PTR_SCREEN
 
 ;-------------------------------------------------------------------------------
 ;   disable all basic, kernal and irq crap
@@ -116,19 +111,6 @@ START !zone {
         +set 1, VIC_IRQ_CONTROL
     cli
 
-    ; setup screen
-!for .j, 25 {
-!set .i = .j - 1
-    lda #.i+1
-    ldx #39
--
-    sta SCREEN + .i*40, x
-    sta HIRES  + .i*40, x
-    sta COLOR_RAM + .i*40, x
-    ;sta SCREEN1 - 24 + .i*40, x
-    dex
-    bpl -
-}
 -
     ; some 7 cycle garbage instructions
     lda ($ff), y
@@ -137,6 +119,7 @@ START !zone {
     lda ($ff, x)
     lda ($ff), y
     inc HIRES
+    inc SCREEN
     sec     ; 2
     +bcs    ; 3
     jmp -
@@ -153,6 +136,7 @@ START !zone {
     sta VIC_CONTROL_Y                       ;  4
 }                                           ;--> 16
 
+!align 255, 0
 IRQ !zone {
 ;-------------------------------------------------------------------------------
 ;   LINE_0
@@ -170,7 +154,7 @@ IRQ !zone {
     ; save stack state
     tsx                                     ;  2
 
-    +ntsc_wait                              ;  6
+    +wait 6                                 ;  6 TODO
     ; begin raster stabilization
     cli                                     ;  2
                                             ;--> 51
@@ -215,8 +199,7 @@ IRQ !zone {
     sta VIC_CONTROL_X                       ;  4
                                             ;--> 12
 
-    +ntsc_wait                              ;  6
-    +wait 63-11-14-11-12-6-6
+    +wait 63-11-14-11-12-6
 
     ; wobble check
     lda #LINE_0 + 2                         ;  2
@@ -261,9 +244,7 @@ IRQ !zone {
     beq +                                   ;  2 (in this loop)
     +inc_vic_control_y                      ; 16
                                             ;--> 20
-    +ntsc_wait                              ;  6
-
-    +wait_loop 63 - 20 -6 - 2 - 3
+    +wait_loop 63 - 20 - 2 - 3
     dex                                     ;  2
     jmp .fld_loop                           ;  3
 +
@@ -275,9 +256,8 @@ IRQ !zone {
     beq +                                   ;  2 (in this loop)
     +inc_vic_control_y                      ; 16
                                             ;--> 20
-    +ntsc_wait                              ;  6
 
-    +wait_loop 63 - 20 -6 - 2 - 3
+    +wait_loop 63 - 20 - 2 - 3
     dex                                     ;  2
     jmp .crunch_loop                        ;  3
 +
@@ -289,7 +269,7 @@ IRQ !zone {
 ;-------------------------------------------------------------------------------
     ; make VSP line not a bad line
     inc VIC_CONTROL_Y
-    +wait 4
+    +wait 5
     ; crunch loop
     sec
     ; introduce an extra cycle if 39 - HARD_X is odd
@@ -322,6 +302,10 @@ IRQ !zone {
     pla
     and #CONTROL_Y_MASK
     sta VIC_CONTROL_Y
+
+!if (>IRQ) != (>*) {
+    !warn "critical irq code in different pages"
+}
 
 ;-------------------------------------------------------------------------------
 ; clean up
@@ -415,11 +399,9 @@ COPY_SOFTCHARS !zone {
 
     ; copy over color infos
     lda SOFTCHARS_C, x
-    lda #0
-    ;sta (PTR_COLOR), y
+    sta (PTR_COLOR), y
     lda SOFTCHARS_S, x
-    lda #0
-    ;sta (PTR_SCREEN), y
+    sta (PTR_SCREEN), y
 
     rts
 }
