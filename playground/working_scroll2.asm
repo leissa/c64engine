@@ -120,6 +120,9 @@ START !zone {
     lda ($ff), y
     inc HIRES
     inc SCREEN
+!for .i, 8 {
+    inc SCREEN + $0400 - .i
+}
     sec     ; 2
     +bcs    ; 3
     jmp -
@@ -313,10 +316,7 @@ IRQ !zone {
 
     jsr JOY
 
-; test soft char
     inc VIC_BORDER
-    ;ldx #3
-    ;jsr COPY_SOFTCHARS
     ldy #0
     jsr COPY_TILE_ROW_0
     ldy #1
