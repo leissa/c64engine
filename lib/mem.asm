@@ -15,6 +15,7 @@ PTR_COLOR           = $08;-$09
 PTR_SCREEN          = $0a;-$0b
 
 TMP_TILE_INDEX      = $0c
+TMP_SOFTCHAR_INDEX  = $0d
 
 FRAME_COUNTER       = $06
 STRIP0_IN_FRAME     = $07
@@ -31,6 +32,8 @@ SPRITE_STRIP_Y      = $18
 SPRITE_STRIP_COLOR  = $20
 SPRITE_STRIP_FRAME  = $28
 MULTI_INDEX_TABLE   = $30
+PTR_TILE = $40
+PTR_LEVEL = $42
 
 ; is indexed by 
 ; lda FRAME_COUNTER_TABLE, x

@@ -317,18 +317,53 @@ IRQ !zone {
     jsr JOY
 
     inc VIC_BORDER
+
+    +set16 $c000, PTR_LEVEL
+    +set16 $b000, PTR_TILE
+
     ldy #0
-    jsr COPY_TILE_ROW_0
-    ldy #1
-    jsr COPY_TILE_ROW_0
-    ldy #2
-    jsr COPY_TILE_ROW_0
+    jsr DO_IT
+    jsr DO_IT
+    jsr DO_IT
     dec VIC_BORDER
 
     +set_raster_line_8 LINE_0
     +set16 IRQ, VECTOR_IRQ
 
     +ack_restore_rti
+}
+
+DO_IT !zone {
+    ; y -> col position
+    ldy #0
+    lda (PTR_LEVEL), y      ; load tile index
+
+    tay
+    sty TMP_TILE_INDEX
+    lda (PTR_TILE), y       ; load soft char index
+    jsr COPY_SOFTCHARS
+    jsr INC_SCROLL_PTRS
+
+    inc TMP_TILE_INDEX
+    ldy TMP_TILE_INDEX
+    lda (PTR_TILE), y       ; load soft char index
+    jsr COPY_SOFTCHARS
+    jsr INC_SCROLL_PTRS
+
+    inc TMP_TILE_INDEX
+    ldy TMP_TILE_INDEX
+    lda (PTR_TILE), y       ; load soft char index
+    jsr COPY_SOFTCHARS
+    jsr INC_SCROLL_PTRS
+
+
+    inc TMP_TILE_INDEX
+    ldy TMP_TILE_INDEX
+    lda (PTR_TILE), y       ; load soft char index
+    jsr COPY_SOFTCHARS
+    jsr INC_SCROLL_PTRS
+
+    rts
 }
 
 INC_SCROLL_PTRS !zone {
@@ -377,7 +412,8 @@ INC_SCROLL_PTRS !zone {
 }
 
 COPY_SOFTCHARS !zone {
-    ; x -> softchar index
+    ; a -> softchar index
+    tax
     
     ; copy over soft char line by line
     ; y is used to index the row
@@ -402,37 +438,6 @@ COPY_SOFTCHARS !zone {
     sta (PTR_COLOR), y
     lda SOFTCHARS_S, x
     sta (PTR_SCREEN), y
-
-    rts
-}
-
-!macro copy_tile_elem .row, .col {
-    ; y -> tile index
-    ldx TILES + .col * $40 + .row * $0100, y  ; load softchar index
-    jsr COPY_SOFTCHARS
-    jsr INC_SCROLL_PTRS
-}
-
-    ; y -> tile index
-COPY_TILE_ROW_0 !zone {
-    sty TMP_TILE_INDEX
-    +copy_tile_elem 0, 0
-    ldy TMP_TILE_INDEX
-
-COPY_TILE_ROW_1
-    sty TMP_TILE_INDEX
-    +copy_tile_elem 0, 1
-    ldy TMP_TILE_INDEX
-
-COPY_TILE_ROW_2
-    sty TMP_TILE_INDEX
-    +copy_tile_elem 0, 2
-    ldy TMP_TILE_INDEX
-
-COPY_TILE_ROW_3
-    sty TMP_TILE_INDEX
-    +copy_tile_elem 0, 3
-    ldy TMP_TILE_INDEX
 
     rts
 }
