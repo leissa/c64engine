@@ -1,0 +1,150 @@
+!to "scroll.prg", cbm   ; output program
+!sl "labels.l"          ; create label file for vice
+!cpu 6510               ; for illegal opcodes
+!convtab scr            ; for conversion to c64 screen codes
+
+!source "../lib/mem.acme"
+!source "../lib/vic.acme"
+!source "../lib/cia.acme"
+!source "../lib/std.acme"
+
+SPRITE_FRAME_BASE = 2040
+
++create_basic_starter $0c00
+*=$0c00; = 2304
+
+    ; Bit 7: Bit 8 of $D012        
+    ; Bit 6: Extended Color Modus  
+    ; Bit 5: Bitmapmode      
+    ; Bit 4: Screen output enabled?
+    ; Bit 3: 25 rows (24 otherwise)
+CONTROL_Y        =%00110000
+CONTROL_Y_MASK   =%10111111
+CONTROL_Y_INVALID=%01110000
+
+    ; Bit 7..5: unused
+    ; Bit 4: Multicolormode
+    ; Bit 3: 40 cols (on)/38 cols (off)
+    ; Bit 2..0: Offset in Pixels starting from the left screen edge
+CONTROL_X        =%00011000
+
+FIRST_BADLINE = $33-3
+LINE_0        = FIRST_BADLINE-3
+LINE_SPLIT    = FIRST_BADLINE-3
+
+LINES_TO_CRUNCH = 31
+
+START !zone {
+
+    ; select VIC area: $4000 - $7FFF
+    lda CIA2_CONTROL_TIMER_A
+    and #%11111100
+    ora #%00000010
+    sta CIA2_DATA_PORT_A
+
+    ; select screen bank 
+    lda # ((SCREEN % $4000 / $0400) << 4) | ((HIRES % $4000 / $2000) << 2)
+    sta VIC_ADDR_SELECT
+
+    ; init pointers
+    +set16 HIRES,     PTR_HIRES
+    +set16 COLOR_RAM, PTR_COLOR
+    +set16 SCREEN,    PTR_SCREEN
+
+;-------------------------------------------------------------------------------
+;   disable all basic, kernal and irq crap
+;-------------------------------------------------------------------------------
+    ; disable IRQs
+    sei
+
+    ; disable ROMs
+    +set RAM_ROM_ALL_RAM_WITHIO, RAM_ROM_SELECTION
+
+    ; ack all interrupts which might have happend
+    +set $ff, VIC_IRQ_STATUS
+    lda CIA1_INTERRUPT_CONTROL
+    lda CIA2_INTERRUPT_CONTROL
+
+    ; set empty interrupt routines
+    +set16 EMPTY_INTERRUPT, VECTOR_NMI
+    +set16 EMPTY_INTERRUPT, VECTOR_RESET
+    +set16 EMPTY_INTERRUPT, VECTOR_IRQ
+
+    ; disable_timer_interrupts
+    lda #%01111111
+    sta CIA1_INTERRUPT_CONTROL
+    sta CIA2_INTERRUPT_CONTROL
+
+    ; set timer A to 0
+    sta CIA2_TIMER_A_LO
+    sta CIA2_TIMER_A_HI
+
+    ; trigger timer A interrupt
+    +set %10000001, CIA2_INTERRUPT_CONTROL
+    +set %00000001, CIA2_CONTROL_TIMER_A
+
+    ; reset stack
+    ldx #$ff
+    txs
+
+    ; just clear this flag and never ever touch this again
+    cld
+
+    ; enable IRQs
+    cli
+
+    ; wait till the timer interrupt has happend
+-
+    bit LOCK
+    bne -
+
+    ; -> NMI is disabled since we will never ever ack it again
+    ; -> zero page completely free on this spot except for the special regs $00 and $01
+
+;-------------------------------------------------------------------------------
+;   setup raster irq
+;-------------------------------------------------------------------------------
+
+    sei
+        +set16 IRQ, VECTOR_IRQ
+        +set_raster_line_9 LINE_0
+        +set 1, VIC_IRQ_CONTROL
+    cli
+
+-
+    ; some 7 cycle garbage instructions
+    lda ($ff), y
+    lda ($ff, x)
+    lda ($ff), y
+    lda ($ff, x)
+    lda ($ff), y
+    inc HIRES
+    inc SCREEN
+!for .i, 8 {
+    inc SCREEN + $0400 - .i
+}
+    sec     ; 2
+    +bcs    ; 3
+    jmp -
+}
+
+!source "joystick.acme"
+!source "raster.acme"
+!source "chars.acme"
+
+SOFT_X   !by 0
+SOFT_Y   !by 0
+HARD_X   !by 0
+HARD_Y   !by 0
+SCREEN_Y !by 0
+TOTAL_Y  !by 0
+NTSC     !by 0
+
+EMPTY_INTERRUPT
+    inc LOCK
+    rti
+
+LOCK
+    !by $ff
+
+!source "data.acme"

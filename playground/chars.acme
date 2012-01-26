@@ -1,0 +1,108 @@
+DO_IT !zone {
+    ; y -> col position
+    lda (PTR_LEVEL), y      ; load tile index
+
+    tay
+    sty TMP_TILE_INDEX
+    lda (PTR_TILE), y       ; load soft char index
+    jsr COPY_SOFTCHARS
+    jsr INC_SCROLL_PTRS
+
+    inc TMP_TILE_INDEX
+    ldy TMP_TILE_INDEX
+    lda (PTR_TILE), y       ; load soft char index
+    jsr COPY_SOFTCHARS
+    jsr INC_SCROLL_PTRS
+
+    inc TMP_TILE_INDEX
+    ldy TMP_TILE_INDEX
+    lda (PTR_TILE), y       ; load soft char index
+    jsr COPY_SOFTCHARS
+    jsr INC_SCROLL_PTRS
+
+
+    inc TMP_TILE_INDEX
+    ldy TMP_TILE_INDEX
+    lda (PTR_TILE), y       ; load soft char index
+    jsr COPY_SOFTCHARS
+    jsr INC_SCROLL_PTRS
+
+    rts
+}
+
+INC_SCROLL_PTRS !zone {
+    lda PTR_HIRES
+    clc
+    adc #8
+    sta PTR_HIRES
+    bcc .out_safely_inc_others  
+
+    inc PTR_HIRES + 1   ; add carry to high byte
+
+    ; PTR_SCREEN and PTR_COLOR _may_ overflow
+    inc PTR_SCREEN
+    inc PTR_COLOR
+
+    ; do PTR_SCREEN and PTR_COLOR overflow, too?
+    bne .out
+
+    inc PTR_SCREEN + 1
+    inc PTR_COLOR + 1
+
+    ; is here a wrap-around of the buffers?
+    lda PTR_COLOR + 1
+    cmp #(>COLOR_RAM) + >($0400)
+    bne .out
+
+    ; wrap around
+    lda # >COLOR_RAM
+    sta PTR_COLOR + 1
+
+    lda # >SCREEN
+    sta PTR_SCREEN + 1
+
+    lda # >HIRES
+    sta PTR_HIRES + 1
+    rts
+
+.out_safely_inc_others
+
+    ; PTR_SCREEN and PTR_COLOR _cannot_ overflow
+    inc PTR_SCREEN
+    inc PTR_COLOR
+
+.out
+    rts
+}
+
+COPY_SOFTCHARS !zone {
+    ; a -> softchar index
+    tax
+    
+    ; copy over soft char line by line
+    ; y is used to index the row
+
+    !for .j, 8 {
+    !set .i = .j - 1
+        
+        !if .i = 0 {
+            ldy #7
+        } else {
+            dey
+        }
+
+        lda SOFTCHARS + .i * $100, x
+        sta (PTR_HIRES), y
+    }
+
+    ; y = 0 here
+
+    ; copy over color infos
+    lda SOFTCHARS_C, x
+    sta (PTR_COLOR), y
+    lda SOFTCHARS_S, x
+    sta (PTR_SCREEN), y
+
+    rts
+}
+
