@@ -1,0 +1,20 @@
+!to "off.prg", cbm   ; output program
+!sl "labels.l"          ; create label file for vice
+!cpu 6510               ; for illegal opcodes
+!convtab scr            ; for conversion to c64 screen codes
+
+!source "../lib/vic.acme"
+!source "../lib/std.acme"
+
+
++create_basic_starter $0900
+
+*=$0900
+
+
+    lda VIC_CONTROL_Y
+    and #%11101111
+    sta VIC_CONTROL_Y
+-
+    inc VIC_BORDER
+    jmp -
