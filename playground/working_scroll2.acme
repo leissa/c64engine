@@ -118,8 +118,6 @@ START !zone {
     lda ($ff), y
     lda ($ff, x)
     lda ($ff), y
-    inc HIRES
-    inc SCREEN
 !for .i, 8 {
     inc SCREEN + $0400 - .i
 }

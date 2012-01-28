@@ -30,7 +30,7 @@ COPY_SOFTCHARS !zone {
     rts
 }
 
-!macro inc_wrap_around {
+!macro inc_wrap_around_rts {
     ; is here a wrap-around of the buffers?
     lda PTR_COLOR + 1
     cmp # >(COLOR_RAM + $0400)
@@ -49,20 +49,20 @@ COPY_SOFTCHARS !zone {
     rts
 }
 
-!macro dec_wrap_around {
+!macro dec_wrap_around_rts {
     ; is here a wrap-around of the buffers?
     lda PTR_COLOR + 1
-    cmp #(>COLOR_RAM) - 1
-    bne +
+    cmp # >(COLOR_RAM - 1)
+    ;bne +
 
     ; wrap around
-    lda # >(HIRES + $1fff)
+    lda # >(HIRES + $2000 - 1)
     sta PTR_HIRES + 1
 
-    lda # >(SCREEN + $03ff)
+    lda # >(SCREEN + $0400 - 1)
     sta PTR_SCREEN + 1
 
-    lda # >(COLOR_RAM + $03ff)
+    lda # >(COLOR_RAM + $0400 - 1)
     sta PTR_COLOR + 1
 +
     rts
@@ -91,7 +91,7 @@ CHAR_INC_SCROLL_PTRS !zone {
     inc PTR_SCREEN + 1
     inc PTR_COLOR + 1
 
-    +inc_wrap_around
+    +inc_wrap_around_rts
 
 .out_safely_inc_others
 
@@ -129,12 +129,12 @@ LINE_INC_SCROLL_PTRS !zone {
     inc PTR_SCREEN + 1
     inc PTR_COLOR + 1
 
-    +inc_wrap_around
+    +inc_wrap_around_rts
 
 .out_safely_inc_others
 
     ; PTR_SCREEN and PTR_COLOR _cannot_ overflow
-    lda #40
+    lda #40-3
     adc PTR_COLOR   ; carry _is_ clear
     adc PTR_SCREEN  ; dito
 
@@ -151,28 +151,31 @@ CHAR_DEC_SCROLL_PTRS !zone {
     sec
     sbc #8
     sta PTR_HIRES
-    ; TODO from here
-    bcc .out_safely_inc_others  
 
-    inc PTR_HIRES + 1   ; add carry to high byte
+    bcs .out_safely_dec_others  
 
-    ; PTR_SCREEN and PTR_COLOR _may_ overflow
-    inc PTR_SCREEN
-    inc PTR_COLOR
+    dec PTR_HIRES + 1   ; sub borrow from high byte
+-
+    ; PTR_SCREEN and PTR_COLOR _may_ underflow
+    dec PTR_SCREEN
+    dec PTR_COLOR
 
-    ; do PTR_SCREEN and PTR_COLOR overflow, too?
+    ; do PTR_SCREEN and PTR_COLOR underflow, too?
     bne .out
+    inc HIRES + 40*8*10
+    inc HIRES + 40*8*15
 
-    inc PTR_SCREEN + 1
-    inc PTR_COLOR + 1
+    dec PTR_SCREEN + 1
+    dec PTR_COLOR + 1
 
-    +inc_wrap_around
+    +dec_wrap_around_rts
 
-.out_safely_inc_others
+.out_safely_dec_others
+    jmp -
 
-    ; PTR_SCREEN and PTR_COLOR _cannot_ overflow
-    inc PTR_SCREEN
-    inc PTR_COLOR
+    ; PTR_SCREEN and PTR_COLOR _cannot_ underflow
+    dec PTR_SCREEN
+    dec PTR_COLOR
 
 .out
     rts
@@ -183,35 +186,35 @@ CHAR_DEC_SCROLL_PTRS !zone {
 ; destroys: A
 ; preservers: X, Y
 LINE_DEC_SCROLL_PTRS !zone {
-    inc PTR_HIRES + 1   ; + 256
+    dec PTR_HIRES + 1   ; - 256
     lda PTR_HIRES
-    clc
-    adc #64-3*8
-    sta PTR_HIRES
-    bcc .out_safely_inc_others  
-
-    inc PTR_HIRES + 1   ; add carry to high byte
-
-    ; PTR_SCREEN and PTR_COLOR _may_ overflow
-    lda #39-3
-    adc PTR_SCREEN      ; carry still set, so add 40-3
     sec
-    adc PTR_COLOR       ; also add 40-3
+    sbc #64-3*8
+    sta PTR_HIRES
+    bcs .out_safely_dec_others  
 
-    ; do PTR_SCREEN and PTR_COLOR overflow, too?
+    dec PTR_HIRES + 1   ; sub borrow from high byte
+
+    ; PTR_SCREEN and PTR_COLOR _may_ underflow
+    lda #39-3
+    sbc PTR_SCREEN      ; carry still clear, so sub 40-3
+    clc
+    sbc PTR_COLOR       ; also add 40-3
+
+    ; do PTR_SCREEN and PTR_COLOR underflow, too?
     bcc .out
 
-    inc PTR_SCREEN + 1
-    inc PTR_COLOR + 1
+    dec PTR_SCREEN + 1
+    dec PTR_COLOR + 1
 
-    +inc_wrap_around
+    +dec_wrap_around_rts
 
-.out_safely_inc_others
+.out_safely_dec_others
 
-    ; PTR_SCREEN and PTR_COLOR _cannot_ overflow
-    lda #40
-    adc PTR_COLOR   ; carry _is_ clear
-    adc PTR_SCREEN  ; dito
+    ; PTR_SCREEN and PTR_COLOR _cannot_ underflow
+    lda #40-3
+    sbc PTR_COLOR   ; carry _is_ clear
+    sbc PTR_SCREEN  ; dito
 
 .out
     rts
@@ -225,25 +228,29 @@ DO_IT !zone {
     sty TMP_TILE_INDEX
     lda (PTR_TILE), y       ; load soft char index
     jsr COPY_SOFTCHARS
-    jsr CHAR_INC_SCROLL_PTRS
+    jsr CHAR_DEC_SCROLL_PTRS
+    ;jsr CHAR_INC_SCROLL_PTRS
 
     inc TMP_TILE_INDEX
     ldy TMP_TILE_INDEX
     lda (PTR_TILE), y       ; load soft char index
     jsr COPY_SOFTCHARS
-    jsr CHAR_INC_SCROLL_PTRS
+    jsr CHAR_DEC_SCROLL_PTRS
+    ;jsr CHAR_INC_SCROLL_PTRS
 
     inc TMP_TILE_INDEX
     ldy TMP_TILE_INDEX
     lda (PTR_TILE), y       ; load soft char index
     jsr COPY_SOFTCHARS
-    jsr CHAR_INC_SCROLL_PTRS
+    jsr CHAR_DEC_SCROLL_PTRS
+    ;jsr CHAR_INC_SCROLL_PTRS
 
     inc TMP_TILE_INDEX
     ldy TMP_TILE_INDEX
     lda (PTR_TILE), y       ; load soft char index
     jsr COPY_SOFTCHARS
-    jsr LINE_INC_SCROLL_PTRS
+    jsr LINE_DEC_SCROLL_PTRS
+    ;jsr CHAR_INC_SCROLL_PTRS
 
     rts
 }

@@ -195,6 +195,8 @@ IRQ !zone {
     jsr DO_IT
     ldy #2
     jsr DO_IT
+    ldy #3
+    jsr DO_IT
     dec VIC_BORDER
 
     +set_raster_line_8 LINE_0
