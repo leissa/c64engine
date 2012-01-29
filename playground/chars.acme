@@ -1,8 +1,6 @@
 ; copy over softchar (index in A) to (PTR_HIRES), (PTR_COLOR), (PTR_SCREEN)
 ; destroys: A, X, Y
 COPY_SOFTCHARS !zone {
-    tax
-    
     ; copy over soft char line by line
     ; y is used to index the row
 
@@ -103,25 +101,79 @@ CHAR_INC_SCROLL_PTRS !zone {
     rts
 }
 
-; adjust PTR_SCREEN, PTR_COLOR and PTR_SCREEN by one line position
-; all necessary wrap-arounds are properly considered
-; destroys: A
-; preservers: X, Y
+;ADD_SCROLL_PTRS !zone {
+;    tax
+;    clc
+;    adc PTR_SCREEN
+;    sta PTR_SCREEN
+;    txa
+;    clc
+;    adc PTR_COLOR
+;    sta PTR_COLOR
+;    bcc +
+;    inc PTR_SCREEN + 1
+;    inc PTR_COLOR  + 1
+;+
+;    txa
+;    cmp #32
+;    bcc +               ; branch if A < 32 
+;    inc PTR_HIRES + 1
+;    ; add to low byte: A * 8 - 256 = 8 * (A - 32)
+;    sec
+;    sbc #32             ; carry is clear
+;+
+;    asl
+;    asl
+;    asl
+;    clc
+;    adc PTR_HIRES
+;    sta PTR_HIRES
+;    bcc +
+;    inc PTR_HIRES + 1
+;+
+;    ; is here a wrap-around of the buffers?
+;    lda PTR_COLOR + 1
+;    cmp # >(COLOR_RAM + $0400)
+;    bne +
+;
+;    ; wrap around
+;    lda # >HIRES
+;    sta PTR_HIRES + 1
+;
+;    lda # >SCREEN
+;    sta PTR_SCREEN + 1
+;
+;    lda # >COLOR_RAM
+;    sta PTR_COLOR + 1
+;+
+;    rts
+;}
+
 LINE_INC_SCROLL_PTRS !zone {
+    tax
     inc PTR_HIRES + 1   ; + 256
-    lda PTR_HIRES
-    clc
-    adc #64-3*8
-    sta PTR_HIRES
-    bcc .out_safely_inc_others  
-
-    inc PTR_HIRES + 1   ; add carry to high byte
-
-    ; PTR_SCREEN and PTR_COLOR _may_ overflow
-    lda #39-3
-    adc PTR_SCREEN      ; carry still set, so add 40-3
+    ; add to low byte: A * 8 - 256 = 8 * (A - 32)
     sec
-    adc PTR_COLOR       ; also add 40-3
+    sbc #32
++
+    asl
+    asl
+    asl
+    clc
+    adc PTR_HIRES
+    sta PTR_HIRES
+    bcc +
+    inc PTR_HIRES + 1   ; add carry to high byte
++
+    ; PTR_SCREEN and PTR_COLOR _may_ overflow
+    txa
+    clc
+    adc PTR_SCREEN 
+    sta PTR_SCREEN
+    txa
+    clc
+    adc PTR_COLOR
+    sta PTR_COLOR
 
     ; do PTR_SCREEN and PTR_COLOR overflow, too?
     bcc .out
@@ -134,13 +186,102 @@ LINE_INC_SCROLL_PTRS !zone {
 .out_safely_inc_others
 
     ; PTR_SCREEN and PTR_COLOR _cannot_ overflow
-    lda #40-3
+    txa
     adc PTR_COLOR   ; carry _is_ clear
     adc PTR_SCREEN  ; dito
 
 .out
     rts
 }
+
+; adjust PTR_SCREEN, PTR_COLOR and PTR_SCREEN by one line position
+; all necessary wrap-arounds are properly considered
+; destroys: A, X
+; preservers: Y
+;ADD_SCROLL_PTRS !zone {
+;    tax
+;    clc
+;    adc PTR_SCREEN
+;    sta PTR_SCREEN
+;    txa
+;    clc
+;    adc PTR_COLOR
+;    sta PTR_COLOR
+;    bcc +
+;    inc PTR_SCREEN + 1
+;    inc PTR_COLOR  + 1
+;+
+;    txa
+;    cmp #32
+;    bcc +               ; branch if A < 32 
+;    inc PTR_HIRES + 1
+;    ; add to low byte: A * 8 - 256 = 8 * (A - 32)
+;    sec
+;    sbc #32             ; carry is clear
+;+
+;    asl
+;    asl
+;    asl
+;    clc
+;    adc PTR_HIRES
+;    sta PTR_HIRES
+;    bcc +
+;    inc PTR_HIRES + 1
+;+
+;    ; is here a wrap-around of the buffers?
+;    lda PTR_COLOR + 1
+;    cmp # >(COLOR_RAM + $0400)
+;    bne +
+;
+;    ; wrap around
+;    lda # >HIRES
+;    sta PTR_HIRES + 1
+;
+;    lda # >SCREEN
+;    sta PTR_SCREEN + 1
+;
+;    lda # >COLOR_RAM
+;    sta PTR_COLOR + 1
+;+
+;    rts
+;}
+
+;LINE_INC_SCROLL_PTRS !zone {
+;    inc PTR_HIRES + 1   ; + 256
+;    lda PTR_HIRES
+;    clc
+;    adc #64-3*8
+;    sta PTR_HIRES
+;    bcc .out_safely_inc_others  
+;
+;    inc PTR_HIRES + 1   ; add carry to high byte
+;
+;    ; PTR_SCREEN and PTR_COLOR _may_ overflow
+;    lda #39-3
+;    adc PTR_SCREEN      ; carry still set, so add 40-3
+;    sta PTR_SCREEN
+;    sec
+;    adc PTR_COLOR       ; also add 40-3
+;    sta PTR_COLOR
+;
+;    ; do PTR_SCREEN and PTR_COLOR overflow, too?
+;    bcc .out
+;
+;    inc PTR_SCREEN + 1
+;    inc PTR_COLOR + 1
+;
+;    +inc_wrap_around_rts
+;
+;.out_safely_inc_others
+;
+;    ; PTR_SCREEN and PTR_COLOR _cannot_ overflow
+;    lda #40-3
+;    adc PTR_COLOR   ; carry _is_ clear
+;    adc PTR_SCREEN  ; dito
+;
+;.out
+;    rts
+;}
 
 ; adjust PTR_SCREEN, PTR_COLOR and PTR_SCREEN by one char postion
 ; all necessary wrap-arounds are properly considered
@@ -198,8 +339,10 @@ LINE_DEC_SCROLL_PTRS !zone {
     ; PTR_SCREEN and PTR_COLOR _may_ underflow
     lda #39-3
     sbc PTR_SCREEN      ; carry still clear, so sub 40-3
+    sta PTR_SCREEN
     clc
     sbc PTR_COLOR       ; also add 40-3
+    STA PTR_COLOR
 
     ; do PTR_SCREEN and PTR_COLOR underflow, too?
     bcc .out
@@ -226,31 +369,29 @@ DO_IT !zone {
 
     tay
     sty TMP_TILE_INDEX
-    lda (PTR_TILE), y       ; load soft char index
+    lax (PTR_TILE), y       ; load soft char index
     jsr COPY_SOFTCHARS
-    jsr CHAR_DEC_SCROLL_PTRS
-    ;jsr CHAR_INC_SCROLL_PTRS
+    jsr CHAR_INC_SCROLL_PTRS
 
     inc TMP_TILE_INDEX
     ldy TMP_TILE_INDEX
-    lda (PTR_TILE), y       ; load soft char index
+    lax (PTR_TILE), y       ; load soft char index
     jsr COPY_SOFTCHARS
-    jsr CHAR_DEC_SCROLL_PTRS
-    ;jsr CHAR_INC_SCROLL_PTRS
+    jsr CHAR_INC_SCROLL_PTRS
 
     inc TMP_TILE_INDEX
     ldy TMP_TILE_INDEX
-    lda (PTR_TILE), y       ; load soft char index
+    lax (PTR_TILE), y       ; load soft char index
     jsr COPY_SOFTCHARS
-    jsr CHAR_DEC_SCROLL_PTRS
-    ;jsr CHAR_INC_SCROLL_PTRS
+    jsr CHAR_INC_SCROLL_PTRS
 
     inc TMP_TILE_INDEX
     ldy TMP_TILE_INDEX
-    lda (PTR_TILE), y       ; load soft char index
+    lax (PTR_TILE), y       ; load soft char index
     jsr COPY_SOFTCHARS
-    jsr LINE_DEC_SCROLL_PTRS
-    ;jsr CHAR_INC_SCROLL_PTRS
+    ;jsr LINE_DEC_SCROLL_PTRS
+    lda #37
+    jsr LINE_INC_SCROLL_PTRS
 
     rts
 }
