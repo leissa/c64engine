@@ -47,9 +47,9 @@ START !zone {
     sta VIC_ADDR_SELECT
 
     ; init pointers
-    +set16 HIRES,     PTR_HIRES
-    +set16 COLOR_RAM, PTR_COLOR
-    +set16 SCREEN,    PTR_SCREEN
+    +set16 HIRES + $800,     PTR_HIRES
+    +set16 COLOR_RAM + $100, PTR_COLOR
+    +set16 SCREEN + $100,    PTR_SCREEN
 
 ;-------------------------------------------------------------------------------
 ;   disable all basic, kernal and irq crap
