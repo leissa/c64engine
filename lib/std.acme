@@ -46,6 +46,76 @@
 }
 
 ;-------------------------------------------------------------------------------
+; convenience branch pseudo opcodes
+;-------------------------------------------------------------------------------
+
+;
+; borrow
+;
+
+; branch if borrow clear
+!macro bbc .l {
+    bcs .l
+}
+
+; branch if borrow set
+!macro bbs .l {
+    bcc .l
+}
+
+;
+; unsigned
+;
+
+; branch if below
+!macro bb .l {
+    bcc .l
+}
+
+; branch if below or equal
+!macro bbe .l {
+    beq .l
+    bcc .l
+}
+
+; branch if above
+!macro ba .l {
+    bne .l
+    bcs .l
+}
+
+; branch if above or equal
+!macro bae .l {
+    bcs .l
+}
+
+;
+; signed
+;
+
+; branch if less
+!macro bl .l {
+    bmi .l
+}
+
+; branch if less or equal
+!macro bbe .l {
+    beq .l
+    bmi .l
+}
+
+; branch if greater
+!macro bg .l {
+    bne .l
+    bpl .l
+}
+
+; branch if greater or equal
+!macro bge .l {
+    bpl .l
+}
+
+;-------------------------------------------------------------------------------
 ; skip jumps
 ;-------------------------------------------------------------------------------
 
