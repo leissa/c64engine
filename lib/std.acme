@@ -99,7 +99,7 @@
 }
 
 ; branch if less or equal
-!macro bbe .l {
+!macro ble .l {
     beq .l
     bmi .l
 }
@@ -401,3 +401,9 @@ BPL_OPCODE = $10
 BMI_OPCODE = $30
 BCS_OPCODE = $b0
 BCC_OPCODE = $90
+
+!macro rsub .val {
+    eor #$ff
+    sec
+    adc .val
+}
