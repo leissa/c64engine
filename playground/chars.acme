@@ -145,7 +145,7 @@ DEC_SCROLL_PTRS !zone {
     sec
     sbc #8
     sta PTR_HIRES
-    bcs .out_safely_dec_others  
+    +bbc .out_safely_dec_others  
 
     dec PTR_HIRES + 1   ; sub borrow from high byte
 
@@ -155,7 +155,7 @@ DEC_SCROLL_PTRS !zone {
     sbc #0              ; dec A (carry clear)
     sta PTR_COLOR
     ; do PTR_SCREEN and PTR_COLOR underflow, too?
-    bcs .out
+    +bbc .out
 
     dec PTR_SCREEN + 1
     dec PTR_COLOR + 1
@@ -185,17 +185,13 @@ SUB_SCROLL_PTRS !zone {
     asl
     asl
     asl
-    eor #$ff
-    sec
-    adc PTR_HIRES
+    +rsub PTR_HIRES
     sta PTR_HIRES
-    bcs +
+    +bbc +
     dec PTR_HIRES + 1   ; sub borrow from high byte
 +
     txa
-    eor #$ff
-    sec
-    adc PTR_SCREEN      ; carry still set
+    +rsub PTR_SCREEN
     sta PTR_SCREEN
     txa
     eor #$ff
@@ -204,7 +200,7 @@ SUB_SCROLL_PTRS !zone {
     sta PTR_COLOR
 
     ; do PTR_SCREEN and PTR_COLOR underflow, too?
-    bcs .out
+    +bbc .out
 
     dec PTR_SCREEN + 1
     dec PTR_COLOR + 1
