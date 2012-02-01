@@ -1,0 +1,39 @@
+
+
+
+
+3 - 5
+
+
+  00000011
+  00000101
+  --------
+1 11111110 -> c = 0
+
+
+  00000101
+  11111010
+  11111011 251
+  00000011   3
+  --------
+  11111110 -> c = 0
+
+
+5 - 3
+
+  00000011
+  11111100
+  11111101
+  00000101
+  --------
+1 00000010 -> c = 1
+
+
+right:
+    dec x -> dec HARD_X (inc HARD_Y)
+left:
+    inc x -> inc HARD_X (dec HARD_Y)
+up:
+    dec y -> dec HARD_Y (inc SCREEN_Y)
+down:
+    inc y -> inc HARD_Y (dec SCREEN_Y)

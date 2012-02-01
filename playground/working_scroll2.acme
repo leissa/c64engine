@@ -18,9 +18,9 @@ SPRITE_FRAME_BASE = 2040
     ; Bit 5: Bitmapmode      
     ; Bit 4: Screen output enabled?
     ; Bit 3: 25 rows (24 otherwise)
-CONTROL_Y        =%00110000
+CONTROL_Y        =%00111000
 CONTROL_Y_MASK   =%10111111
-CONTROL_Y_INVALID=%01110000
+CONTROL_Y_INVALID=%01111000
 
     ; Bit 7..5: unused
     ; Bit 4: Multicolormode
@@ -32,7 +32,7 @@ FIRST_BADLINE = $33-3
 LINE_0        = FIRST_BADLINE-3
 LINE_SPLIT    = FIRST_BADLINE-3
 
-LINES_TO_CRUNCH = 31
+LINES_TO_CRUNCH = 30
 
 START !zone {
 
@@ -121,22 +121,29 @@ START !zone {
 !for .i, 8 {
     inc SCREEN + $0400 - .i
 }
+
     sec     ; 2
     +bcs    ; 3
     jmp -
 }
 
+!source "scroll.acme"
 !source "joystick.acme"
 !source "raster.acme"
 !source "chars.acme"
 
 SOFT_X   !by 0
+;SOFT_Y   !by 7
 SOFT_Y   !by 0
 HARD_X   !by 0
+;HARD_Y   !by 24
 HARD_Y   !by 0
 SCREEN_Y !by 0
 TOTAL_Y  !by 0
-NTSC     !by 0
+TILE_X   !by 0
+TILE_Y   !by 0
+TILE_COL !by 0
+TILE_ROW !by 0
 
 EMPTY_INTERRUPT
     inc LOCK

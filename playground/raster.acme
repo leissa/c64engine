@@ -84,7 +84,7 @@ IRQ !zone {
 ;-------------------------------------------------------------------------------
 
     ; wobble check from above               ;  3
-    lda #LINES_TO_CRUNCH-1                  ;  2
+    lda #LINES_TO_CRUNCH                    ;  2
     sec                                     ;  2
     sbc TOTAL_Y                             ;  4
     tax                                     ;  2
@@ -95,7 +95,7 @@ IRQ !zone {
     sta VIC_CONTROL_Y                       ;  4
                                             ;--> 6
 
-    lda #7 + LINES_TO_CRUNCH % 8            ;  2
+    lda #7 + (LINES_TO_CRUNCH+1) % 8            ;  2
     sec                                     ;  2
     sbc SOFT_Y                              ;  4
     and #%00000111                          ;  2
