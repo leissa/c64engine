@@ -161,7 +161,7 @@ HARD_Y !by 24
 SCREEN_Y!by 0
 TOTAL_Y !by 0
 TILE_X !by 63
-TILE_Y !by 64
+TILE_Y !by 63
 TILE_C !by 3
 TILE_R !by 3
 

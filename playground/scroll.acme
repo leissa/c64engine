@@ -65,7 +65,18 @@ DEC_HARD_Y !zone {
     +bbc .l
 }
 
+!macro tile_check .rc, .rcmax, .xy, .xymax, .l {
+    lda .xy
+    cmp #.xymax
+    bne +
+    lda .rc
+    cmp #.rcmax
+    beq .l
++
+}
+
 SCROLL_U !zone {
+    +tile_check TILE_R, 0, TILE_Y, 0, .return
     +wrap_dec SOFT_Y, 2, 8, .return
     jsr DEC_HARD_Y
     +wrap_dec TILE_R, 1, 4, .return
@@ -76,6 +87,7 @@ SCROLL_U !zone {
 }
 
 SCROLL_D !zone {
+    +tile_check TILE_R, 3, TILE_Y, 63, .return
     +wrap_inc SOFT_Y, 2, 8, .return
     jsr INC_HARD_Y
     +wrap_inc TILE_R, 1, 4, .return
@@ -86,6 +98,7 @@ SCROLL_D !zone {
 }
 
 SCROLL_L !zone {
+    +tile_check TILE_C, 0, TILE_X, 0, .return
     +wrap_inc SOFT_X, 2, 8, .return
 
     inc HARD_X
@@ -105,6 +118,7 @@ SCROLL_L !zone {
 }
 
 SCROLL_R !zone {
+    +tile_check TILE_C, 3, TILE_X, 63, .return
     +wrap_dec SOFT_X, 2, 8, .return
 
     dec HARD_X
