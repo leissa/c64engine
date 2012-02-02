@@ -1,3 +1,5 @@
+SCROLL_SPEED = 4
+
 INC_HARD_Y !zone {
     inc HARD_Y
     lda #25
@@ -13,8 +15,8 @@ INC_HARD_Y !zone {
     sta HARD_X
     clc
     adc #40
-    cmp #39
-    +bae +
+    cmp #39 ; if A <= 39 -> sta HARD_X <=> if A > 39 -> jmp
+    +ba +
     sta HARD_X
     rts
 +
@@ -77,7 +79,7 @@ DEC_HARD_Y !zone {
 
 SCROLL_U !zone {
     +tile_check TILE_R, 0, TILE_Y, 0, .return
-    +wrap_dec SOFT_Y, 2, 8, .return
+    +wrap_dec SOFT_Y, SCROLL_SPEED, 8, .return
     jsr DEC_HARD_Y
     +wrap_dec TILE_R, 1, 4, .return
     dec TILE_Y
@@ -86,9 +88,10 @@ SCROLL_U !zone {
     rts
 }
 
+; 15 18 1
 SCROLL_D !zone {
     +tile_check TILE_R, 3, TILE_Y, 63, .return
-    +wrap_inc SOFT_Y, 2, 8, .return
+    +wrap_inc SOFT_Y, SCROLL_SPEED, 8, .return
     jsr INC_HARD_Y
     +wrap_inc TILE_R, 1, 4, .return
     inc TILE_Y
@@ -99,7 +102,7 @@ SCROLL_D !zone {
 
 SCROLL_L !zone {
     +tile_check TILE_C, 0, TILE_X, 0, .return
-    +wrap_inc SOFT_X, 2, 8, .return
+    +wrap_inc SOFT_X, SCROLL_SPEED, 8, .return
 
     inc HARD_X
     lda #40
@@ -119,7 +122,7 @@ SCROLL_L !zone {
 
 SCROLL_R !zone {
     +tile_check TILE_C, 3, TILE_X, 63, .return
-    +wrap_dec SOFT_X, 2, 8, .return
+    +wrap_dec SOFT_X, SCROLL_SPEED, 8, .return
 
     dec HARD_X
     bpl +

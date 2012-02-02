@@ -80,8 +80,9 @@
 
 ; branch if above
 !macro ba .l {
-    bne .l
+    beq +
     bcs .l
++
 }
 
 ; branch if above or equal
