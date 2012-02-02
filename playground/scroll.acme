@@ -22,7 +22,8 @@ INC_HARD_Y !zone {
     sta HARD_X
     clc
     adc #40
-    bpl +
+    cmp #39
+    +bae +
     sta HARD_X
     jmp ++
 +
