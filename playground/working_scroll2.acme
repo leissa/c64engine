@@ -122,11 +122,11 @@ START !zone {
         jsr DEBUG_1
     lda SCREEN_Y
         jsr DEBUG_2
-    lda TILE_COL
+    lda TILE_C
         jsr DEBUG_4
     lda TILE_X
         jsr DEBUG_5
-    lda TILE_ROW
+    lda TILE_R
         jsr DEBUG_6
     lda TILE_Y
         jsr DEBUG_7
@@ -151,17 +151,17 @@ START !zone {
 !source "raster.acme"
 !source "chars.acme"
 
-SOFT_X   !by 0
-SOFT_Y   !by 0
-HARD_X   !by 0
-HARD_Y   !by 24
-;HARD_Y   !by 0
-SCREEN_Y !by 0
-TOTAL_Y  !by 0
-TILE_X   !by 0
-TILE_Y   !by 0
-TILE_COL !by 0
-TILE_ROW !by 0
+SOFT_X !by 0
+SOFT_Y !by 0
+HARD_X !by 0
+HARD_Y !by 24
+;HARD_Y  !by 0
+SCREEN_Y!by 0
+TOTAL_Y !by 0
+TILE_X !by 0
+TILE_Y !by 0
+TILE_C !by 0
+TILE_R !by 0
 
 EMPTY_INTERRUPT
     inc LOCK

@@ -47,40 +47,46 @@ DEC_HARD_Y !zone {
     rts
 }
 
-!macro wrap_inc_2 .mem, .l {
+!macro wrap_inc .mem, .inc, .and, .l {
     lda .mem
     clc
-    adc #2
-    and #%00000111
+    adc #.inc
+    and #.and
     sta .mem
     bne .l
 }
 
-!macro wrap_dec_2 .mem, .l {
+!macro wrap_dec .mem, .dec, .and, .l {
     lda .mem
     sec
-    sbc #2
-    and #%00000111
+    sbc #.dec
+    and #.and
     sta .mem
     +bbc .l
 }
 
 SCROLL_U !zone {
-    +wrap_dec_2 SOFT_Y, +
+    +wrap_dec SOFT_Y, 2, %00000111, .return
     jsr DEC_HARD_Y
-+
+
+    +wrap_dec TILE_R, 1, %00000011, .return
+
+    dec TILE_Y
+
+.return
     rts
 }
 
 SCROLL_D !zone {
-    +wrap_inc_2 SOFT_Y, +
+    +wrap_inc SOFT_Y, 2, %00000111, .return
     jsr INC_HARD_Y
-+
+    +wrap_inc TILE_R, 1, %00000011, .return
+.return
     rts
 }
 
 SCROLL_L !zone {
-    +wrap_inc_2 SOFT_X, +
+    +wrap_inc SOFT_X, 2, %00000111, .return
 
     inc HARD_X
     lda #40
@@ -91,11 +97,14 @@ SCROLL_L !zone {
     sta HARD_X
     jsr DEC_HARD_Y
 +
+    +wrap_inc TILE_C, 1, %00000011, .return
+
+.return
     rts
 }
 
 SCROLL_R !zone {
-    +wrap_dec_2 SOFT_X, +
+    +wrap_dec SOFT_X, 2, %00000111, .return
 
     dec HARD_X
     bpl +
@@ -104,5 +113,8 @@ SCROLL_R !zone {
     sta HARD_X
     jsr INC_HARD_Y
 +
+    +wrap_dec TILE_C, 1, %00000011, .return
+
+.return
     rts
 }
