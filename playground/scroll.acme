@@ -16,10 +16,10 @@ INC_HARD_Y !zone {
     cmp #39
     +bae +
     sta HARD_X
-    jmp ++
+    rts
 +
     dec SCREEN_Y
-++
+
 .return
     rts
 }
@@ -39,10 +39,10 @@ DEC_HARD_Y !zone {
     sbc #40
     bmi +
     sta HARD_X
-    jmp ++
+    rts
 +
     inc SCREEN_Y
-++
+
 .return
     rts
 }
