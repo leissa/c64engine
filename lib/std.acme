@@ -107,7 +107,7 @@
 
 ; branch if greater
 !macro bg .l {
-    bne .l
+    beq .l
     bpl .l
 }
 
