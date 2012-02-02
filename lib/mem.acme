@@ -63,9 +63,9 @@ SPR_FR_STATUS_0 = $7800; - $7aff
 SPR_FR_STATUS_1 = $7c00; - $7dff
 
 SPR_PTR         = SCREEN + $400 - 8
-SPR_PTR_ZERO    = SCREEN_ZERO + $400 - 8
-SPR_PTR_STATUS_0= SCREEN_STATUS_0 + $400 - 8
-SPR_PTR_STATUS_1= SCREEN_STATUS_1 + $400 - 8
+;SPR_PTR_ZERO    = SCREEN_ZERO + $400 - 8
+;SPR_PTR_STATUS_0= SCREEN_STATUS_0 + $400 - 8
+;SPR_PTR_STATUS_1= SCREEN_STATUS_1 + $400 - 8
 
 ; REMARK: there is still plenty of room within the dummy screen areas
 

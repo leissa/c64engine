@@ -58,6 +58,8 @@ START !zone {
     sei
 
     ; disable ROMs
+    +set RAM_ROM_ALL_RAM_WITHCHARROM, RAM_ROM_SELECTION
+    jsr COPY_CHARS
     +set RAM_ROM_ALL_RAM_WITHIO, RAM_ROM_SELECTION
 
     ; ack all interrupts which might have happend
@@ -111,33 +113,49 @@ START !zone {
         +set 1, VIC_IRQ_CONTROL
     cli
 
+    jsr INIT_SPRITES
+
 -
+    lda HARD_X
+        jsr DEBUG_0
+    lda HARD_Y
+        jsr DEBUG_1
+    lda SCREEN_Y
+        jsr DEBUG_2
+    lda TILE_COL
+        jsr DEBUG_4
+    lda TILE_X
+        jsr DEBUG_5
+    lda TILE_ROW
+        jsr DEBUG_6
+    lda TILE_Y
+        jsr DEBUG_7
     ; some 7 cycle garbage instructions
     lda ($ff), y
     lda ($ff, x)
     lda ($ff), y
     lda ($ff, x)
     lda ($ff), y
-!for .i, 8 {
-    inc SCREEN + $0400 - .i
-}
+;!for .i, 8 {
+    ;inc SCREEN + $0400 - .i
+;}
 
     sec     ; 2
     +bcs    ; 3
     jmp -
 }
 
+!source "debug.acme"
 !source "scroll.acme"
 !source "joystick.acme"
 !source "raster.acme"
 !source "chars.acme"
 
 SOFT_X   !by 0
-;SOFT_Y   !by 7
 SOFT_Y   !by 0
 HARD_X   !by 0
-;HARD_Y   !by 24
-HARD_Y   !by 0
+HARD_Y   !by 24
+;HARD_Y   !by 0
 SCREEN_Y !by 0
 TOTAL_Y  !by 0
 TILE_X   !by 0

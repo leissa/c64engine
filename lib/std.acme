@@ -365,7 +365,6 @@ RAM_ROM_DEFAULT	             = %00110111
 RAM_ROM_ALL_RAM_WITHIO       = %00110101
 RAM_ROM_ALL_RAM_WITHCHARROM  = %00110001
 RAM_ROM_ALL_RAM              = %00110000
-RAM_ROM_BASIC_CHAR_KERNAL    = %00110011
 
 !macro set .value, .addr {
     lda #.value

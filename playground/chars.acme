@@ -237,9 +237,9 @@ DO_IT !zone {
     ldy TMP_TILE_INDEX
     lax (PTR_TILE), y       ; load soft char index
     jsr COPY_SOFTCHARS
-    ;jsr DEC_SCROLL_PTRS
-    lda #37
-    jsr SUB_SCROLL_PTRS
+    jsr DEC_SCROLL_PTRS
+    ;lda #37
+    ;jsr SUB_SCROLL_PTRS
 
     rts
 }

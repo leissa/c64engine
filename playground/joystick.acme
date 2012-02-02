@@ -3,19 +3,27 @@ JOY !zone {
 .up
     lsr 
     bcs .down
-    +dec_soft_y
+    pha
+    jsr SCROLL_U
+    pla
 .down
     lsr
     bcs .left
-    +inc_soft_y
+    pha
+    jsr SCROLL_D
+    pla
 .left
     lsr
     bcs .right
-    +inc_soft_x
+    pha
+    jsr SCROLL_L
+    pla
 .right
     lsr
     bcs .fire
-    +dec_soft_x
+    pha
+    jsr SCROLL_R
+    pla
 .fire
     lsr
     bcs +
