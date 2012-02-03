@@ -190,14 +190,14 @@ IRQ !zone {
     +set16 $c000, PTR_LEVEL
     +set16 $b000, PTR_TILE
 
-    ldy #0
-    jsr DO_IT
-    ldy #1
-    jsr DO_IT
-    ldy #2
-    jsr DO_IT 
-    ldy #3
-    jsr DO_IT
+    ;ldy #0
+    ;jsr DO_IT
+    ;ldy #1
+    ;jsr DO_IT
+    ;ldy #2
+    ;jsr DO_IT 
+    ;ldy #3
+    ;jsr DO_IT
     dec VIC_BORDER
     dec VIC_BORDER
 

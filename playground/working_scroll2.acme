@@ -115,6 +115,17 @@ START !zone {
 
     jsr INIT_SPRITES
 
+    ldx #0
+    lda #0
+-
+!for .i, 32 {
+    sta HIRES + (.i-1)*$100, x
+    clc
+    adc #3
+}
+    inx
+    +bne -
+
 -
     lda HARD_X
         jsr DEBUG_0

@@ -15,8 +15,8 @@ INC_HARD_Y !zone {
     sta HARD_X
     clc
     adc #40
-    cmp #39 ; if A <= 39 -> sta HARD_X <=> if A > 39 -> jmp
-    +ba +
+    cmp #40 
+    +bae +          ; jmp if A < 40
     sta HARD_X
     rts
 +
@@ -88,7 +88,6 @@ SCROLL_U !zone {
     rts
 }
 
-; 15 18 1
 SCROLL_D !zone {
     +tile_check TILE_R, 3, TILE_Y, 63, .return
     +wrap_inc SOFT_Y, SCROLL_SPEED, 8, .return
