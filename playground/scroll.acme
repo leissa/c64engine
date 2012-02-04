@@ -1,6 +1,9 @@
-SCROLL_SPEED = 4
+SCROLL_SPEED = 2
 
 INC_HARD_Y !zone {
+    lda SCREEN_Y
+    beq .alty
+
     inc HARD_Y
     lda #25
     cmp HARD_Y
@@ -24,9 +27,16 @@ INC_HARD_Y !zone {
 
 .return
     rts
+
+.alty
+    inc SCREEN_Y
+    rts
 }
 
 DEC_HARD_Y !zone {
+    lda SCREEN_Y
+    bne .alty
+
     dec HARD_Y
     bpl .return
 
@@ -46,6 +56,10 @@ DEC_HARD_Y !zone {
     inc SCREEN_Y
 
 .return
+    rts
+
+.alty
+    dec SCREEN_Y
     rts
 }
 
