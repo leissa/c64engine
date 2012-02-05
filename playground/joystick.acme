@@ -1,12 +1,14 @@
 JOY !zone {
-    inc SLOWDOWN
-    lda SLOWDOWN
-    cmp #2
+!if SLOWDOWN != 0 {
+    inc .slowdown
+    lda .slowdown
+    cmp #SLOWDOWN
     beq +
     rts
 +
     lda #0
-    sta SLOWDOWN
+    sta .slowdown
+}
     lda CIA1_PORT_2
 .up
     lsr 
@@ -38,7 +40,7 @@ JOY !zone {
     inc SCREEN
 +
     rts
+
+.slowdown !by 0
 }
 
-SLOWDOWN 
-!by 0

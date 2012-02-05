@@ -8,6 +8,8 @@
 !source "../lib/cia.acme"
 !source "../lib/std.acme"
 
+SLOWDOWN=4
+
 SPRITE_FRAME_BASE = 2040
 
 +create_basic_starter $0c00
