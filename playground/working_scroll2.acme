@@ -18,15 +18,17 @@ SPRITE_FRAME_BASE = 2040
     ; Bit 5: Bitmapmode      
     ; Bit 4: Screen output enabled?
     ; Bit 3: 25 rows (24 otherwise)
-CONTROL_Y        =%00111000
+;CONTROL_Y        =%00111000
+CONTROL_Y        =%00110000
 CONTROL_Y_MASK   =%10111111
-CONTROL_Y_INVALID=%01111000
+;CONTROL_Y_INVALID=%00110000
+CONTROL_Y_INVALID=%01110000
 
     ; Bit 7..5: unused
     ; Bit 4: Multicolormode
     ; Bit 3: 40 cols (on)/38 cols (off)
     ; Bit 2..0: Offset in Pixels starting from the left screen edge
-CONTROL_X        =%00011000
+CONTROL_X        =%00010000
 
 FIRST_BADLINE = $33-3
 LINE_0        = FIRST_BADLINE-3
@@ -131,9 +133,9 @@ START !zone {
         jsr DEBUG_0
     lda HARD_Y
         jsr DEBUG_1
-    lda SCREEN_Y
+    lda SOFT_X
         jsr DEBUG_2
-    lda TOTAL_Y
+    lda SOFT_Y
         jsr DEBUG_3
     lda TILE_C
         jsr DEBUG_4
@@ -167,14 +169,11 @@ START !zone {
 SOFT_X !by 0
 SOFT_Y !by 0
 HARD_X !by 0
-HARD_Y !by 24
-;HARD_Y  !by 0
-SCREEN_Y!by 0
-TOTAL_Y !by 0
-TILE_X !by 63
-TILE_Y !by 63
-TILE_C !by 3
-TILE_R !by 3
+HARD_Y !by 0
+TILE_X !by 0
+TILE_Y !by 0
+TILE_C !by 0
+TILE_R !by 0
 
 EMPTY_INTERRUPT
     inc LOCK

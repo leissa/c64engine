@@ -1,4 +1,12 @@
 JOY !zone {
+    inc SLOWDOWN
+    lda SLOWDOWN
+    cmp #2
+    beq +
+    rts
++
+    lda #0
+    sta SLOWDOWN
     lda CIA1_PORT_2
 .up
     lsr 
@@ -29,9 +37,8 @@ JOY !zone {
     bcs +
     inc SCREEN
 +
-    lda SCREEN_Y
-    clc
-    adc HARD_Y
-    sta TOTAL_Y
     rts
 }
+
+SLOWDOWN 
+!by 0

@@ -86,7 +86,7 @@ IRQ !zone {
     ; wobble check from above               ;  3
     lda #LINES_TO_CRUNCH                    ;  2
     sec                                     ;  2
-    sbc TOTAL_Y                             ;  4
+    sbc HARD_Y                              ;  4
     tax                                     ;  2
                                             ;--> 13
 
@@ -120,7 +120,7 @@ IRQ !zone {
     jmp .fld_loop                           ;  3
 +
 
-    ldx TOTAL_Y
+    ldx HARD_Y
 
 .crunch_loop
     cpx #0                                  ;  2
@@ -164,7 +164,7 @@ IRQ !zone {
     sta VIC_CONTROL_Y
     pha
 
-    +wait_loop 63 * 7
+    +wait_loop 63 * 6
 
     ldx SOFT_Y
     ;bne +

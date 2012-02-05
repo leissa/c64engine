@@ -1,11 +1,8 @@
-SCROLL_SPEED = 2
+SCROLL_SPEED = 1
 
 INC_HARD_Y !zone {
-    lda SCREEN_Y
-    beq .alty
-
     inc HARD_Y
-    lda #25
+    lda #26
     cmp HARD_Y
     bne .return
 
@@ -19,28 +16,19 @@ INC_HARD_Y !zone {
     clc
     adc #40
     cmp #40 
-    +bae +          ; jmp if A < 40
+    +bae .return    ; jmp if A < 40
     sta HARD_X
-    rts
-+
-    dec SCREEN_Y
+    inc HARD_Y
 
 .return
-    rts
-
-.alty
-    inc SCREEN_Y
     rts
 }
 
 DEC_HARD_Y !zone {
-    lda SCREEN_Y
-    bne .alty
-
     dec HARD_Y
     bpl .return
 
-    lda #24
+    lda #25
     sta HARD_Y
 
     lda HARD_X
@@ -49,17 +37,11 @@ DEC_HARD_Y !zone {
     sta HARD_X
     sec
     sbc #40
-    bmi +
+    bmi .return
     sta HARD_X
-    rts
-+
-    inc SCREEN_Y
+    dec HARD_Y
 
 .return
-    rts
-
-.alty
-    dec SCREEN_Y
     rts
 }
 
