@@ -187,8 +187,8 @@ IRQ !zone {
 
     inc VIC_BORDER
 
-    +set16 $c000, PTR_LEVEL
-    +set16 $b000, PTR_TILE
+    ;+set16 $c000, PTR_LEVEL
+    ;+set16 $b000, PTR_TILE
 
     ;ldy #0
     ;jsr DO_IT

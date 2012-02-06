@@ -8,7 +8,7 @@
 !source "../lib/cia.acme"
 !source "../lib/std.acme"
 
-SLOWDOWN=4
+SLOWDOWN=0
 
 SPRITE_FRAME_BASE = 2040
 
@@ -51,9 +51,9 @@ START !zone {
     sta VIC_ADDR_SELECT
 
     ; init pointers
-    +set16 HIRES + $800,     PTR_HIRES
-    +set16 COLOR_RAM + $100, PTR_COLOR
-    +set16 SCREEN + $100,    PTR_SCREEN
+    +set16 HIRES + $800*3,     PTR_HIRES_R
+    +set16 COLOR_RAM + $100*3, PTR_COLOR_R
+    +set16 SCREEN + $100*3,    PTR_SCREEN_R
 
 ;-------------------------------------------------------------------------------
 ;   disable all basic, kernal and irq crap

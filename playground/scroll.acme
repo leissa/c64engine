@@ -1,4 +1,4 @@
-SCROLL_SPEED = 1
+SCROLL_SPEED = 2
 
 INC_HARD_Y !zone {
     inc HARD_Y
@@ -74,11 +74,14 @@ DEC_HARD_Y !zone {
 }
 
 SCROLL_U !zone {
+    jsr DO_IT
     +tile_check TILE_R, 0, TILE_Y, 0, .return
     +wrap_dec SOFT_Y, SCROLL_SPEED, 8, .return
     jsr DEC_HARD_Y
     +wrap_dec TILE_R, 1, 4, .return
     dec TILE_Y
+
+    lda TILE_Y
 
 .return
     rts
