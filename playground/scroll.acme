@@ -124,7 +124,7 @@ SCROLL_L !zone {
 
 SCROLL_R !zone {
     +tile_check TILE_C, 3, TILE_X, 63, .return
-    +wrap_dec SOFT_X, SCROLL_SPEED, 8, .return
+    +wrap_dec SOFT_X, SCROLL_SPEED, 8, .return_d
 
     dec HARD_X
     bpl +
