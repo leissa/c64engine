@@ -51,107 +51,13 @@
 ; tiles - row0
 
 *=$b000
-!by 0
-!by 1
-!by 2
-!by 3
+!by 0, 1, 2, 3
+!by 1, 2, 3, 0
+!by 2, 3, 0, 1
+!by 3, 0, 1, 2
+!fill $1000-$10, 0
 
-*=$b040
-!by 1
-!by 2
-!by 0
-!by 0
-
-*=$b080
-!by 2
-!by 1
-!by 0
-!by 0
-
-*=$b0c0
-!by 3
-!by 0
-!by 0
-!by 0
-
-; tiles - row1
-
-*=$b100
-!by 0
-!by 0
-!by 0
-!by 0
-
-*=$b140
-!by 0
-!by 0
-!by 0
-!by 0
-
-*=$b180
-!by 0
-!by 0
-!by 0
-!by 0
-
-*=$b1c0
-!by 0
-!by 0
-!by 0
-!by 0
-
-; tiles - row2
-
-*=$b200
-!by 0
-!by 0
-!by 0
-!by 0
-
-*=$b240
-!by 0
-!by 0
-!by 0
-!by 0
-
-*=$b280
-!by 0
-!by 0
-!by 0
-!by 0
-
-*=$b2c0
-!by 0
-!by 0
-!by 0
-!by 0
-
-; tiles - row3
-
-*=$b300
-!by 0
-!by 0
-!by 0
-!by 0
-
-*=$b340
-!by 0
-!by 0
-!by 0
-!by 0
-
-*=$b380
-!by 0
-!by 0
-!by 0
-!by 0
-
-*=$b3c0
-!by 0
-!by 0
-!by 0
-!by 0
 
 ; level data
 *=$c000
-!by 0,1,2,3,0,1,2,3
+!fill $1000, 0

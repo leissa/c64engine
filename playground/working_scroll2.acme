@@ -9,6 +9,12 @@
 !source "../lib/std.acme"
 
 SLOWDOWN=0
+SCROLL_SPEED = 1
+X_WORKLOAD = 40 / (8/SCROLL_SPEED)
+!if X_WORKLOAD * (8 / SCROLL_SPEED) != 40 {
+    !error "invalid SCROLL_SPEED"
+}
+
 
 SPRITE_FRAME_BASE = 2040
 
@@ -50,9 +56,9 @@ START !zone {
     sta VIC_ADDR_SELECT
 
     ; init pointers
-    +set16 HIRES + 40 * 8 * 5,     PTR_HIRES_R
-    +set16 COLOR_RAM + 40 * 5, PTR_COLOR_R
-    +set16 SCREEN + 40 * 5,    PTR_SCREEN_R
+    +set16 HIRES + 40 * 8 * 0,     PTR_HIRES_R
+    +set16 COLOR_RAM + 40 * 0, PTR_COLOR_R
+    +set16 SCREEN + 40 * 0,    PTR_SCREEN_R
 
 ;-------------------------------------------------------------------------------
 ;   disable all basic, kernal and irq crap
@@ -138,13 +144,17 @@ START !zone {
         jsr DEBUG_2
     lda SOFT_Y
         jsr DEBUG_3
-    lda TILE_C
+    lda R8
         jsr DEBUG_4
-    lda TILE_X
+    ;lda TILE_C
+    lda R16 + 1
         jsr DEBUG_5
-    lda TILE_R
+    ;lda TILE_X
+    lda R16
         jsr DEBUG_6
-    lda TILE_Y
+    ;lda TILE_R
+    ;lda TILE_Y
+    lda D8
         jsr DEBUG_7
     ; some 7 cycle garbage instructions
     lda ($ff), y

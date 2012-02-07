@@ -270,18 +270,21 @@ DO_U !zone {
     ldy TILE_C
     sty R8
 
-!for .j, 10 {
+!for .j, X_WORKLOAD {
     lax (R16), y            ; load soft char index
     jsr COPY_SOFTCHARS_R
 
-    !if .j != 10 {
+    !if .j != X_WORKLOAD {
         jsr DEC_SCROLL_PTRS
-        dec R8
-        bpl +
+
+        lda R8
+        sec
+        sbc #1
+        and #%00000011
+        sta R8
+        +bbc +
         +fetch_tile_index
         +calc_tile_ptr
-        ldy #0
-        sty R8
 +
         ldy R8
     }
@@ -303,19 +306,26 @@ DO_D !zone {
     bne +
     ldy #0
 +
+    sty R8
 
-!for .j, 10 {
-    lda (R16), y            ; load soft char index
+!for .j, X_WORKLOAD {
+    lax (R16), y            ; load soft char index
     jsr COPY_SOFTCHARS_R
 
-    !if .j != 10 {
+    !if .j != X_WORKLOAD {
         jsr INC_SCROLL_PTRS
+
+        ldy R8
         iny
+        tya
+        and #%00000011
+        sty R8
         cpy #4
         bne +
         +fetch_tile_index
         +calc_tile_ptr
         ldy #0
+        sty R8
 +
     }
 

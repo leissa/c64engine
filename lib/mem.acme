@@ -35,6 +35,7 @@ SPRITE_STRIP_FRAME  = $28
 MULTI_INDEX_TABLE   = $30
 R16 = $42; -$43
 R8 = $44
+D8 = $45
 
 ; is indexed by 
 ; lda FRAME_COUNTER_TABLE, x

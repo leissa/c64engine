@@ -182,10 +182,10 @@ IRQ !zone {
 ; clean up
 ;-------------------------------------------------------------------------------
 
-    inc VIC_BORDER
+    ;inc VIC_BORDER
     jsr JOY
 
-    dec VIC_BORDER
+    ;dec VIC_BORDER
 
     +set_raster_line_8 LINE_0
     +set16 IRQ, VECTOR_IRQ

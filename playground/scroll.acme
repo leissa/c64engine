@@ -1,5 +1,3 @@
-SCROLL_SPEED = 2
-
 INC_HARD_Y !zone {
     inc HARD_Y
     lda #26
@@ -74,27 +72,29 @@ DEC_HARD_Y !zone {
 }
 
 SCROLL_U !zone {
-    jsr DO_U
     +tile_check TILE_R, 0, TILE_Y, 0, .return
-    +wrap_dec SOFT_Y, SCROLL_SPEED, 8, .return
+    +wrap_dec SOFT_Y, SCROLL_SPEED, 8, .return_d
     jsr DEC_HARD_Y
     +wrap_dec TILE_R, 1, 4, .return
     dec TILE_Y
 
     lda TILE_Y
 
+.return_d
+    jsr DO_U
 .return
     rts
 }
 
 SCROLL_D !zone {
-    jsr DO_D
     +tile_check TILE_R, 3, TILE_Y, 63, .return
-    +wrap_inc SOFT_Y, SCROLL_SPEED, 8, .return
+    +wrap_inc SOFT_Y, SCROLL_SPEED, 8, .return_d
     jsr INC_HARD_Y
-    +wrap_inc TILE_R, 1, 4, .return
+    +wrap_inc TILE_R, 1, 4, .return_d
     inc TILE_Y
 
+.return_d
+    jsr DO_D
 .return
     rts
 }
