@@ -75,7 +75,7 @@ SCROLL_U !zone {
     +tile_check TILE_R, 0, TILE_Y, 0, .return
     +wrap_dec SOFT_Y, SCROLL_SPEED, 8, .return_d
     jsr DEC_HARD_Y
-    +wrap_dec TILE_R, 1, 4, .return
+    +wrap_dec TILE_R, 1, 4, .return_d
     dec TILE_Y
 
     lda TILE_Y

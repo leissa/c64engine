@@ -56,9 +56,13 @@ START !zone {
     sta VIC_ADDR_SELECT
 
     ; init pointers
-    +set16 HIRES + 40 * 8 * 0,     PTR_HIRES_R
+    +set16 HIRES + 40 * 8 * 0, PTR_HIRES_R
     +set16 COLOR_RAM + 40 * 0, PTR_COLOR_R
     +set16 SCREEN + 40 * 0,    PTR_SCREEN_R
+
+    +set16 HIRES + 40 * 8 * 0 + 5, PTR_HIRES_C
+    +set16 COLOR_RAM + 40 * 0 + 5, PTR_COLOR_C
+    +set16 SCREEN + 40 * 0 + 5,    PTR_SCREEN_C
 
 ;-------------------------------------------------------------------------------
 ;   disable all basic, kernal and irq crap
@@ -181,8 +185,8 @@ SOFT_X !by 0
 SOFT_Y !by 0
 HARD_X !by 0
 HARD_Y !by 0
-TILE_X !by 10
-TILE_Y !by 10
+TILE_X !by 20
+TILE_Y !by 20
 TILE_C !by 0
 TILE_R !by 0
 

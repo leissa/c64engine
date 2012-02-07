@@ -48,6 +48,18 @@
 !by %10000000
 !by %00011000
 
+; color ram - color
+*=$a800
+!by 0,0,0
+!by 1
+!fill $100-4, 0
+
+; screen ram - color
+*=$a900
+!by 0,0,0
+!by %00100011
+!fill $100-4, 0
+
 ; tiles - row0
 
 *=$b000

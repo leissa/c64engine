@@ -28,7 +28,37 @@ COPY_SOFTCHARS_R !zone {
     rts
 }
 
-!macro inc_wrap_around_rts {
+; copy over softchar (index in X) to (PTR_HIRES_R), (PTR_COLOR_R), (PTR_SCREEN_R)
+; destroys: A, Y
+COPY_SOFTCHARS_C !zone {
+    ; copy over soft char line by line
+    ; y is used to index the row
+
+    !for .j, 8 {
+    !set .i = .j - 1
+        
+        !if .i = 0 {
+            ldy #7
+        } else {
+            dey
+        }
+
+        lda SOFTCHARS + .i * $100, x
+        sta (PTR_HIRES_C), y
+    }
+
+    ; y = 0 here
+
+    ; copy over color infos
+    lda SOFTCHARS_C, x
+    sta (PTR_COLOR_C), y
+    lda SOFTCHARS_S, x
+    sta (PTR_SCREEN_C), y
+
+    rts
+}
+
+!macro inc_wrap_around_rts_r {
     ; is here a wrap-around of the buffers?
     lda PTR_COLOR_R + 1
     cmp # >(COLOR_RAM + $0400)
@@ -47,7 +77,26 @@ COPY_SOFTCHARS_R !zone {
     rts
 }
 
-!macro dec_wrap_around_rts {
+!macro inc_wrap_around_rts_c {
+    ; is here a wrap-around of the buffers?
+    lda PTR_COLOR_C + 1
+    cmp # >(COLOR_RAM + $0400)
+    bne +
+
+    ; wrap around
+    lda # >HIRES
+    sta PTR_HIRES_C + 1
+
+    lda # >SCREEN
+    sta PTR_SCREEN_C + 1
+
+    lda # >COLOR_RAM
+    sta PTR_COLOR_C + 1
++
+    rts
+}
+
+!macro dec_wrap_around_rts_r {
     ; is here a wrap-around of the buffers?
     lda PTR_COLOR_R + 1
     cmp # >(COLOR_RAM - 1)
@@ -66,11 +115,30 @@ COPY_SOFTCHARS_R !zone {
     rts
 }
 
+!macro dec_wrap_around_rts_c {
+    ; is here a wrap-around of the buffers?
+    lda PTR_COLOR_C + 1
+    cmp # >(COLOR_RAM - 1)
+    bne +
+
+    ; wrap around
+    lda # >(HIRES + $2000 - 8)
+    sta PTR_HIRES_C + 1
+
+    lda # >(SCREEN + $0400 - 1)
+    sta PTR_SCREEN_C + 1
+
+    lda # >(COLOR_RAM + $0400 - 1)
+    sta PTR_COLOR_C + 1
++
+    rts
+}
+
 ; adjust PTR_SCREEN, PTR_COLOR and PTR_SCREEN by one char postion
 ; all necessary wrap-arounds are properly considered
 ; destroys: A
 ; preservers: X, Y
-INC_SCROLL_PTRS !zone {
+INC_SCROLL_PTRS_R !zone {
     lda PTR_HIRES_R
     clc
     adc #8
@@ -89,7 +157,7 @@ INC_SCROLL_PTRS !zone {
     inc PTR_SCREEN_R + 1
     inc PTR_COLOR_R + 1
 
-    +inc_wrap_around_rts
+    +inc_wrap_around_rts_r
 
 .out_safely_inc_others
 
@@ -101,7 +169,42 @@ INC_SCROLL_PTRS !zone {
     rts
 }
 
-ADD_SCROLL_PTRS !zone {
+; adjust PTR_SCREEN, PTR_COLOR and PTR_SCREEN by one char postion
+; all necessary wrap-arounds are properly considered
+; destroys: A
+; preservers: X, Y
+INC_SCROLL_PTRS_C !zone {
+    lda PTR_HIRES_C
+    clc
+    adc #8
+    sta PTR_HIRES_C
+    bcc .out_safely_inc_others  
+
+    inc PTR_HIRES_C + 1   ; add carry to high byte
+
+    ; PTR_SCREEN and PTR_COLOR _may_ overflow
+    inc PTR_SCREEN_C
+    inc PTR_COLOR_C
+
+    ; do PTR_SCREEN and PTR_COLOR overflow, too?
+    bne .out
+
+    inc PTR_SCREEN_C + 1
+    inc PTR_COLOR_C + 1
+
+    +inc_wrap_around_rts_c
+
+.out_safely_inc_others
+
+    ; PTR_SCREEN and PTR_COLOR _cannot_ overflow
+    inc PTR_SCREEN_C
+    inc PTR_COLOR_C
+
+.out
+    rts
+}
+
+ADD_SCROLL_PTRS_R !zone {
     tax
     inc PTR_HIRES_R + 1   ; + 256
     ; add to low byte: A * 8 - 256 = 8 * (A - 32)
@@ -130,17 +233,51 @@ ADD_SCROLL_PTRS !zone {
     inc PTR_SCREEN_R + 1
     inc PTR_COLOR_R + 1
 
-    +inc_wrap_around_rts
+    +inc_wrap_around_rts_r
 
 .out
     rts
 }
 
+ADD_SCROLL_PTRS_C !zone {
+    tax
+    inc PTR_HIRES_C + 1   ; + 256
+    ; add to low byte: A * 8 - 256 = 8 * (A - 32)
+    sec
+    sbc #32
+    asl
+    asl
+    asl
+    clc
+    adc PTR_HIRES_C
+    sta PTR_HIRES_C
+    bcc +
+    inc PTR_HIRES_C + 1   ; add carry to high byte
++
+    txa
+    adc PTR_SCREEN_C      ; carry still clear
+    sta PTR_SCREEN_C
+    txa
+    clc
+    adc PTR_COLOR_C
+    sta PTR_COLOR_C
+
+    ; do PTR_SCREEN and PTR_COLOR overflow, too?
+    bcc .out
+
+    inc PTR_SCREEN_C + 1
+    inc PTR_COLOR_C + 1
+
+    +inc_wrap_around_rts_c
+
+.out
+    rts
+}
 ; adjust PTR_SCREEN, PTR_COLOR and PTR_SCREEN by one char postion
 ; all necessary wrap-arounds are properly considered
 ; destroys: A
 ; preservers: X, Y
-DEC_SCROLL_PTRS !zone {
+DEC_SCROLL_PTRS_R !zone {
     lda PTR_HIRES_R
     sec
     sbc #8
@@ -152,6 +289,7 @@ DEC_SCROLL_PTRS !zone {
     ; PTR_SCREEN and PTR_COLOR _may_ underflow
     dec PTR_SCREEN_R
     lda PTR_COLOR_R
+    clc
     sbc #0              ; dec A (carry clear)
     sta PTR_COLOR_R
     ; do PTR_SCREEN and PTR_COLOR underflow, too?
@@ -160,7 +298,7 @@ DEC_SCROLL_PTRS !zone {
     dec PTR_SCREEN_R + 1
     dec PTR_COLOR_R + 1
 
-    +dec_wrap_around_rts
+    +dec_wrap_around_rts_r
 
 .out_safely_dec_others
 
@@ -172,11 +310,43 @@ DEC_SCROLL_PTRS !zone {
     rts
 }
 
+DEC_SCROLL_PTRS_C !zone {
+    lda PTR_HIRES_C
+    sec
+    sbc #8
+    sta PTR_HIRES_C
+    +bbc .out_safely_dec_others  
+
+    dec PTR_HIRES_C + 1   ; sub borrow from high byte
+
+    ; PTR_SCREEN and PTR_COLOR _may_ underflow
+    dec PTR_SCREEN_C
+    lda PTR_COLOR_C
+    sbc #0              ; dec A (carry clear)
+    sta PTR_COLOR_C
+    ; do PTR_SCREEN and PTR_COLOR underflow, too?
+    +bbc .out
+
+    dec PTR_SCREEN_C + 1
+    dec PTR_COLOR_C + 1
+
+    +dec_wrap_around_rts_c
+
+.out_safely_dec_others
+
+    ; PTR_SCREEN and PTR_COLOR _cannot_ underflow
+    dec PTR_SCREEN_C
+    dec PTR_COLOR_C
+
+.out
+    rts
+}
+
 ; adjust PTR_SCREEN, PTR_COLOR and PTR_SCREEN by one line position
 ; all necessary wrap-arounds are properly considered
 ; destroys: A
 ; preservers: X, Y
-SUB_SCROLL_PTRS !zone {
+SUB_SCROLL_PTRS_R !zone {
     tax
     dec PTR_HIRES_R + 1   ; - 256
     ; sub from low byte: A * 8 - 256 = 8 * (A - 32)
@@ -205,7 +375,42 @@ SUB_SCROLL_PTRS !zone {
     dec PTR_SCREEN_R + 1
     dec PTR_COLOR_R + 1
 
-    +dec_wrap_around_rts
+    +dec_wrap_around_rts_r
+
+.out
+    rts
+}
+
+SUB_SCROLL_PTRS_C !zone {
+    tax
+    dec PTR_HIRES_C + 1   ; - 256
+    ; sub from low byte: A * 8 - 256 = 8 * (A - 32)
+    sec
+    sbc #32
+    asl
+    asl
+    asl
+    +rsub PTR_HIRES_C
+    sta PTR_HIRES_C
+    +bbc +
+    dec PTR_HIRES_C + 1   ; sub borrow from high byte
++
+    txa
+    +rsub PTR_SCREEN_C
+    sta PTR_SCREEN_C
+    txa
+    eor #$ff
+    sec
+    adc PTR_COLOR_C
+    sta PTR_COLOR_C
+
+    ; do PTR_SCREEN and PTR_COLOR underflow, too?
+    +bbc .out
+
+    dec PTR_SCREEN_C + 1
+    dec PTR_COLOR_C + 1
+
+    +dec_wrap_around_rts_c
 
 .out
     rts
@@ -275,7 +480,7 @@ DO_U !zone {
     jsr COPY_SOFTCHARS_R
 
     !if .j != X_WORKLOAD {
-        jsr DEC_SCROLL_PTRS
+        jsr DEC_SCROLL_PTRS_R
 
         lda R8
         sec
@@ -290,14 +495,14 @@ DO_U !zone {
     }
 
 }
-    jsr DEC_SCROLL_PTRS
+    jsr DEC_SCROLL_PTRS_R
     dec VIC_BORDER
     rts
 }
 
 DO_D !zone {
     inc VIC_BORDER
-    jsr INC_SCROLL_PTRS
+    jsr INC_SCROLL_PTRS_R
     +fetch_tile_index
     +calc_tile_ptr
     ldy TILE_C
@@ -313,7 +518,7 @@ DO_D !zone {
     jsr COPY_SOFTCHARS_R
 
     !if .j != X_WORKLOAD {
-        jsr INC_SCROLL_PTRS
+        jsr INC_SCROLL_PTRS_R
 
         ldy R8
         iny

@@ -72,10 +72,10 @@ SPR_PTR         = SCREEN + $400 - 8
 ; REMARK: there is still plenty of room within the dummy screen areas
 
 SOFT_SPR_FR     = $8000; - $8fff
-SOFTCHARS       = $a000; - $a800
+SOFTCHARS       = $a000; - $7fff
 
-SOFTCHARS_C = $8800
-SOFTCHARS_S = $8900
+SOFTCHARS_C = $a800
+SOFTCHARS_S = $a900
 
 ; 64 x 64 tiles (6.4 x 10.24 full screens)
 LEVEL       = $a000; - $afff
