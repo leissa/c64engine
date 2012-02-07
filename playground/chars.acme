@@ -289,7 +289,6 @@ DEC_SCROLL_PTRS_R !zone {
     ; PTR_SCREEN and PTR_COLOR _may_ underflow
     dec PTR_SCREEN_R
     lda PTR_COLOR_R
-    clc
     sbc #0              ; dec A (carry clear)
     sta PTR_COLOR_R
     ; do PTR_SCREEN and PTR_COLOR underflow, too?
@@ -467,6 +466,17 @@ SUB_SCROLL_PTRS_C !zone {
 }
 
 
+!macro do_u1 {
+    +fetch_tile_index
+    +calc_tile_ptr
+
+    ldy TILE_C
+
+    lax (R16), y            ; load soft char index
+    jsr COPY_SOFTCHARS_R
+    jsr DEC_SCROLL_PTRS_R
+}
+
 DO_U !zone {
     inc VIC_BORDER
     +fetch_tile_index
@@ -500,6 +510,20 @@ DO_U !zone {
     rts
 }
 
+!macro do_d1 {
+    jsr INC_SCROLL_PTRS_R
+    +fetch_tile_index
+    +calc_tile_ptr
+    ldy TILE_C
+    iny
+    cpy #4
+    bne +
+    ldy #0
++
+    lax (R16), y            ; load soft char index
+    jsr COPY_SOFTCHARS_R
+}
+
 DO_D !zone {
     inc VIC_BORDER
     jsr INC_SCROLL_PTRS_R
@@ -524,6 +548,7 @@ DO_D !zone {
         iny
         tya
         and #%00000011
+        tay
         sty R8
         cpy #4
         bne +
@@ -536,5 +561,21 @@ DO_D !zone {
 
 }
     dec VIC_BORDER
+    rts
+}
+
+DO_L !zone {
+    lda SOFT_X
+    bne +
+    +do_u1
++
+    rts
+}
+
+DO_R !zone {
+    lda SOFT_X
+    bne +
+    +do_d1
++
     rts
 }

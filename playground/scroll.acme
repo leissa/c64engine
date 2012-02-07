@@ -101,7 +101,7 @@ SCROLL_D !zone {
 
 SCROLL_L !zone {
     +tile_check TILE_C, 0, TILE_X, 0, .return
-    +wrap_inc SOFT_X, SCROLL_SPEED, 8, .return
+    +wrap_inc SOFT_X, SCROLL_SPEED, 8, .return_d
 
     inc HARD_X
     lda #40
@@ -112,8 +112,11 @@ SCROLL_L !zone {
     sta HARD_X
     jsr DEC_HARD_Y
 +
-    +wrap_dec TILE_C, 1, 4, .return
+    +wrap_dec TILE_C, 1, 4, .return_d
     dec TILE_X
+
+.return_d
+    jsr DO_L
 
 .return
     rts
@@ -130,8 +133,11 @@ SCROLL_R !zone {
     sta HARD_X
     jsr INC_HARD_Y
 +
-    +wrap_inc TILE_C, 1, 4, .return
+    +wrap_inc TILE_C, 1, 4, .return_d
     inc TILE_X
+
+.return_d
+    jsr DO_R
 
 .return
     rts
