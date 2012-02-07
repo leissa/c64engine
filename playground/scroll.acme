@@ -74,7 +74,7 @@ DEC_HARD_Y !zone {
 }
 
 SCROLL_U !zone {
-    jsr DO_IT
+    jsr DO_U
     +tile_check TILE_R, 0, TILE_Y, 0, .return
     +wrap_dec SOFT_Y, SCROLL_SPEED, 8, .return
     jsr DEC_HARD_Y
@@ -88,6 +88,7 @@ SCROLL_U !zone {
 }
 
 SCROLL_D !zone {
+    jsr DO_D
     +tile_check TILE_R, 3, TILE_Y, 63, .return
     +wrap_inc SOFT_Y, SCROLL_SPEED, 8, .return
     jsr INC_HARD_Y

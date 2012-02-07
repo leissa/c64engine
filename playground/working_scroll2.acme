@@ -39,7 +39,6 @@ LINE_SPLIT    = FIRST_BADLINE-3
 LINES_TO_CRUNCH = 25
 
 START !zone {
-
     ; select VIC area: $4000 - $7FFF
     lda CIA2_CONTROL_TIMER_A
     and #%11111100
@@ -51,9 +50,9 @@ START !zone {
     sta VIC_ADDR_SELECT
 
     ; init pointers
-    +set16 HIRES + $800*3,     PTR_HIRES_R
-    +set16 COLOR_RAM + $100*3, PTR_COLOR_R
-    +set16 SCREEN + $100*3,    PTR_SCREEN_R
+    +set16 HIRES + 40 * 8 * 5,     PTR_HIRES_R
+    +set16 COLOR_RAM + 40 * 5, PTR_COLOR_R
+    +set16 SCREEN + 40 * 5,    PTR_SCREEN_R
 
 ;-------------------------------------------------------------------------------
 ;   disable all basic, kernal and irq crap
@@ -172,8 +171,8 @@ SOFT_X !by 0
 SOFT_Y !by 0
 HARD_X !by 0
 HARD_Y !by 0
-TILE_X !by 0
-TILE_Y !by 0
+TILE_X !by 10
+TILE_Y !by 10
 TILE_C !by 0
 TILE_R !by 0
 

@@ -33,7 +33,8 @@ SPRITE_STRIP_Y      = $18
 SPRITE_STRIP_COLOR  = $20
 SPRITE_STRIP_FRAME  = $28
 MULTI_INDEX_TABLE   = $30
-TMP = $42
+R16 = $42; -$43
+R8 = $44
 
 ; is indexed by 
 ; lda FRAME_COUNTER_TABLE, x
