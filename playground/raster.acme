@@ -15,7 +15,10 @@ IRQ !zone {
 
     ; irq event                             ;  7
     ; last instruction                      ;  1 (min)
-    +save_regs                              ;  9
+    sta .restore_a + 1                      ;  4
+    stx .restore_x + 1                      ;  4
+    sty .restore_y + 1                      ;  4
+
     ; ack interrupt
     inc VIC_IRQ_STATUS                      ;  6
 
@@ -25,7 +28,7 @@ IRQ !zone {
     ; save stack state
     tsx                                     ;  2
 
-    +wait 6                                 ;  6 TODO
+    +wait 3                                 ;  6 TODO
     ; begin raster stabilization
     cli                                     ;  2
                                             ;--> 51
@@ -190,5 +193,15 @@ IRQ !zone {
     +set_raster_line_8 LINE_0
     +set16 IRQ, VECTOR_IRQ
 
-    +ack_restore_rti
+    ; ack interrupt
+    inc VIC_IRQ_STATUS
+
+.restore_a
+    lda #0
+.restore_x
+    ldx #0
+.restore_y
+    ldy #0
+
+    rti
 }

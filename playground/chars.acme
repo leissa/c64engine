@@ -538,25 +538,25 @@ DO_D !zone {
     sty R8
 
 !for .j, X_WORKLOAD {
+
     lax (R16), y            ; load soft char index
     jsr COPY_SOFTCHARS_R
+    lda R8
+    sta DBG + .j-1
 
     !if .j != X_WORKLOAD {
         jsr INC_SCROLL_PTRS_R
 
-        ldy R8
-        iny
-        tya
+        lda R8
+        clc
+        adc #1
         and #%00000011
-        tay
-        sty R8
-        cpy #4
+        sta R8
         bne +
         +fetch_tile_index
         +calc_tile_ptr
-        ldy #0
-        sty R8
 +
+        ldy R8
     }
 
 }

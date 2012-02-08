@@ -15,7 +15,6 @@ X_WORKLOAD = 40 / (8/SCROLL_SPEED)
     !error "invalid SCROLL_SPEED"
 }
 
-
 SPRITE_FRAME_BASE = 2040
 
 +create_basic_starter $0c00
@@ -36,9 +35,9 @@ CONTROL_Y_INVALID=%01110000
     ; Bit 4: Multicolormode
     ; Bit 3: 40 cols (on)/38 cols (off)
     ; Bit 2..0: Offset in Pixels starting from the left screen edge
-CONTROL_X        =%00010000
+CONTROL_X        =%00011000
 
-FIRST_BADLINE = $33-3
+FIRST_BADLINE = $30
 LINE_0        = FIRST_BADLINE-3
 LINE_SPLIT    = FIRST_BADLINE-3
 
@@ -140,25 +139,21 @@ START !zone {
     +bne -
 
 -
-    lda HARD_X
+    lda DBG + 0
         jsr DEBUG_0
-    lda HARD_Y
+    lda DBG + 1
         jsr DEBUG_1
-    lda SOFT_X
+    lda DBG + 2
         jsr DEBUG_2
-    lda SOFT_Y
+    lda DBG + 3
         jsr DEBUG_3
-    lda R8
+    lda DBG + 4
         jsr DEBUG_4
-    ;lda TILE_C
-    lda R16 + 1
+    lda DBG + 5
         jsr DEBUG_5
-    ;lda TILE_X
-    lda R16
+    lda DBG + 6
         jsr DEBUG_6
-    ;lda TILE_R
-    ;lda TILE_Y
-    lda D8
+    lda DBG + 7
         jsr DEBUG_7
     ; some 7 cycle garbage instructions
     lda ($ff), y

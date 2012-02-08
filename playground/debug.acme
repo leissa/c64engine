@@ -89,3 +89,5 @@ DEBUG_4 +dbg2spr 4
 DEBUG_5 +dbg2spr 5
 DEBUG_6 +dbg2spr 6
 DEBUG_7 +dbg2spr 7
+
+DEBUG_SIZE=DEBUG_1-DEBUG_0

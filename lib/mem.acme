@@ -4,11 +4,6 @@
 
 RAM_ROM_SWITCH     = $01
 
-SAVE_A             = $02
-SAVE_X             = $03
-SAVE_Y             = $04
-
-TMP_TILE_INDEX      = $05
 PTR_HIRES_R         = $06;-$07
 PTR_COLOR_R         = $08;-$09
 PTR_SCREEN_R        = $0a;-$0b
@@ -34,8 +29,9 @@ SPRITE_STRIP_COLOR  = $20
 SPRITE_STRIP_FRAME  = $28
 MULTI_INDEX_TABLE   = $30
 R16 = $42; -$43
-R8 = $44
-D8 = $45
+R8 = $45
+
+DBG = $50
 
 ; is indexed by 
 ; lda FRAME_COUNTER_TABLE, x
