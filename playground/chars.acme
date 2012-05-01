@@ -415,6 +415,24 @@ SUB_SCROLL_PTRS_C !zone {
     rts
 }
 
+INC_PTR_TILE_R !zone {
+    inc PTR_TILE_R
+    bne +
+    inc PTR_TILE_R + 1
++
+    rts
+}
+
+DEC_PTR_TILE_R !zone {
+    lda #0
+    dcp PTR_TILE_R
+    +bbc+
+    dec PTR_TILE_R + 1
++
+    rts
+}
+
+
 !macro split16 .times {
 !for .j, .times {
     lsr
@@ -491,6 +509,7 @@ DO_U !zone {
 
     !if .j != X_WORKLOAD {
         jsr DEC_SCROLL_PTRS_R
+        jsr DEC_PTR_TILE_R
 
         lda R8
         sec
@@ -506,6 +525,7 @@ DO_U !zone {
 
 }
     jsr DEC_SCROLL_PTRS_R
+    jsr DEC_PTR_TILE_R
     dec VIC_BORDER
     rts
 }
@@ -527,6 +547,7 @@ DO_U !zone {
 DO_D !zone {
     inc VIC_BORDER
     jsr INC_SCROLL_PTRS_R
+    jsr INC_PTR_TILE_R
     +fetch_tile_index
     +calc_tile_ptr
     ldy TILE_C
@@ -546,6 +567,7 @@ DO_D !zone {
 
     !if .j != X_WORKLOAD {
         jsr INC_SCROLL_PTRS_R
+        jsr INC_PTR_TILE_R
 
         lda R8
         clc

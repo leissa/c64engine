@@ -4,6 +4,7 @@
 
 RAM_ROM_SWITCH     = $01
 
+PTR_TILE_R          = $04;-$05
 PTR_HIRES_R         = $06;-$07
 PTR_COLOR_R         = $08;-$09
 PTR_SCREEN_R        = $0a;-$0b
