@@ -2,10 +2,10 @@
 !cpu 6510               ; for illegal opcodes
 !convtab scr            ; for conversion to c64 screen codes
 
-!source "../lib/vic.asm"
-!source "../lib/cia.asm"
-!source "../lib/std.asm"
-!source "../lib/zero.asm"
+!source "../lib/vic.acme"
+!source "../lib/cia.acme"
+!source "../lib/std.acme"
+!source "../lib/zero.acme"
 
 NUM_SPRITES       = 32
 SPRITE_FRAME_BASE = 2040
@@ -376,8 +376,8 @@ MULTI_SPRITE_Y
 
     !by $32,$32,$32,$32,$32,$32,$32,$32
     !by $47,$47,$47,$47,$47,$47,$47,$47
-    ;!by $47,$47,$47,$47,$47,$47,$47,$47
-    !by $5c,$5c,$5c,$5c,$5c,$5c,$5c,$5c
+    !by $47,$47,$47,$47,$47,$47,$47,$47
+    ;!by $5c,$5c,$5c,$5c,$5c,$5c,$5c,$5c
     !by $71,$71,$71,$71,$71,$71,$71,$71
 
     ;!by $32,$32,$32,$32,$32,$32,$32,$32

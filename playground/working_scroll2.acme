@@ -9,7 +9,7 @@
 !source "../lib/std.acme"
 
 SLOWDOWN=0
-SCROLL_SPEED = 8
+SCROLL_SPEED = 2
 X_WORKLOAD = 40 / (8/SCROLL_SPEED)
 !if X_WORKLOAD * (8 / SCROLL_SPEED) != 40 {
     !error "invalid SCROLL_SPEED"
