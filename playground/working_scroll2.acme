@@ -8,7 +8,7 @@
 !source "../lib/cia.acme"
 !source "../lib/std.acme"
 
-SLOWDOWN=0
+SLOWDOWN=2
 SCROLL_SPEED = 2
 X_WORKLOAD = 40 / (8/SCROLL_SPEED)
 !if X_WORKLOAD * (8 / SCROLL_SPEED) != 40 {
@@ -136,8 +136,7 @@ START !zone {
     adc #3
 }
     inx
-    +bne -
-
+    +lbne -
 -
     lda DBG + 0
         jsr DEBUG_0

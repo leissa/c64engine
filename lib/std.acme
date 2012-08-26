@@ -5,42 +5,42 @@
 ; far branches
 ;-------------------------------------------------------------------------------
 
-!macro bcc .t {
+!macro lbcc .t {
     bcs * + 5
     jmp .t
 }
 
-!macro bcs .t {
+!macro lbcs .t {
     bcc * + 5
     jmp .t
 }
 
-!macro beq .t {
+!macro lbeq .t {
     bne * + 5
     jmp .t
 }
 
-!macro bne .t {
+!macro lbne .t {
     beq * + 5
     jmp .t
 }
 
-!macro bmi .t {
+!macro lbmi .t {
     bpl * + 5
 	jmp .t
 }
 
-!macro bpl .t {
+!macro lbpl .t {
     bmi * + 5
 	jmp .t
 }
 
-!macro bvc .t {
+!macro lbvc .t {
     bvs * + 5
 	jmp .t
 }
 
-!macro bvs .t {
+!macro lbvs .t {
     bvc * + 5
 	jmp .t
 }
@@ -63,30 +63,42 @@
     bcc .l
 }
 
+; long branch if borrow clear
+!macro lbbc .l {
+    bcc * + 5
+    jmp .l
+}
+
+; long branch if borrow set
+!macro lbbs .l {
+    bcs * + 5
+    jmp .l
+}
+
 ;
 ; unsigned
 ;
 
 ; branch if below
-!macro bb .l {
+!macro bult .l {
     bcc .l
 }
 
 ; branch if below or equal
-!macro bbe .l {
+!macro bule .l {
     beq .l
     bcc .l
 }
 
 ; branch if above
-!macro ba .l {
+!macro bugt .l {
     beq +
     bcs .l
 +
 }
 
 ; branch if above or equal
-!macro bae .l {
+!macro buge .l {
     bcs .l
 }
 
@@ -95,24 +107,24 @@
 ;
 
 ; branch if less
-!macro bl .l {
+!macro bslt .l {
     bmi .l
 }
 
 ; branch if less or equal
-!macro ble .l {
+!macro bsle .l {
     beq .l
     bmi .l
 }
 
 ; branch if greater
-!macro bg .l {
+!macro bsgt .l {
     beq .l
     bpl .l
 }
 
 ; branch if greater or equal
-!macro bge .l {
+!macro bsge .l {
     bpl .l
 }
 

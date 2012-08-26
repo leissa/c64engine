@@ -14,7 +14,7 @@ INC_HARD_Y !zone {
     clc
     adc #40
     cmp #40 
-    +bae .return    ; jmp if A < 40
+    +buge .return    ; jmp if A < 40
     sta HARD_X
     inc HARD_Y
 
