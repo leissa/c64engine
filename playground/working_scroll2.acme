@@ -158,10 +158,6 @@ SOFT_X !by 0
 SOFT_Y !by 0
 HARD_X !by 0
 HARD_Y !by 0
-TILE_X !by 20
-TILE_Y !by 20
-TILE_C !by 0
-TILE_R !by 0
 
 EMPTY_INTERRUPT
     inc LOCK
@@ -169,5 +165,3 @@ EMPTY_INTERRUPT
 
 LOCK
     !by $ff
-
-!source "data.acme"
