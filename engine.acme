@@ -1,12 +1,12 @@
-!to "scroll.prg", cbm   ; output program
+!to "engine.prg", cbm   ; output program
 !sl "labels.l"          ; create label file for vice
 !cpu 6510               ; for illegal opcodes
 !convtab scr            ; for conversion to c64 screen codes
 
-!source "../lib/mem.acme"
-!source "../lib/vic.acme"
-!source "../lib/cia.acme"
-!source "../lib/std.acme"
+!source "lib/mem.acme"
+!source "lib/vic.acme"
+!source "lib/cia.acme"
+!source "lib/std.acme"
 
 SLOWDOWN=2
 SCROLL_SPEED = 2
@@ -152,7 +152,6 @@ START !zone {
 !source "scroll.acme"
 !source "joystick.acme"
 !source "raster.acme"
-;!source "chars.acme"
 
 SOFT_X !by 0
 SOFT_Y !by 0
