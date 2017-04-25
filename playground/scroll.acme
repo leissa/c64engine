@@ -61,47 +61,24 @@ DEC_HARD_Y !zone {
     +bbc .l
 }
 
-!macro tile_check .rc, .rcmax, .xy, .xymax, .l {
-    lda .xy
-    cmp #.xymax
-    bne +
-    lda .rc
-    cmp #.rcmax
-    beq .l
-+
-}
-
 SCROLL_U !zone {
-    +tile_check TILE_R, 0, TILE_Y, 0, .return
-    +wrap_dec SOFT_Y, SCROLL_SPEED, 8, .return_d
+    +wrap_dec SOFT_Y, SCROLL_SPEED, 8, .return
     jsr DEC_HARD_Y
-    +wrap_dec TILE_R, 1, 4, .return_d
-    dec TILE_Y
 
-    lda TILE_Y
-
-.return_d
-    jsr DO_U
 .return
     rts
 }
 
 SCROLL_D !zone {
-    +tile_check TILE_R, 3, TILE_Y, 63, .return
-    +wrap_inc SOFT_Y, SCROLL_SPEED, 8, .return_d
+    +wrap_inc SOFT_Y, SCROLL_SPEED, 8, .return
     jsr INC_HARD_Y
-    +wrap_inc TILE_R, 1, 4, .return_d
-    inc TILE_Y
 
-.return_d
-    jsr DO_D
 .return
     rts
 }
 
 SCROLL_L !zone {
-    +tile_check TILE_C, 0, TILE_X, 0, .return
-    +wrap_inc SOFT_X, SCROLL_SPEED, 8, .return_d
+    +wrap_inc SOFT_X, SCROLL_SPEED, 8, .return
 
     inc HARD_X
     lda #40
@@ -112,19 +89,12 @@ SCROLL_L !zone {
     sta HARD_X
     jsr DEC_HARD_Y
 +
-    +wrap_dec TILE_C, 1, 4, .return_d
-    dec TILE_X
-
-.return_d
-    jsr DO_L
-
 .return
     rts
 }
 
 SCROLL_R !zone {
-    +tile_check TILE_C, 3, TILE_X, 63, .return
-    +wrap_dec SOFT_X, SCROLL_SPEED, 8, .return_d
+    +wrap_dec SOFT_X, SCROLL_SPEED, 8, .return
 
     dec HARD_X
     bpl +
@@ -133,12 +103,6 @@ SCROLL_R !zone {
     sta HARD_X
     jsr INC_HARD_Y
 +
-    +wrap_inc TILE_C, 1, 4, .return_d
-    inc TILE_X
-
-.return_d
-    jsr DO_R
-
 .return
     rts
 }

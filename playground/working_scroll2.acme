@@ -152,7 +152,7 @@ START !zone {
 !source "scroll.acme"
 !source "joystick.acme"
 !source "raster.acme"
-!source "chars.acme"
+;!source "chars.acme"
 
 SOFT_X !by 0
 SOFT_Y !by 0
