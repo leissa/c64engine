@@ -70,8 +70,6 @@ START !zone {
     sei
 
     ; disable ROMs
-    +set RAM_ROM_ALL_RAM_WITHCHARROM, RAM_ROM_SELECTION
-    jsr COPY_CHARS
     +set RAM_ROM_ALL_RAM_WITHIO, RAM_ROM_SELECTION
 
     ; ack all interrupts which might have happend
@@ -125,8 +123,6 @@ START !zone {
         +set 1, VIC_IRQ_CONTROL
     cli
 
-    jsr INIT_SPRITES
-
     ldx #0
     lda #0
 -
@@ -138,22 +134,6 @@ START !zone {
     inx
     +lbne -
 -
-    lda DBG + 0
-        jsr DEBUG_0
-    lda DBG + 1
-        jsr DEBUG_1
-    lda DBG + 2
-        jsr DEBUG_2
-    lda DBG + 3
-        jsr DEBUG_3
-    lda DBG + 4
-        jsr DEBUG_4
-    lda DBG + 5
-        jsr DEBUG_5
-    lda DBG + 6
-        jsr DEBUG_6
-    lda DBG + 7
-        jsr DEBUG_7
     ; some 7 cycle garbage instructions
     lda ($ff), y
     lda ($ff, x)
@@ -169,7 +149,6 @@ START !zone {
     jmp -
 }
 
-!source "debug.acme"
 !source "scroll.acme"
 !source "joystick.acme"
 !source "raster.acme"
