@@ -1,6 +1,8 @@
 ; first raster line with backgroundcolor: 51
 ; 12 cylces left border + 40 cylces screen + 11 cycles right border
 
+FIRST_RASTER = 51
+
 ; VIC constants
 
 VIC = $D000
