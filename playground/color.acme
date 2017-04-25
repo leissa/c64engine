@@ -135,7 +135,7 @@ START !zone {
 }
     txa
     sbx #8
-    +bpl -
+    +lbpl -
 
     lda #%11110000
     ldx #$0f
