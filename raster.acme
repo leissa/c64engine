@@ -49,9 +49,8 @@ IRQ !zone {
     ; calculate the number of nops to skip in VSP
     lda #39                                 ;  2
     sec                                     ;  2
-.hard_x
+HARD_X = *+1
     sbc #0                                  ;  2
-HARD_X = .hard_x + 1
     lsr                                     ;  2
     sta .self_modifying_branch__nops + 1    ;  4
                                             ;--> 12
@@ -71,9 +70,8 @@ HARD_X = .hard_x + 1
     ; set up soft scroll
     lda #CONTROL_X                          ;  2
     clc                                     ;  2
-.soft_x
+SOFT_X = *+1
     adc #0                                  ;  2
-SOFT_X = .soft_x + 1
     sta VIC_CONTROL_X                       ;  4
                                             ;--> 10
 
@@ -96,9 +94,8 @@ SOFT_X = .soft_x + 1
     ; wobble check from above               ;  3
     lda #LINES_TO_CRUNCH                    ;  2
     sec                                     ;  2
-.hard_y
+HARD_Y = *+1
     sbc #0                                  ;  2
-HARD_Y = .hard_y + 1
     tax                                     ;  2
                                             ;--> 11
 
@@ -109,13 +106,12 @@ HARD_Y = .hard_y + 1
 
     lda #7 + (LINES_TO_CRUNCH+1) % 8        ;  2
     sec                                     ;  2
-.soft_y
+SOFT_Y = *+1
     sbc #0                                  ;  2
-SOFT_Y = .soft_y+1
 
     and #%00000111                          ;  2
     adc #CONTROL_Y_INVALID-1                ;  2
-    sta .load_soft_y+1                      ;  4
+    sta .control_y                          ;  4
                                             ;--> 14
 
     ;wait till just before LINE_O + 3 == FIRST_BADLINE
@@ -174,7 +170,7 @@ SOFT_Y = .soft_y+1
 ; soft scroll
 ;-------------------------------------------------------------------------------
 
-.load_soft_y
+.control_y = *+1
     lda #0
     sta VIC_CONTROL_Y
     pha
