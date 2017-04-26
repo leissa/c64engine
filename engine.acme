@@ -87,7 +87,7 @@ START !zone {
     lda #0
     ldx #63
 -
-    sta VIC_BANK - 64, x
+    sta VIC_BANK - 128, x
     dex
     bpl -
 
@@ -100,7 +100,7 @@ START !zone {
     bpl -
 
     ; set sprite pionters in that bank
-    lda #$ff
+    lda #$fe
     !for .i, 8 {
         sta SPR_PTR - $4000
     }
