@@ -64,6 +64,7 @@ DEC_HARD_Y !zone {
 SCROLL_U !zone {
     +wrap_dec SOFT_Y, SCROLL_SPEED, 8, .return
     jsr DEC_HARD_Y
+    dec VIC_SPR_0_Y
 
 .return
     rts
@@ -72,6 +73,7 @@ SCROLL_U !zone {
 SCROLL_D !zone {
     +wrap_inc SOFT_Y, SCROLL_SPEED, 8, .return
     jsr INC_HARD_Y
+    inc VIC_SPR_0_Y
 
 .return
     rts

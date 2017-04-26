@@ -46,11 +46,11 @@ FRAME_COUNTER_TABLE = $50-1
 CPU_STACK   = $0100; - $01FF
 
 ; 
-; VIC area: $8000 - $bfff
+; VIC area
 ; 
 
+VIC_BANK        = $4000; - $7ff
 HIRES           = $4000; - $5fff
 SPR_FR          = $6000; - $7bff -> 112 sprite frames
 SCREEN          = $7c00; - $7fff
-
 SPR_PTR         = SCREEN + $400 - 8

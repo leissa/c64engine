@@ -77,7 +77,10 @@ SOFT_X = .soft_x + 1
     sta VIC_CONTROL_X                       ;  4
                                             ;--> 10
 
-    +wait 63-11-12-11-10-6
+    ; switch to VIC bank 0
+    inc CIA2_DATA_PORT_A                    ;  6
+
+    +wait 63-11-12-11-10-6-6
 
     ; wobble check
     lda #LINE_0 + 2                         ;  2
@@ -185,6 +188,9 @@ SOFT_Y = .soft_y+1
     pla
     and #CONTROL_Y_MASK
     sta VIC_CONTROL_Y
+
+    ; switch to VIC bank 1
+    dec CIA2_DATA_PORT_A
 
 !if (>IRQ) != (>*) {
     !error "critical irq code in different pages"

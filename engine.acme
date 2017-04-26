@@ -84,9 +84,35 @@ START !zone {
 ;   setup raster irq
 ;-------------------------------------------------------------------------------
 
-    ;+set %00000001, VIC_SPR_ENABLE
-    ;+set %100, VIC_SPR_0_X
-    ;+set %100, VIC_SPR_0_Y
+    ; prepare zero sprite for clipping
+
+    ; zero-fill sprite frame
+    lda #0
+    ldx #63
+-
+    sta VIC_BANK - 64, x
+    dex
+    bpl -
+
+    ; fill test sprite frame
+    lda #$ff
+    ldx #63
+-
+    sta SPR_FR, x
+    dex
+    bpl -
+
+    ; set sprite pionters in that bank
+    lda #$ff
+    !for .i, 8 {
+        sta SPR_PTR - $4000
+    }
+
+    +set $ff, VIC_SPR_ENABLE
+    +set 100, VIC_SPR_0_X
+    +set 100, VIC_SPR_0_Y
+
+    +set (SPR_FR % $4000) / 64, SPR_PTR
 
     lda #%00011011
     ldx #0
