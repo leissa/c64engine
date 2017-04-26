@@ -28,7 +28,7 @@ IRQ !zone {
     ; save stack state
     tsx                                     ;  2
 
-    +wait 3                                 ;  6 TODO
+    +wait 3                                 ;  6
     ; begin raster stabilization
     cli                                     ;  2
                                             ;--> 51
@@ -49,10 +49,12 @@ IRQ !zone {
     ; calculate the number of nops to skip in VSP
     lda #39                                 ;  2
     sec                                     ;  2
-    sbc HARD_X                              ;  4
+.hard_x
+    sbc #0                                  ;  2
+HARD_X = .hard_x + 1
     lsr                                     ;  2
     sta .self_modifying_branch__nops + 1    ;  4
-                                            ;--> 14
+                                            ;--> 12
 
     ; introduce an extra cycle in VSP if carry is set
     bcs .set_bcc                            ;2-3
@@ -69,11 +71,13 @@ IRQ !zone {
     ; set up soft scroll
     lda #CONTROL_X                          ;  2
     clc                                     ;  2
-    adc SOFT_X                              ;  4
+.soft_x
+    adc #0                                  ;  2
+SOFT_X = .soft_x + 1
     sta VIC_CONTROL_X                       ;  4
-                                            ;--> 12
+                                            ;--> 10
 
-    +wait 63-11-14-11-12-6
+    +wait 63-11-12-11-10-6
 
     ; wobble check
     lda #LINE_0 + 2                         ;  2
@@ -89,25 +93,30 @@ IRQ !zone {
     ; wobble check from above               ;  3
     lda #LINES_TO_CRUNCH                    ;  2
     sec                                     ;  2
-    sbc HARD_Y                              ;  4
+.hard_y
+    sbc #0                                  ;  2
+HARD_Y = .hard_y + 1
     tax                                     ;  2
-                                            ;--> 13
+                                            ;--> 11
 
     ; make FIRST_BADLINE a bad line
     lda #CONTROL_Y_INVALID                  ;  2
     sta VIC_CONTROL_Y                       ;  4
                                             ;--> 6
 
-    lda #7 + (LINES_TO_CRUNCH+1) % 8            ;  2
+    lda #7 + (LINES_TO_CRUNCH+1) % 8        ;  2
     sec                                     ;  2
-    sbc SOFT_Y                              ;  4
+.soft_y
+    sbc #0                                  ;  2
+SOFT_Y = .soft_y+1
+
     and #%00000111                          ;  2
     adc #CONTROL_Y_INVALID-1                ;  2
     sta .load_soft_y+1                      ;  4
-                                            ;--> 16
+                                            ;--> 14
 
     ;wait till just before LINE_O + 3 == FIRST_BADLINE
-    +wait_loop 63 - 13 - 6 - 16 - 20 - 4
+    +wait_loop 63 - 11 - 6 - 14 - 20 - 4
 
 ;-------------------------------------------------------------------------------
 ;   FLD & line crunch

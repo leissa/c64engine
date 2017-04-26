@@ -94,14 +94,12 @@ START !zone {
     ;+set %100, VIC_SPR_0_X
     ;+set %100, VIC_SPR_0_Y
 
-
     lda #%00011011
     ldx #0
 -
     sta HIRES, x
     dex
     bne -
-
 
     sei
         +set16 IRQ, VECTOR_IRQ
@@ -116,10 +114,6 @@ START !zone {
     lda ($ff), y
     lda ($ff, x)
     lda ($ff), y
-;!for .i, 8 {
-    ;inc SCREEN + $0400 - .i
-;}
-
     sec     ; 2
     +bcs    ; 3
     jmp -
@@ -128,8 +122,3 @@ START !zone {
 !source "scroll.acme"
 !source "joystick.acme"
 !source "raster.acme"
-
-SOFT_X !by 0
-SOFT_Y !by 0
-HARD_X !by 0
-HARD_Y !by 0
