@@ -8,19 +8,19 @@
 !source "lib/cia.acme"
 !source "lib/std.acme"
 
-SLOWDOWN=2
-SCROLL_SPEED = 2
+SLOWDOWN            = 0
+SCROLL_SPEED        = 2
+
+CONTROL_X           = %00010000
+CONTROL_Y           = %00110000
+CONTROL_Y_INVALID   = %01110000
+CONTROL_Y_MASK      = %10111111
+
+LINE_0              = FIRST_BADLINE-3
+LINES_TO_CRUNCH     = 25
 
 +create_basic_starter $0c00
 *=$0c00; = 2304
-
-CONTROL_X        =%00010000
-CONTROL_Y        =%00110000
-CONTROL_Y_INVALID=%01110000
-CONTROL_Y_MASK   =%10111111
-
-LINE_0        = FIRST_BADLINE-3
-LINES_TO_CRUNCH = 25
 
 START !zone {
     ; select VIC area: bank 1
