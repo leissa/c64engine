@@ -10,12 +10,6 @@
 
 SLOWDOWN=2
 SCROLL_SPEED = 2
-X_WORKLOAD = 40 / (8/SCROLL_SPEED)
-!if X_WORKLOAD * (8 / SCROLL_SPEED) != 40 {
-    !error "invalid SCROLL_SPEED"
-}
-
-SPRITE_FRAME_BASE = 2040
 
 +create_basic_starter $0c00
 *=$0c00; = 2304
