@@ -2,6 +2,7 @@
 ; 12 cylces left border + 40 cylces screen + 11 cycles right border
 
 FIRST_RASTER = 51
+FIRST_BADLINE = FIRST_RASTER-3 ; subtract 3 due to y-softscroll
 
 ; VIC constants
 
