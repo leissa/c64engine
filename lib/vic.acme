@@ -29,7 +29,7 @@ VIC_SPR_COORDS = VIC_SPR_0_X
 
     ; Bit 7: Bit 8 of $D012
     ; Bit 6: Extended Color Modus
-    ; Bit 5: Hires-Bitmapmode
+    ; Bit 5: Bitmap Mode
     ; Bit 4: Screen output enabled?
     ; Bit 3: 25 rows (24 otherwise)
     ; Bit 2..0: Offset in raster rows starting from the top screen edge
@@ -46,7 +46,7 @@ VIC_LIGHT_PEN_Y = $D014
 VIC_SPR_ENABLE  = $D015
 
     ; Bit 7..5: unused
-    ; Bit 4: Multicolor-Bitmapmode
+    ; Bit 4: Multi-Color Mode
     ; Bit 3: 40 cols (on)/38 cols (off)
     ; Bit 2..0: Offset in Pixels starting from the left screen edge
 VIC_CONTROL_X   = $D016

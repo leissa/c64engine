@@ -46,34 +46,11 @@ FRAME_COUNTER_TABLE = $50-1
 CPU_STACK   = $0100; - $01FF
 
 ; 
-; VIC area: $4000 - $7FFF
+; VIC area: $8000 - $bfff
 ; 
 
 HIRES           = $4000; - $5fff
-SPR_FR          = $6000; - $6fff ; 32 sprites * 2 buffers * 64 bytes/frame
-
-SCREEN          = $7000; - $73ff
-SCREEN_ZERO     = $7400; only sprite ptrs used
-SCREEN_STATUS_0 = $7800; only sprite ptrs used
-SCREEN_STATUS_1 = $7c00; only sprite ptrs used
-
-SPR_FR_ZERO     = $7400; - $7440
-SPR_FR_STATUS_0 = $7800; - $7aff
-SPR_FR_STATUS_1 = $7c00; - $7dff
+SPR_FR          = $6000; - $7bff -> 112 sprite frames
+SCREEN          = $7c00; - $7fff
 
 SPR_PTR         = SCREEN + $400 - 8
-;SPR_PTR_ZERO    = SCREEN_ZERO + $400 - 8
-;SPR_PTR_STATUS_0= SCREEN_STATUS_0 + $400 - 8
-;SPR_PTR_STATUS_1= SCREEN_STATUS_1 + $400 - 8
-
-; REMARK: there is still plenty of room within the dummy screen areas
-
-SOFT_SPR_FR     = $8000; - $8fff
-SOFTCHARS       = $a000; - $7fff
-
-SOFTCHARS_C = $a800
-SOFTCHARS_S = $a900
-
-; 64 x 64 tiles (6.4 x 10.24 full screens)
-LEVEL       = $a000; - $afff
-TILES       = $b000; - $bfff

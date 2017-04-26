@@ -203,5 +203,6 @@ IRQ !zone {
 .restore_y
     ldy #0
 
+EMPTY_INTERRUPT
     rti
 }

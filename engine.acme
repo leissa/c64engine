@@ -20,22 +20,10 @@ SPRITE_FRAME_BASE = 2040
 +create_basic_starter $0c00
 *=$0c00; = 2304
 
-    ; Bit 7: Bit 8 of $D012        
-    ; Bit 6: Extended Color Modus  
-    ; Bit 5: Bitmapmode      
-    ; Bit 4: Screen output enabled?
-    ; Bit 3: 25 rows (24 otherwise)
-;CONTROL_Y        =%00111000
+CONTROL_X        =%00010000
 CONTROL_Y        =%00110000
 CONTROL_Y_MASK   =%10111111
-;CONTROL_Y_INVALID=%00110000
 CONTROL_Y_INVALID=%01110000
-
-    ; Bit 7..5: unused
-    ; Bit 4: Multicolormode
-    ; Bit 3: 40 cols (on)/38 cols (off)
-    ; Bit 2..0: Offset in Pixels starting from the left screen edge
-CONTROL_X        =%00011000
 
 FIRST_BADLINE = $30
 LINE_0        = FIRST_BADLINE-3
@@ -44,24 +32,15 @@ LINE_SPLIT    = FIRST_BADLINE-3
 LINES_TO_CRUNCH = 25
 
 START !zone {
-    ; select VIC area: $4000 - $7FFF
-    lda CIA2_CONTROL_TIMER_A
+    ; select VIC area: bank 1
+    lda CIA2_DATA_PORT_A
     and #%11111100
     ora #%00000010
     sta CIA2_DATA_PORT_A
 
-    ; select screen bank 
-    lda # ((SCREEN % $4000 / $0400) << 4) | ((HIRES % $4000 / $2000) << 2)
+    ; select screen bank 15, hires-bank 0
+    lda #%11110000
     sta VIC_ADDR_SELECT
-
-    ; init pointers
-    +set16 HIRES + 40 * 8 * 0, PTR_HIRES_R
-    +set16 COLOR_RAM + 40 * 0, PTR_COLOR_R
-    +set16 SCREEN + 40 * 0,    PTR_SCREEN_R
-
-    +set16 HIRES + 40 * 8 * 0 + 5, PTR_HIRES_C
-    +set16 COLOR_RAM + 40 * 0 + 5, PTR_COLOR_C
-    +set16 SCREEN + 40 * 0 + 5,    PTR_SCREEN_C
 
 ;-------------------------------------------------------------------------------
 ;   disable all basic, kernal and irq crap
@@ -70,17 +49,15 @@ START !zone {
     sei
 
     ; disable ROMs
-    +set RAM_ROM_ALL_RAM_WITHIO, RAM_ROM_SELECTION
+    +set RAM_ROM_ALL_RAM_WITH_IO, RAM_ROM_SELECTION
 
     ; ack all interrupts which might have happend
     +set $ff, VIC_IRQ_STATUS
     lda CIA1_INTERRUPT_CONTROL
     lda CIA2_INTERRUPT_CONTROL
 
-    ; set empty interrupt routines
+    ; set empty interrupt routine
     +set16 EMPTY_INTERRUPT, VECTOR_NMI
-    +set16 EMPTY_INTERRUPT, VECTOR_RESET
-    +set16 EMPTY_INTERRUPT, VECTOR_IRQ
 
     ; disable_timer_interrupts
     lda #%01111111
@@ -88,6 +65,7 @@ START !zone {
     sta CIA2_INTERRUPT_CONTROL
 
     ; set timer A to 0
+    lda #0
     sta CIA2_TIMER_A_LO
     sta CIA2_TIMER_A_HI
 
@@ -105,17 +83,25 @@ START !zone {
     ; enable IRQs
     cli
 
-    ; wait till the timer interrupt has happend
--
-    bit LOCK
-    bne -
-
-    ; -> NMI is disabled since we will never ever ack it again
+    ; -> NMI is disabled as soon as EMPTY_INTERRUPT has been triggered since we will never ever ack NMI again
     ; -> zero page completely free on this spot except for the special regs $00 and $01
 
 ;-------------------------------------------------------------------------------
 ;   setup raster irq
 ;-------------------------------------------------------------------------------
+
+    ;+set %00000001, VIC_SPR_ENABLE
+    ;+set %100, VIC_SPR_0_X
+    ;+set %100, VIC_SPR_0_Y
+
+
+    lda #%00011011
+    ldx #0
+-
+    sta HIRES, x
+    dex
+    bne -
+
 
     sei
         +set16 IRQ, VECTOR_IRQ
@@ -123,16 +109,6 @@ START !zone {
         +set 1, VIC_IRQ_CONTROL
     cli
 
-    ldx #0
-    lda #0
--
-!for .i, 32 {
-    sta HIRES + (.i-1)*$100, x
-    clc
-    adc #3
-}
-    inx
-    +lbne -
 -
     ; some 7 cycle garbage instructions
     lda ($ff), y
@@ -157,10 +133,3 @@ SOFT_X !by 0
 SOFT_Y !by 0
 HARD_X !by 0
 HARD_Y !by 0
-
-EMPTY_INTERRUPT
-    inc LOCK
-    rti
-
-LOCK
-    !by $ff
