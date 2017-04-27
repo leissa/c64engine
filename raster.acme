@@ -8,7 +8,10 @@
 }                                           ;--> 16
 
 !align 255, 0
-IRQ !zone {
+!zone {
+.y_scroll_wait_table
+    !by (63 * 7) / 5-3, (63 * 6) / 5, (63 * 6) / 5, (63 * 6) / 5
+IRQ
 ;-------------------------------------------------------------------------------
 ;   LINE_0
 ;-------------------------------------------------------------------------------
@@ -76,7 +79,8 @@ SOFT_X = *+1
                                             ;--> 10
 
     ; switch to VIC bank 0
-    inc CIA2_DATA_PORT_A                    ;  6
+    ;inc CIA2_DATA_PORT_A                    ;  6
+    inc $ff00                    ;  6
 
     +wait 63-11-12-11-10-6-6
 
@@ -91,31 +95,34 @@ SOFT_X = *+1
 ;   LINE_0 + 2
 ;-------------------------------------------------------------------------------
 
-    ; wobble check from above               ;  3
+    ; wobble check from above               ;-->  3
+
+    ; make FIRST_BADLINE a bad line
+    lda #CONTROL_Y_INVALID                  ;  2
+    sta VIC_CONTROL_Y                       ;  4
+                                            ;-->  6
+
     lda #LINES_TO_CRUNCH                    ;  2
     sec                                     ;  2
 HARD_Y = *+1
     sbc #0                                  ;  2
     tax                                     ;  2
-                                            ;--> 11
+                                            ;-->  8
 
-    ; make FIRST_BADLINE a bad line
-    lda #CONTROL_Y_INVALID                  ;  2
-    sta VIC_CONTROL_Y                       ;  4
-                                            ;--> 6
-
+    ; pre-compute VIC_CONTROL_Y value for soft-scrolling
     lda #7 + (LINES_TO_CRUNCH+1) % 8        ;  2
     sec                                     ;  2
 SOFT_Y = *+1
     sbc #0                                  ;  2
 
     and #%00000111                          ;  2
-    adc #CONTROL_Y_INVALID-1                ;  2
-    sta .control_y                          ;  4
-                                            ;--> 14
+    ora #CONTROL_Y_INVALID                  ;  2
+    ; spill pre-computed value
+    pha                                     ;  3
+                                            ;--> 13
 
     ;wait till just before LINE_O + 3 == FIRST_BADLINE
-    +wait_loop 63 - 11 - 6 - 14 - 20 - 4
+    +wait_loop 63 - 3 - 6 - 8 - 13 - 20 - 4
 
 ;-------------------------------------------------------------------------------
 ;   FLD & line crunch
@@ -139,7 +146,7 @@ SOFT_Y = *+1
     +inc_vic_control_y                      ; 16
                                             ;--> 20
 
-    +wait_loop 63 - 20 - 2 - 3
+    +wait 63 - 20 - 2 - 3
     dex                                     ;  2
     jmp .crunch_loop                        ;  3
 +
@@ -152,7 +159,6 @@ SOFT_Y = *+1
     ; make VSP line not a bad line
     inc VIC_CONTROL_Y
     +wait 5
-    ; crunch loop
     sec
     ; introduce an extra cycle if 39 - HARD_X is odd
 .self_modifying_branch__lsb
@@ -163,6 +169,9 @@ SOFT_Y = *+1
     +bcs                                    ;  3
     +wait 38                                ;0-38
 
+!if (>IRQ) != (>*) {
+    !error "critical irq code in different pages"
+}
     ; generate bad line
     dec VIC_CONTROL_Y
 
@@ -170,27 +179,28 @@ SOFT_Y = *+1
 ; soft scroll
 ;-------------------------------------------------------------------------------
 
-.control_y = *+1
-    lda #0
+    ; reload pre-computed VIC_CONTROL_Y value
+    pla
     sta VIC_CONTROL_Y
     pha
 
-    +wait_loop 63 * 6 + 15
+    ; wait depending on SOFT_Y
+    lda SOFT_Y
+    lsr
+    tay
+    lda .y_scroll_wait_table, y
+    tay
+-
+    dey
+    bne -
 
-    ldx SOFT_Y
-    bne +
-    +wait_loop 24
-+
+    ; get rid of illegal screen mode
     pla
     and #CONTROL_Y_MASK
     sta VIC_CONTROL_Y
-
     ; switch to VIC bank 1
-    dec CIA2_DATA_PORT_A
-
-!if (>IRQ) != (>*) {
-    !error "critical irq code in different pages"
-}
+    ;dec CIA2_DATA_PORT_A
+    dec $ff00
 
 ;-------------------------------------------------------------------------------
 ; clean up
