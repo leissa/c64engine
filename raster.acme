@@ -8,11 +8,7 @@
 }                                           ;--> 16
 
 !align 255, 0
-!zone {
-.y_scroll_wait_table 
-    ; I did trial & error to come up with theses values
-    !by 84, 75, 75, 75 
-IRQ
+IRQ !zone {
 ;-------------------------------------------------------------------------------
 ;   LINE_0
 ;-------------------------------------------------------------------------------
@@ -102,7 +98,7 @@ SOFT_X = *+1
     sta VIC_CONTROL_Y                       ;  4
                                             ;-->  6
 
-    lda #LINES_TO_CRUNCH                    ;  2
+    lda #25                                 ;  2
     sec                                     ;  2
 HARD_Y = *+1
     sbc #0                                  ;  2
@@ -110,7 +106,7 @@ HARD_Y = *+1
                                             ;-->  8
 
     ; pre-compute VIC_CONTROL_Y value for soft-scrolling
-    lda #7 + (LINES_TO_CRUNCH+1) % 8        ;  2
+    lda #7 + (25+1) % 8                     ;  2
     sec                                     ;  2
 SOFT_Y = *+1
     sbc #0                                  ;  2
@@ -179,17 +175,19 @@ SOFT_Y = *+1
 ; soft scroll
 ;-------------------------------------------------------------------------------
 
+.wait_amaount = 75
+
     ; reload pre-computed VIC_CONTROL_Y value
     pla
     sta VIC_CONTROL_Y
     pha
 
     ; wait depending on SOFT_Y
+    ldy #.wait_amaount
     lda SOFT_Y
-    lsr
-    tay
-    lda .y_scroll_wait_table, y
-    tay
+    bne +
+    ldy #.wait_amaount+9
++
 -
     dey
     bne -
