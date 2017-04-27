@@ -175,29 +175,28 @@ SOFT_Y = *+1
 ; soft scroll
 ;-------------------------------------------------------------------------------
 
-.wait_amaount = 75
-
     ; reload pre-computed VIC_CONTROL_Y value
     pla
     sta VIC_CONTROL_Y
-    pha
+    and #CONTROL_Y_MASK
+    tay
 
-    ; wait depending on SOFT_Y
-    ldy #.wait_amaount
-    lda SOFT_Y
-    bne +
-    ldy #.wait_amaount+9
-+
+    ; wait till end of AGSP region
+    lda #FIRST_BADLINE+25+8
+    ldx #FIRST_BADLINE+25+8+1
 -
-    dey
+    cmp VIC_RASTER
     bne -
 
-    ; get rid of illegal screen mode
-    pla
-    and #CONTROL_Y_MASK
-    sta VIC_CONTROL_Y
     ; switch to VIC bank 1
     dec CIA2_DATA_PORT_A
+
+    ; wait till end of AGSP region
+-
+    cpx VIC_RASTER
+    bne -
+
+    sty VIC_CONTROL_Y
 
 ;-------------------------------------------------------------------------------
 ; clean up

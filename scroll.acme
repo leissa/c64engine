@@ -64,7 +64,12 @@ DEC_HARD_Y !zone {
 SCROLL_U !zone {
     +wrap_dec SOFT_Y, SCROLL_SPEED, 8, .return
     jsr DEC_HARD_Y
+
+    lda VIC_SPR_0_Y
+    cmp #73
+    beq+
     dec VIC_SPR_0_Y
++
 
 .return
     rts
@@ -92,6 +97,7 @@ SCROLL_L !zone {
     jsr DEC_HARD_Y
 +
 .return
+    dec VIC_SPR_0_X
     rts
 }
 
@@ -106,5 +112,6 @@ SCROLL_R !zone {
     jsr INC_HARD_Y
 +
 .return
+    inc VIC_SPR_0_X
     rts
 }

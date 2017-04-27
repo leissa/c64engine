@@ -75,10 +75,8 @@ START !zone {
     ; -> zero page completely free on this spot except for the special regs $00 and $01
 
 ;-------------------------------------------------------------------------------
-;   setup raster irq
+;   setup sprites
 ;-------------------------------------------------------------------------------
-
-    ; prepare zero sprite for clipping
 
     ; zero-fill sprite frame
     lda #0
@@ -104,16 +102,13 @@ START !zone {
 
     +set $ff, VIC_SPR_ENABLE
     +set 100, VIC_SPR_0_X
-    +set 100, VIC_SPR_0_Y
+    +set  81, VIC_SPR_0_Y
 
     +set (SPR_FR % $4000) / 64, SPR_PTR
 
-    lda #%00011011
-    ldx #0
--
-    sta HIRES, x
-    dex
-    bne -
+;-------------------------------------------------------------------------------
+;   setup raster irq
+;-------------------------------------------------------------------------------
 
     sei
         +set16 IRQ, VECTOR_IRQ
