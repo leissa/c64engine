@@ -9,8 +9,9 @@
 
 !align 255, 0
 !zone {
-.y_scroll_wait_table
-    !by (63 * 7) / 5-4, (63 * 6) / 5, (63 * 6) / 5, (63 * 6) / 5
+.y_scroll_wait_table 
+    ; I did trial & error to come up with theses values
+    !by 84, 75, 75, 75 
 IRQ
 ;-------------------------------------------------------------------------------
 ;   LINE_0
