@@ -96,15 +96,17 @@ START !zone {
 
     ; set sprite pionters in that bank
     lda #$fe
+    ldx # (SPR_FR % $4000) / 64
     !for .i, 8 {
-        sta SPR_PTR - $4000
+        sta SPR_PTR - $4000 + (.i-1)
+        stx SPR_PTR + (.i-1)
     }
 
     +set $ff, VIC_SPR_ENABLE
-    +set 100, VIC_SPR_0_X
-    +set  81, VIC_SPR_0_Y
-
-    +set (SPR_FR % $4000) / 64, SPR_PTR
+    !for .i, 8 {
+        +set  24 + (.i-1) * 32, VIC_SPR_0_X + (.i-1)*2
+        +set 100, VIC_SPR_0_Y + (.i-1)*2
+    }
 
 ;-------------------------------------------------------------------------------
 ;   setup raster irq

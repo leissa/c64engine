@@ -180,22 +180,16 @@ SOFT_Y = *+1
     sta VIC_CONTROL_Y
     and #CONTROL_Y_MASK
     tay
+    ldx CIA2_DATA_PORT_A
+    dex
 
     ; wait till end of AGSP region
     lda #FIRST_BADLINE+25+8
-    ldx #FIRST_BADLINE+25+8+1
 -
     cmp VIC_RASTER
-    bne -
+    +buge -
 
-    ; switch to VIC bank 1
-    dec CIA2_DATA_PORT_A
-
-    ; wait till end of AGSP region
--
-    cpx VIC_RASTER
-    bne -
-
+    stx CIA2_DATA_PORT_A
     sty VIC_CONTROL_Y
 
 ;-------------------------------------------------------------------------------

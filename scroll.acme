@@ -62,29 +62,36 @@ DEC_HARD_Y !zone {
 }
 
 SCROLL_U !zone {
-    +wrap_dec SOFT_Y, SCROLL_SPEED, 8, .return
-    jsr DEC_HARD_Y
-
     lda VIC_SPR_0_Y
     cmp #73
     beq+
-    dec VIC_SPR_0_Y
+    !for .i, 8 {
+        dec VIC_SPR_0_Y + (.i-1)*2
+    }
 +
+    +wrap_dec SOFT_Y, SCROLL_SPEED, 8, .return
+    jsr DEC_HARD_Y
 
 .return
     rts
 }
 
 SCROLL_D !zone {
+    !for .i, 8 {
+        inc VIC_SPR_0_Y + (.i-1)*2
+    }
+
     +wrap_inc SOFT_Y, SCROLL_SPEED, 8, .return
     jsr INC_HARD_Y
-    inc VIC_SPR_0_Y
-
 .return
     rts
 }
 
 SCROLL_L !zone {
+    !for .i, 8 {
+        dec VIC_SPR_0_X + (.i-1)*2
+    }
+
     +wrap_inc SOFT_X, SCROLL_SPEED, 8, .return
 
     inc HARD_X
@@ -97,11 +104,14 @@ SCROLL_L !zone {
     jsr DEC_HARD_Y
 +
 .return
-    dec VIC_SPR_0_X
     rts
 }
 
 SCROLL_R !zone {
+    !for .i, 8 {
+        inc VIC_SPR_0_X + (.i-1)*2
+    }
+
     +wrap_dec SOFT_X, SCROLL_SPEED, 8, .return
 
     dec HARD_X
@@ -112,6 +122,5 @@ SCROLL_R !zone {
     jsr INC_HARD_Y
 +
 .return
-    inc VIC_SPR_0_X
     rts
 }
