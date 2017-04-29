@@ -19,7 +19,7 @@ Use joystick in port 2 to run the demo.
 
 * Bitmap scrolling using [AGSP](http://codebase64.org/doku.php?id=base:agsp_any_given_screen_position)
 
-    This technique only 36 raster lines CPU time and 33 raster lines of screen memory. All other screen space - including screen memory (used for colors ```%01``` and ```%10```) and color ram (color ```%11```) is moved around as well.
+    This technique only requires 36 raster lines CPU time and 33 raster lines of screen memory. All other screen space - including screen memory (used for colors ```%01``` and ```%10```) and color ram (color ```%11```) is moved around as well.
     The code for copying around tiles is not yet implemented.
     
 * Sprite-Multiplexer
