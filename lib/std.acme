@@ -249,55 +249,18 @@ VECTOR_NMI   = $fffa
 VECTOR_RESET = $fffc
 VECTOR_IRQ   = $fffe
 
-!macro save_regs {
-    ;inc VIC_BORDER
-    ;nop
-    ;nop
-    ;nop
-    sta SAVE_A
-    stx SAVE_X
-    sty SAVE_Y
-}
-
-!macro restore_regs {
-    lda SAVE_A
-    ldx SAVE_X
-    ldy SAVE_Y
-}
-
-!macro stack_save_regs {
-    pha
-    txa
-    pha
-    tya
-    pha
-}
-
-!macro stack_restore_regs {
-    pla
-    tay
-    pla
-    tax
-    pla   
+!macro save_regs .label {
+    !set .offset = 3
+    sta .label + .offset + 1
+    stx .label + .offset + 3
+    sty .label + .offset + 5
 }
 
 !macro ack_restore_rti {
-    ;dec VIC_BORDER
-    ;nop
-    ;nop
-    ;nop
     inc VIC_IRQ_STATUS
-    +restore_regs
-    rti
-}
-
-!macro stack_save_regs_and_ack_interrupt {
-    inc VIC_IRQ_STATUS
-    +stack_save_regs
-}
-
-!macro stack_restore_regs_and_rti {
-    +stack_restore_regs
+    lda #0
+    ldx #0
+    ldy #0
     rti
 }
 
