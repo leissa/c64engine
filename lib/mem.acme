@@ -22,12 +22,12 @@ CPU_STACK           = $0100
 ;  sprite multiplexer
 ;
 
-SPR_0_INDEX         = $0200; $020f
-SPR_0_X             = $0210; $021f
-SPR_0_Y             = $0220; $022f
-SPR_0_COLOR         = $0230; $023f
-SPR_0_PTR           = $0240; $024f
-SPR_0_FLAGS         = $0250; $025f
+SPR_0_INDEX         = $0200; - $020f
+SPR_0_X             = $0210; - $021f
+SPR_0_Y             = $0220; - $022f
+SPR_0_COLOR         = $0230; - $023f
+SPR_0_PTR           = $0240; - $024f
+SPR_0_FLAGS         = $0250; - $025f
 
 ;MULTI_MAX_Y_IN_STRIP = $05
 ;FRAME_COUNTER       = $06
