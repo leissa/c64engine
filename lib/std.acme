@@ -296,11 +296,11 @@ VECTOR_IRQ   = $fffe
             !error "does not work for an input value of 1"
         } else {
             !if .w % 2 = 0 {
-                !for .i, .w / 2 {
+                !for .i, 0, .w / 2 - 1 {
                     nop
                 }
             } else {
-                !for .i, (.w-3) / 2 {
+                !for .i, 0, (.w-3) / 2 - 1 {
                     nop
                 }
                 bit $ea
