@@ -47,11 +47,7 @@ START               = $080b
 
     ; set empty interrupt routine
     +set16 EMPTY_INTERRUPT, VECTOR_NMI
-
-    ; disable_timer_interrupts
-    lda #%01111111
-    sta CIA1_INTERRUPT_CONTROL
-    sta CIA2_INTERRUPT_CONTROL
+    +disable_timer_interrupts
 
     ; set timer A to 0
     lda #0
