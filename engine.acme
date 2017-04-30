@@ -75,6 +75,9 @@ START               = $080b
 ;   setup sprites
 ;-------------------------------------------------------------------------------
 
+    lda #%10101010
+    sta VIC_SPR_MULTI
+
     ; zero-fill sprite frame
     lda #0
     ldx #63
