@@ -207,3 +207,43 @@ SOFT_Y = *+1
     +ack_restore_rti
 EMPTY_INTERRUPT = *-1
 }
+
+!macro rol2 .addr {
+    php
+    rol .addr
+    plp
+    rol .addr
+}
+
+CACHE_SPRITE_STRIP !zone {
+    !for .i, 0, 3 {
+        ldy SPR_INDEX + .i, x
+
+        lda SPR_0_Y, y
+        asl
+        sta STRIP_Y + .i
+
+        lda SPR_0_X, y
+        asl
+        sta STRIP_X + .i
+        +rol2 STRIP_X_MSB
+
+        lda SPR_0_COLOR + .i, y
+        sta STRIP_COLOR_A + .i
+        asl
+        asl
+        asl
+        asl
+        sta STRIP_COLOR_B + .i
+
+        lda SPR_0_FRAME, y
+        sta STRIP_FRAME + .i
+    }
+
+    ;lda MULTI_MAX_Y_IN_STRIP
+    ;clc
+    ;adc #SPRITE_HEIGHT
+    ;+set_raster_line_8
+
+    rts
+}
