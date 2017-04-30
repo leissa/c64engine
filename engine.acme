@@ -16,10 +16,11 @@ LINE_0              = FIRST_BADLINE-3
 SCROLL_SPEED        = 2
 SLOWDOWN            = 2
 
-+create_basic_starter $0c00
-*=$0c00; = 2304
+START               = $080b
++create_basic_starter START
+*=START
 
-START !zone {
+!zone {
     ; select VIC area: bank 1
     lda CIA2_DATA_PORT_A
     and #%11111100
