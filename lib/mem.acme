@@ -1,5 +1,5 @@
 ; 
-; zero page: $0000 - $00FF
+; zero page: $0000 - $00ff
 ;
 
 RAM_ROM_SWITCH     = $01
@@ -12,6 +12,22 @@ PTR_HIRES_C         = $0c;-$0d
 PTR_COLOR_C         = $0e;-$0f
 PTR_SCREEN_C        = $10;-$11
 
+;
+; CPU stack: $0100 - $01ff
+;
+
+CPU_STACK           = $0100
+
+;
+;  sprite multiplexer
+;
+
+SPR_0_INDEX         = $0200; $020f
+SPR_0_X             = $0210; $021f
+SPR_0_Y             = $0220; $022f
+SPR_0_COLOR         = $0230; $023f
+SPR_0_PTR           = $0240; $024f
+SPR_0_FLAGS         = $0250; $025f
 
 ;MULTI_MAX_Y_IN_STRIP = $05
 ;FRAME_COUNTER       = $06
@@ -40,10 +56,10 @@ DBG = $50
 FRAME_COUNTER_TABLE = $50-1
 
 ; 
-; CPU stack: $0100 - $01FF
+; CPU stack: $0100 - $01ff
 ;
 
-CPU_STACK   = $0100; - $01FF
+CPU_STACK   = $0100; - $01ff
 
 ; 
 ; VIC area
