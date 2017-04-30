@@ -87,7 +87,7 @@ START
     ldx #$ff
     txs
 
-    +set RAM_ROM_ALL_RAM_WITHIO, RAM_ROM_SELECTION
+    +set RAM_ROM_ALL_RAM_WITH_IO, RAM_ROM_SELECTION
 
     ; just select raster interrupts
     +disable_timer_interrupts

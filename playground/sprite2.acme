@@ -2,16 +2,18 @@
 !cpu 6510               ; for illegal opcodes
 !convtab scr            ; for conversion to c64 screen codes
 
-!source "lib/vic.acme"
-!source "lib/cia.acme"
-!source "lib/std.acme"
-!source "lib/zero.acme"
+!source "../lib/vic.acme"
+!source "../lib/cia.acme"
+!source "../lib/std.acme"
+!source "../lib/zero.acme"
+!source "../lib/zero2.acme"
 
 NUM_SPRITES       = 32  ; 64 HW sprites
 SPRITE_FRAME_BASE = 2040
 ;TOP_RASTER_LINE   = 255
 TOP_RASTER_LINE   = $20
 SAFETY_LINES      = 3
+MULTI_COLOR = 1
 
 FRAME_OFFSET = 16
 SPRITE_HEIGHT = 16 + 1 - 2
@@ -70,7 +72,7 @@ START
     ldx #$ff
     txs
 
-    +set RAM_ROM_ALL_RAM_WITHIO, RAM_ROM_SELECTION
+    +set RAM_ROM_ALL_RAM_WITH_IO, RAM_ROM_SELECTION
 
     ; just select raster interrupts
     +disable_timer_interrupts
@@ -224,8 +226,6 @@ DISPLAY_SPRITE_STRIP !zone {
         lda SPRITE_STRIP_IMC_COLOR + .i
         sta VIC_SPR_0_COLOR + .i
     }
-
-}
 
     rts
 }
