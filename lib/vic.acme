@@ -8,15 +8,15 @@ FIRST_BADLINE = FIRST_RASTER-3 ; subtract 3 due to y-softscroll
 
 VIC = $D000
 
-VIC_SPR_0_X     = $D000 
-VIC_SPR_0_Y     = $D001 
-VIC_SPR_1_X     = $D002 
-VIC_SPR_1_Y     = $D003 
-VIC_SPR_2_X     = $D004 
-VIC_SPR_2_Y     = $D005 
-VIC_SPR_3_X     = $D006 
-VIC_SPR_3_Y     = $D007 
-VIC_SPR_4_X     = $D008 
+VIC_SPR_0_X     = $D000
+VIC_SPR_0_Y     = $D001
+VIC_SPR_1_X     = $D002
+VIC_SPR_1_Y     = $D003
+VIC_SPR_2_X     = $D004
+VIC_SPR_2_Y     = $D005
+VIC_SPR_3_X     = $D006
+VIC_SPR_3_Y     = $D007
+VIC_SPR_4_X     = $D008
 VIC_SPR_4_Y     = $D009
 VIC_SPR_5_X     = $D00A
 VIC_SPR_5_Y     = $D00B
@@ -39,7 +39,7 @@ VIC_SPR_COORDS = VIC_SPR_0_X
     ;       010 -> 1 pixel up
 VIC_CONTROL_Y   = $D011
 
-    ; read: current line: 
+    ; read: current line:
     ; write: interrupt request at line
 VIC_RASTER      = $D012
 VIC_LIGHT_PEN_X = $D013
@@ -70,14 +70,14 @@ VIC_ADDR_SELECT = $D018
     ;   setting a bit = appropriate interrupt flag is cleared
 VIC_IRQ_STATUS  = $D019
 
-    ; Is the appropriate bit set here and in $D019 
+    ; Is the appropriate bit set here and in $D019
     ; an IRQ is triggered and bit 7 in $D019 is set
     ;
     ; Bit 7..4: unused
     ; Bit 3: IRQ triggered by lightpen
-    ; Bit 2: IRQ triggered by S-S-collision 
+    ; Bit 2: IRQ triggered by S-S-collision
     ; Bit 1: IRQ triggered by S-B-Kollision
-    ; Bit 0: IRQ triggered by raster line 
+    ; Bit 0: IRQ triggered by raster line
 VIC_IRQ_CONTROL = $D01A
 
 VIC_SPR_PRIORITY= $D01B
@@ -103,6 +103,24 @@ VIC_SPR_4_COLOR = $D02B
 VIC_SPR_5_COLOR = $D02C
 VIC_SPR_6_COLOR = $D02D
 VIC_SPR_7_COLOR = $D02E
+
+
+BLACK           = $0
+WHITE           = $1
+RED             = $2
+CYAN            = $3
+PURPLE          = $4
+GREEN           = $5
+BLUE            = $6
+YELLOW          = $7
+ORANGE          = $8
+BROWN           = $9
+LIGHT_RED       = $a
+DARK_GREY       = $b
+GREY            = $c
+LIGHT_GREEN     = $d
+LIGHT_BLUE      = $e
+LIGHT_GREY      = $f
 
 !macro set_raster_line_8 .line {
     lda #(.line%256)

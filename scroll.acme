@@ -62,11 +62,12 @@ DEC_HARD_Y !zone {
 }
 
 SCROLL_U !zone {
+    inc HIRES
     lda VIC_SPR_0_Y
     cmp #73
     beq+
     !for .i, 0, 7 {
-        dec VIC_SPR_0_Y + .i*2
+        ;dec VIC_SPR_0_Y + .i*2
     }
 +
     +wrap_dec SOFT_Y, SCROLL_SPEED, 8, .return
@@ -78,7 +79,7 @@ SCROLL_U !zone {
 
 SCROLL_D !zone {
     !for .i, 0, 7 {
-        inc VIC_SPR_0_Y + .i*2
+        ;inc VIC_SPR_0_Y + .i*2
     }
 
     +wrap_inc SOFT_Y, SCROLL_SPEED, 8, .return
@@ -89,7 +90,7 @@ SCROLL_D !zone {
 
 SCROLL_L !zone {
     !for .i, 0, 7 {
-        dec VIC_SPR_0_X + .i*2
+        ;dec VIC_SPR_0_X + .i*2
     }
 
     +wrap_inc SOFT_X, SCROLL_SPEED, 8, .return
@@ -109,7 +110,7 @@ SCROLL_L !zone {
 
 SCROLL_R !zone {
     !for .i, 0, 7 {
-        inc VIC_SPR_0_X + .i*2
+        ;inc VIC_SPR_0_X + .i*2
     }
 
     +wrap_dec SOFT_X, SCROLL_SPEED, 8, .return

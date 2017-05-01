@@ -364,6 +364,22 @@ RAM_ROM_ALL_RAM              = %00110000
         !warn "yeah"
     }
 }
+
+!macro copy .src, .dst {
+    lda .src
+    sta .dst
+}
+
+!macro copy_x .src, .dst {
+    ldx .src
+    stx .dst
+}
+
+!macro copy_y .src, .dst {
+    ldy .src
+    sty .dst
+}
+
 !macro inc16 .val {
     inc .val
     bcc +

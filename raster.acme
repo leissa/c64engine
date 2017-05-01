@@ -195,10 +195,10 @@ SOFT_Y = *+1
 ; clean up
 ;-------------------------------------------------------------------------------
 
-    ;inc VIC_BORDER
     jsr JOY
-
-    ;dec VIC_BORDER
+    ldx #0
+    jsr CACHE_SPRITE_STRIP
+    jsr DISPLAY_SPRITE_STRIP
 
     +set_raster_line_8 LINE_0
     +set16 IRQ, VECTOR_IRQ
@@ -237,22 +237,24 @@ DISPLAY_SPRITE_STRIP
     lda STRIP_X_MSB
     sta VIC_SPR_X_MSB
 
-    ; set sprite frames
+    ; set sprite pointers
     !for .i, 0, 3 {
         ldx STRIP_0_PTR + .i
-        stx SPR_0_PTR + .i*2
+        ;ldx #$80
+        stx SPR_PTR + .i*2 + 1
         inx
-        stx SPR_0_PTR + .i*2 + 1
+        ;ldx #$80
+        stx SPR_PTR + .i*2
     }
     
     ; set colors
     !for .i, 0, 3 {
         lda STRIP_0_COLOR + .i
         sta VIC_SPR_0_COLOR + .i*2
-        asl
-        asl
-        asl
-        asl
+        lsr
+        lsr
+        lsr
+        lsr
         sta VIC_SPR_0_COLOR + .i*2 + 1
     }
 
@@ -261,7 +263,8 @@ DISPLAY_SPRITE_STRIP
 
 !zone {
 CACHE_SPRITE_STRIP 
-    !for .i, 0, 3 {
+    !for .j, 0, 3 {
+        !set .i = 3-.j
         ldy SPR_INDEX + .i, x
 
         lda SPR_0_Y, y
@@ -276,7 +279,7 @@ CACHE_SPRITE_STRIP
         lda SPR_0_COLOR + .i, y
         sta STRIP_0_COLOR + .i
 
-        lda SPR_0_PTR, y
+        lda SPR_0_PTR + .i, y
         sta STRIP_0_PTR + .i
     }
 

@@ -22,20 +22,20 @@ CPU_STACK           = $0100
 ;  sprite multiplexer
 ;
 
-SPR_INDEX           = $0200; - $020f
-SPR_0_X             = $0210; - $021f
-SPR_0_Y             = $0220; - $022f
-SPR_0_COLOR         = $0230; - $023f
-SPR_0_PTR           = $0240; - $024f
-SPR_0_FLAGS         = $0250; - $025f
-STRIP_0_X           = $0260; - $0267
-STRIP_0_Y           = $0268; - $026f
-STRIP_0_COLOR       = $0270; - $0277
-STRIP_0_PTR         = $0278; - $027f
-STRIP_X_MSB         = $0280
-STRIP_X_EXPAND      = $0281
-STRIP_Y_EXPAND      = $0282
-STRIP_MAX_Y         = $0283
+SPR_INDEX           = $0700; - $020f
+SPR_0_X             = $0710; - $021f
+SPR_0_Y             = $0720; - $022f
+SPR_0_COLOR         = $0730; - $023f
+SPR_0_PTR           = $0740; - $024f
+SPR_0_FLAGS         = $0750; - $025f
+STRIP_0_X           = $0760; - $0263
+STRIP_0_Y           = $0764; - $0267
+STRIP_0_COLOR       = $0768; - $026b
+STRIP_0_PTR         = $076c; - $026f
+STRIP_X_MSB         = $0780
+STRIP_X_EXPAND      = $0781
+STRIP_Y_EXPAND      = $0782
+STRIP_MAX_Y         = $0783
 
 ;MULTI_MAX_Y_IN_STRIP = $05
 ;FRAME_COUNTER       = $06
@@ -73,8 +73,8 @@ CPU_STACK   = $0100; - $01ff
 ; VIC area
 ; 
 
-VIC_BANK        = $4000; - $7ff
+VIC_BANK        = $4000; - $7fff
 HIRES           = $4000; - $5fff
 SPR_FR          = $6000; - $7bff -> 112 sprite frames
 SCREEN          = $7c00; - $7fff
-SPR_PTR         = SCREEN + $400 - 8
+SPR_PTR         = SCREEN + $0400 - 8
