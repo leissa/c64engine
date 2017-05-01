@@ -75,7 +75,8 @@ SOFT_X = *+1
                                             ;--> 10
 
     ; switch to VIC bank 0
-    inc CIA2_DATA_PORT_A                    ;  6
+    ;inc CIA2_DATA_PORT_A                    ;  6
+    inc $ff00
 
     +wait 63-11-12-11-10-6-6
 
@@ -183,12 +184,13 @@ SOFT_Y = *+1
     dex
 
     ; wait till end of AGSP region
-    lda #FIRST_BADLINE+25+8
+    lda #FIRST_BADLINE+25+8-1
 -
     cmp VIC_RASTER
     +buge -
 
-    stx CIA2_DATA_PORT_A
+    ;stx CIA2_DATA_PORT_A
+    stx $ff00
     sty VIC_CONTROL_Y
 
 ;-------------------------------------------------------------------------------
