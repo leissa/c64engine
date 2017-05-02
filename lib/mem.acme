@@ -5,6 +5,7 @@
 RAM_ROM_SWITCH      = $01
 TMP_SPR_X_MSB       = $02
 TMP_CONTROL_Y       = $03
+SORT_CUR_MIN        = $04
 ;
 ; CPU stack: $0100 - $01ff
 ;
