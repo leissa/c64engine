@@ -197,36 +197,44 @@ SOFT_Y = *+1
 ; sprite multiplexing
 ;-------------------------------------------------------------------------------
 
+    inc VIC_BORDER
     jsr DISPLAY_SPRITE_STRIP
     ldx #$04
     jsr CACHE_SPRITE_STRIP
+    dec VIC_BORDER
     +set16 .strip_1, VECTOR_IRQ
 .out_0
     +ack_restore_rti
 
 .strip_1
     +save_regs .out_1
+    inc VIC_BORDER
     jsr DISPLAY_SPRITE_STRIP
     ldx #$08
     jsr CACHE_SPRITE_STRIP
+    dec VIC_BORDER
     +set16 .strip_2, VECTOR_IRQ
 .out_1
     +ack_restore_rti
 
 .strip_2
     +save_regs .out_2
+    inc VIC_BORDER
     jsr DISPLAY_SPRITE_STRIP
     ldx #$0c
     jsr CACHE_SPRITE_STRIP
+    dec VIC_BORDER
     +set16 .strip_3, VECTOR_IRQ
 .out_2
     +ack_restore_rti
 
 .strip_3
     +save_regs .out_3
+    inc VIC_BORDER
     jsr DISPLAY_SPRITE_STRIP
     ldx #$00
     jsr CACHE_SPRITE_STRIP
+    dec VIC_BORDER
     +set_raster_line_8 LINE_0
     +set16 IRQ, VECTOR_IRQ
     jsr JOY
