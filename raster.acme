@@ -270,12 +270,9 @@ DISPLAY_SPRITE_STRIP
         +rol2 VIC_SPR_X_MSB
     
         ; colors
-        lda SPR_0_COLOR, y
+        lda SPR_0_COLOR_A, y
         sta VIC_SPR_0_COLOR + .i*2
-        lsr
-        lsr
-        lsr
-        lsr
+        lda SPR_0_COLOR_B, y
         sta VIC_SPR_0_COLOR + .i*2 + 1
 
         ; set sprite pointers

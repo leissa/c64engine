@@ -2,16 +2,8 @@
 ; zero page: $0000 - $00ff
 ;
 
-RAM_ROM_SWITCH     = $01
-
-PTR_TILE_R          = $04;-$05
-PTR_HIRES_R         = $06;-$07
-PTR_COLOR_R         = $08;-$09
-PTR_SCREEN_R        = $0a;-$0b
-PTR_HIRES_C         = $0c;-$0d
-PTR_COLOR_C         = $0e;-$0f
-PTR_SCREEN_C        = $10;-$11
-
+RAM_ROM_SWITCH      = $01
+;TMP_SPR_X_MSB       = $02
 ;
 ; CPU stack: $0100 - $01ff
 ;
@@ -22,20 +14,12 @@ CPU_STACK           = $0100
 ;  sprite multiplexer
 ;
 
-;SPR_INDEX           = $0700; - $020f
-SPR_0_X             = $0710; - $021f
-SPR_0_Y             = $0720; - $022f
-SPR_0_COLOR         = $0730; - $023f
-SPR_0_PTR           = $0740; - $024f
-SPR_0_FLAGS         = $0750; - $025f
-STRIP_0_X           = $0760; - $0263
-STRIP_0_Y           = $0764; - $0267
-STRIP_0_COLOR       = $0768; - $026b
-STRIP_0_PTR         = $076c; - $026f
-STRIP_X_MSB         = $0770
-STRIP_X_EXPAND      = $0771
-STRIP_Y_EXPAND      = $0772
-STRIP_MAX_Y         = $0773
+SPR_0_X             = $0700; - $070f
+SPR_0_Y             = $0710; - $071f
+SPR_0_COLOR_A       = $0720; - $072f
+SPR_0_COLOR_B       = $0730; - $073f
+SPR_0_PTR           = $0740; - $074f
+SPR_0_FLAGS         = $0750; - $075f
 
 ;MULTI_MAX_Y_IN_STRIP = $05
 ;FRAME_COUNTER       = $06
