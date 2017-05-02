@@ -109,6 +109,17 @@ START               = $080b
 
     +set $ff, VIC_SPR_ENABLE
 
+    ; fill color ram
+    ldx #0
+-
+    txa
+    sta COLOR_RAM + $0000, x
+    sta COLOR_RAM + $0100, x
+    sta COLOR_RAM + $0200, x
+    sta COLOR_RAM + $0300, x
+    dex
+    bne -
+
 ;-------------------------------------------------------------------------------
 ;   setup raster irq
 ;-------------------------------------------------------------------------------
