@@ -15,7 +15,7 @@ IRQ !zone {
 
     ; irq event                             ;  7
     ; last instruction                      ;  1 (min)
-    +save_regs .out                         ; 12
+    +save_regs .out_0                       ; 12
                                             ;--> 20
 
     ; ack interrupt
@@ -194,18 +194,43 @@ SOFT_Y = *+1
     sty VIC_CONTROL_Y
 
 ;-------------------------------------------------------------------------------
-; clean up
+; sprite multiplexing
 ;-------------------------------------------------------------------------------
 
-    jsr JOY
-    ldx #0
-    jsr CACHE_SPRITE_STRIP
     jsr DISPLAY_SPRITE_STRIP
+    ldx #$04
+    jsr CACHE_SPRITE_STRIP
+    +set16 .strip_1, VECTOR_IRQ
+.out_0
+    +ack_restore_rti
 
+.strip_1
+    +save_regs .out_1
+    jsr DISPLAY_SPRITE_STRIP
+    ldx #$08
+    jsr CACHE_SPRITE_STRIP
+    +set16 .strip_2, VECTOR_IRQ
+.out_1
+    +ack_restore_rti
+
+.strip_2
+    +save_regs .out_2
+    jsr DISPLAY_SPRITE_STRIP
+    ldx #$0c
+    jsr CACHE_SPRITE_STRIP
+    +set16 .strip_3, VECTOR_IRQ
+.out_2
+    +ack_restore_rti
+
+.strip_3
+    +save_regs .out_3
+    jsr DISPLAY_SPRITE_STRIP
+    ldx #$00
+    jsr CACHE_SPRITE_STRIP
     +set_raster_line_8 LINE_0
     +set16 IRQ, VECTOR_IRQ
-
-.out
+    jsr JOY
+.out_3
     +ack_restore_rti
 EMPTY_INTERRUPT = *-1
 }
@@ -242,10 +267,8 @@ DISPLAY_SPRITE_STRIP
     ; set sprite pointers
     !for .i, 0, 3 {
         ldx STRIP_0_PTR + .i
-        ;ldx #$80
         stx SPR_PTR + .i*2 + 1
         inx
-        ;ldx #$80
         stx SPR_PTR + .i*2
     }
     
@@ -278,14 +301,14 @@ CACHE_SPRITE_STRIP
         sta STRIP_0_X + .i
         +rol2 STRIP_X_MSB
 
-        lda SPR_0_COLOR + .i, y
+        lda SPR_0_COLOR, y
         sta STRIP_0_COLOR + .i
 
-        lda SPR_0_PTR + .i, y
+        lda SPR_0_PTR, y
         sta STRIP_0_PTR + .i
     }
 
-    ; reload max y in strip
+    ; reload max y of last strip
     lda STRIP_MAX_Y
     clc
     adc #21
@@ -294,3 +317,4 @@ CACHE_SPRITE_STRIP
     rts
 }
 
+!warn *

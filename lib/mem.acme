@@ -32,10 +32,10 @@ STRIP_0_X           = $0760; - $0263
 STRIP_0_Y           = $0764; - $0267
 STRIP_0_COLOR       = $0768; - $026b
 STRIP_0_PTR         = $076c; - $026f
-STRIP_X_MSB         = $0780
-STRIP_X_EXPAND      = $0781
-STRIP_Y_EXPAND      = $0782
-STRIP_MAX_Y         = $0783
+STRIP_X_MSB         = $0770
+STRIP_X_EXPAND      = $0771
+STRIP_Y_EXPAND      = $0772
+STRIP_MAX_Y         = $0773
 
 ;MULTI_MAX_Y_IN_STRIP = $05
 ;FRAME_COUNTER       = $06
