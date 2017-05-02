@@ -198,9 +198,8 @@ SOFT_Y = *+1
 ;-------------------------------------------------------------------------------
 
     inc VIC_BORDER
+    ldx #$00
     jsr DISPLAY_SPRITE_STRIP
-    ldx #$04
-    jsr CACHE_SPRITE_STRIP
     dec VIC_BORDER
     +set16 .strip_1, VECTOR_IRQ
 .out_0
@@ -209,9 +208,8 @@ SOFT_Y = *+1
 .strip_1
     +save_regs .out_1
     inc VIC_BORDER
+    ldx #$04
     jsr DISPLAY_SPRITE_STRIP
-    ldx #$08
-    jsr CACHE_SPRITE_STRIP
     dec VIC_BORDER
     +set16 .strip_2, VECTOR_IRQ
 .out_1
@@ -220,9 +218,8 @@ SOFT_Y = *+1
 .strip_2
     +save_regs .out_2
     inc VIC_BORDER
+    ldx #$08
     jsr DISPLAY_SPRITE_STRIP
-    ldx #$0c
-    jsr CACHE_SPRITE_STRIP
     dec VIC_BORDER
     +set16 .strip_3, VECTOR_IRQ
 .out_2
@@ -231,9 +228,8 @@ SOFT_Y = *+1
 .strip_3
     +save_regs .out_3
     inc VIC_BORDER
+    ldx #$0c
     jsr DISPLAY_SPRITE_STRIP
-    ldx #$00
-    jsr CACHE_SPRITE_STRIP
     dec VIC_BORDER
     +set_raster_line_8 LINE_0
     +set16 IRQ, VECTOR_IRQ
@@ -250,79 +246,58 @@ EMPTY_INTERRUPT = *-1
     rol .addr
 }
 
+!align 255, 0
+SPR_INDEX
+!by $00, $01, $02, $03, $04, $05, $06, $07, $08, $09, $0a, $0b, $0c, $0d, $0e, $0f; SPR_INDEX
 !zone {
 DISPLAY_SPRITE_STRIP 
-    ; set most important first: the y-coords
-    !for .i, 0, 3 {
-        lda STRIP_0_Y + .i
+    !for .j, 0, 3 {
+        !set .i = 3-.j
+        ; index
+        ldy SPR_INDEX + .i, x
+
+        ; y-coord
+        lda SPR_0_Y, y
+        asl
         sta VIC_SPR_0_Y + 4*.i
         sta VIC_SPR_0_Y + 4*.i + 2
-    }
 
-    ; remember max y-coord of this strip
-    sta STRIP_MAX_Y
-
-    ; now the x-coords
-    !for .i, 0, 3 {
-        lda STRIP_0_X + .i
+        ; x-coord
+        lda SPR_0_X, y
+        asl
         sta VIC_SPR_0_X + 4*.i
         sta VIC_SPR_0_X + 4*.i + 2
-    }
-
-    lda STRIP_X_MSB
-    sta VIC_SPR_X_MSB
-
-    ; set sprite pointers
-    !for .i, 0, 3 {
-        ldx STRIP_0_PTR + .i
-        stx SPR_PTR + .i*2 + 1
-        inx
-        stx SPR_PTR + .i*2
-    }
+        +rol2 VIC_SPR_X_MSB
     
-    ; set colors
-    !for .i, 0, 3 {
-        lda STRIP_0_COLOR + .i
+        ; colors
+        lda SPR_0_COLOR, y
         sta VIC_SPR_0_COLOR + .i*2
         lsr
         lsr
         lsr
         lsr
         sta VIC_SPR_0_COLOR + .i*2 + 1
-    }
 
-    rts
-}
-
-!zone {
-CACHE_SPRITE_STRIP 
-    !for .j, 0, 3 {
-        !set .i = 3-.j
-        ldy SPR_INDEX + .i, x
-
-        lda SPR_0_Y, y
-        asl
-        sta STRIP_0_Y + .i
-
-        lda SPR_0_X, y
-        asl
-        sta STRIP_0_X + .i
-        +rol2 STRIP_X_MSB
-
-        lda SPR_0_COLOR, y
-        sta STRIP_0_COLOR + .i
-
+        ; set sprite pointers
         lda SPR_0_PTR, y
-        sta STRIP_0_PTR + .i
+        sta SPR_PTR + .i*2 + 1
+        clc
+        adc #1
+        sta SPR_PTR + .i*2
     }
 
-    ; reload max y of last strip
-    lda STRIP_MAX_Y
-    clc
-    adc #21
+    cpx #$c0
+    beq +
+    ; fist y of next strip
+    ldy SPR_INDEX + 4, x
+    !if >* != >SPR_INDEX {
+        !error "SPR_INDEX in different pages"
+    }
+    lda SPR_0_Y, y
+    asl
+    sec
+    sbc #7
     +set_raster_line_8
-
++
     rts
 }
-
-!warn *

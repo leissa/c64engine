@@ -22,7 +22,7 @@ CPU_STACK           = $0100
 ;  sprite multiplexer
 ;
 
-SPR_INDEX           = $0700; - $020f
+;SPR_INDEX           = $0700; - $020f
 SPR_0_X             = $0710; - $021f
 SPR_0_Y             = $0720; - $022f
 SPR_0_COLOR         = $0730; - $023f
