@@ -114,7 +114,7 @@ SOFT_Y = *+1
     and #%00000111                          ;  2
     ora #CONTROL_Y_INVALID                  ;  2
     ; spill pre-computed value
-    pha                                     ;  3
+    sta TMP_CONTROL_Y                       ;  3
                                             ;--> 13
 
     ;wait till just before LINE_O + 3 == FIRST_BADLINE
@@ -176,31 +176,38 @@ SOFT_Y = *+1
 ;-------------------------------------------------------------------------------
 
     ; reload pre-computed VIC_CONTROL_Y value
-    pla
+    lda TMP_CONTROL_Y
     sta VIC_CONTROL_Y
     and #CONTROL_Y_MASK
-    tay
-    ldx CIA2_DATA_PORT_A
-    dex
+    sta TMP_CONTROL_Y
 
+    ;inc VIC_BORDER
+    ldx #$00
+    jsr DISPLAY_SPRITE_STRIP
+    ;dec VIC_BORDER
+
+    ;ldx CIA2_DATA_PORT_A
+    ;dex
+
+    lda TMP_CONTROL_Y
     ; wait till end of AGSP region
-    lda #FIRST_BADLINE+25+8-1
+    ldy #FIRST_BADLINE+25+8
 -
-    cmp VIC_RASTER
-    +buge -
+    cpy VIC_RASTER
+    bne -
 
     ;stx CIA2_DATA_PORT_A
-    stx $ff00
-    sty VIC_CONTROL_Y
+    ;stx $ff00
+    sta VIC_CONTROL_Y
 
 ;-------------------------------------------------------------------------------
 ; sprite multiplexing
 ;-------------------------------------------------------------------------------
 
-    inc VIC_BORDER
-    ldx #$00
-    jsr DISPLAY_SPRITE_STRIP
-    dec VIC_BORDER
+    ;dec VIC_BORDER
+    ;ldx #$00
+    ;jsr DISPLAY_SPRITE_STRIP
+    ;dec VIC_BORDER
     +set16 .strip_1, VECTOR_IRQ
 .out_0
     +ack_restore_rti
