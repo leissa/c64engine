@@ -247,9 +247,16 @@ EMPTY_INTERRUPT = *-1
 }
 
 !align 255, 0
-SPR_INDEX
-!by $00, $01, $02, $03, $04, $05, $06, $07, $08, $09, $0a, $0b, $0c, $0d, $0e, $0f; SPR_INDEX
 !zone {
+SPR_INDEX
+    !by $00, $01, $02, $03, $04, $05, $06, $07, $08, $09, $0a, $0b, $0c, $0d, $0e, $0f
+
+.x_msb_table
+    !by %00000000, %00000011, %00001100, %00001111
+    !by %00110000, %00110011, %00111100, %00111111
+    !by %11000000, %11000011, %11001100, %11001111
+    !by %11110000, %11110011, %11111100, %11111111
+
 DISPLAY_SPRITE_STRIP 
     !for .j, 0, 3 {
         !set .i = 3-.j
@@ -265,9 +272,9 @@ DISPLAY_SPRITE_STRIP
         ; x-coord
         lda SPR_0_X, y
         asl
+        rol TMP_SPR_X_MSB
         sta VIC_SPR_0_X + 4*.i
         sta VIC_SPR_0_X + 4*.i + 2
-        +rol2 VIC_SPR_X_MSB
     
         ; colors
         lda SPR_0_COLOR_A, y
@@ -283,18 +290,27 @@ DISPLAY_SPRITE_STRIP
         sta SPR_PTR + .i*2
     }
 
-    cpx #$c0
-    beq +
     ; fist y of next strip
     ldy SPR_INDEX + 4, x
-    !if >* != >SPR_INDEX {
-        !error "SPR_INDEX in different pages"
-    }
+.ld_index=*-1
     lda SPR_0_Y, y
     asl
     sec
     sbc #7
     +set_raster_line_8
-+
+
+    ldx TMP_SPR_X_MSB
+    lda .x_msb_table, x
+.ld_x_msb_table=*-1
+    sta VIC_SPR_X_MSB
+
     rts
+
+    !if >.ld_index != >SPR_INDEX {
+        !error ".ld_index and SPR_INDEX in different pages"
+    }
+
+    !if >.ld_x_msb_table != >.x_msb_table {
+        !error ".ld_x_msb_table and .x_msb_table in different pages"
+    }
 }
