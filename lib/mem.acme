@@ -9,7 +9,7 @@ SORT_L              = $04
 SORT_R              = $05
 SORT_L_NUM          = $06
 SORT_R_NUM          = $07
-TMP_R               = $08
+TMP_I_L             = $08
 
 SPR_I               = $10; - $1f  sprite y-coord
 SPR_Y               = $20; - $2f  sprite y-coord

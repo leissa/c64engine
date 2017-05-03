@@ -345,11 +345,10 @@ SPR_SORT !zone {
         lda #.l
         sta SORT_L
         lda #.r
+        sta sort_l_end
         sta SORT_R
-            
-        lda #.num
-        sta SORT_L_NUM
-        sta SORT_R_NUM
+        lda #.r + .num
+        sta sort_r_end
         jsr merge_sort
     }
 
@@ -360,30 +359,32 @@ SPR_SORT !zone {
     +merge  0,  4, 4
     +merge  8, 12, 4
     +merge  0,  8, 8
+    rts
 
 .swap_inc_j
     ; swap
+    ; y still holds SORT_L
     ; x still holds l-index
-    ldy SORT_L
+    stx TMP_I_L     ; spill old l-index
+
+    ; l-index := r-index
     ldx SORT_R
-
-    lda SPR_I, y
-    sta TMP_R
-
-    lda SPR_I, x
+    lda SPR_I, x 
     sta SPR_I, y
 
-    lda TMP_R
+    ; r-index := old l-index
+    lda TMP_I_L
     sta SPR_I, x
 
-    inc SORT_R
-    dec SORT_R_NUM
-    bmi .out
+sort_r_end=*+1
+    lda #0
+    sec
+    isc SORT_R
+    beq .out
 
 merge_sort
     ldy SORT_R
     ldx SPR_I, y
-    stx TMP_R
     lda SPR_Y, x    ; A: r-elem
 
     ldy SORT_L
@@ -392,9 +393,11 @@ merge_sort
     ; swap if A < M 
     +bult .swap_inc_j
 
-    inc SORT_L
-    dec SORT_L_NUM
-    bmi .out
+sort_l_end=*+1
+    lda #0
+    sec
+    isc SORT_L
+    beq .out
     jmp merge_sort
 .out
     rts
