@@ -364,17 +364,17 @@ SPR_SORT !zone {
 .swap_inc_j
     ; swap
     ; x still holds l-index
-    ldx SORT_L
-    ldy SORT_R
-
-    lda SPR_I, x
-    sta TMP_R
+    ldy SORT_L
+    ldx SORT_R
 
     lda SPR_I, y
-    sta SPR_I, x
+    sta TMP_R
+
+    lda SPR_I, x
+    sta SPR_I, y
 
     lda TMP_R
-    sta SPR_I, y
+    sta SPR_I, x
 
     inc SORT_R
     dec SORT_R_NUM
