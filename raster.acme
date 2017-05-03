@@ -243,10 +243,17 @@ SOFT_Y = *+1
     +set_raster_line_8 LINE_0
     +set16 IRQ, VECTOR_IRQ
     jsr JOY
-    +wait_loop 63 * 8
+
+    ; just for testing
+    !for .i, 0, 15 {
+        lda #.i
+        sta SPR_I + .i
+    }
+
     inc VIC_BORDER
     jsr SPR_SORT
     dec VIC_BORDER
+
 .out_3
     +ack_restore_rti
 EMPTY_INTERRUPT = *-1
@@ -341,24 +348,24 @@ SPR_SORT !zone {
 +
     }
 
-    !macro merge .l, .r, .num {
+    !macro merge .l, .num {
         lda #.l
         sta SORT_L
-        lda #.r
+        lda #.l + .num
         sta sort_l_end
         sta SORT_R
-        lda #.r + .num
+        lda #.l + 2*.num
         sta sort_r_end
         jsr merge_sort
     }
 
-    +merge  0,  2, 2
-    +merge  4,  6, 2
-    +merge  8, 10, 2
-    +merge 12, 14, 2
-    +merge  0,  4, 4
-    +merge  8, 12, 4
-    +merge  0,  8, 8
+    +merge  0, 2
+    +merge  4, 2
+    +merge  8, 2
+    +merge 12, 2
+    +merge  0, 4
+    +merge  8, 4
+    +merge  0, 8
     rts
 
 .swap_inc_j
@@ -399,6 +406,7 @@ sort_l_end=*+1
     isc SORT_L
     beq .out
     jmp merge_sort
+
 .out
     rts
 }
