@@ -258,6 +258,8 @@ EMPTY_INTERRUPT = *-1
     rol .addr
 }
 
+!warn "bytes wasted: ", SPR_I-*
+
 !align 255, 0
 !zone {
 SPR_I
