@@ -331,8 +331,8 @@ SPR_SORT !zone {
     !for .i, 0, 7 {
         ldx SPR_I + .i*2
         ldy SPR_I + .i*2 + 1
-        lda SPR_Y, y; A: right elem
-        cmp SPR_Y, x; M: left  elem
+        lda SPR_Y, y    ; A: r-elem
+        cmp SPR_Y, x    ; M: l-elem
         ; swap if A < M 
         ; skip if A >= M
         +buge +
@@ -341,12 +341,12 @@ SPR_SORT !zone {
 +
     }
 
-    !macro merge .i, .j, .num {
-        +set .i, SORT_I
-        +set .j, SORT_J
+    !macro merge .r, .l, .num {
+        +set .r, SORT_L
+        +set .l, SORT_R
         lda #.num
-        sta SORT_I_NUM
-        sta SORT_J_NUM
+        sta SORT_L_NUM
+        sta SORT_R_NUM
         jsr merge_sort
     }
 
@@ -362,35 +362,35 @@ SPR_SORT !zone {
 
 .swap_inc_j
     ; swap
-    ldy SPR_I, x
+    ; x still holds l-index
+    ldy SORT_R
     stx SPR_I, y
 
-    ldx SORT_J
-    ldy SPR_I, x
-    lda TMP_J
-    sta SPR_I, y
+    ldy SORT_L
+    ldx SPR_I, y
+    lda TMP_R
+    sta SPR_I, x
 
-    inc SORT_J
-    dec SORT_J_NUM
+    inc SORT_R
+    dec SORT_R_NUM
     bmi .out
 
 merge_sort
     rts
-
-    ldy SORT_J
+    ldy SORT_R
     ldx SPR_I, y
-    stx TMP_J
-    lda SPR_Y, x; A: right elem
+    stx TMP_R
+    lda SPR_Y, x    ; A: r-elem
 
-    ldy SORT_I
+    ldy SORT_L
     ldx SPR_I, y
-    cmp SPR_Y, x; M: left  elem
+    cmp SPR_Y, x    ; M: l-elem
     ; swap if A < M 
     ; skip if A >= M
     +buge .swap_inc_j
 
-    inc SORT_I
-    dec SORT_I_NUM
+    inc SORT_L
+    dec SORT_L_NUM
     bmi .out
     jmp merge_sort
 .out
