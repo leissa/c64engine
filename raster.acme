@@ -276,7 +276,7 @@ EMPTY_INTERRUPT = *-1
     !by %11000000, %11000011, %11001100, %11001111
     !by %11110000, %11110011, %11111100, %11111111
 
-DISPLAY_SPRITE_STRIP 
+DISPLAY_SPRITE_STRIP
     +set 0, TMP_SPR_X_MSB
     !for .i, 0, 3 {
         !set .r = 3-.i
@@ -295,7 +295,7 @@ DISPLAY_SPRITE_STRIP
         rol TMP_SPR_X_MSB
         sta VIC_SPR_0_X + 4*.r
         sta VIC_SPR_0_X + 4*.r + 2
-    
+
         ; colors
         lda SPR_A, y
         sta VIC_SPR_0_COLOR + .r*2
@@ -340,7 +340,7 @@ SPR_SORT !zone {
         ldy SPR_I + .i*2 + 1
         lda SPR_Y, y    ; A: r-elem
         cmp SPR_Y, x    ; M: l-elem
-        ; swap if A < M 
+        ; swap if A < M
         ; skip if A >= M
         +buge +
         sty SPR_I + .i*2
@@ -376,7 +376,7 @@ SPR_SORT !zone {
 
     ; l-index := r-index
     ldx SORT_R
-    lda SPR_I, x 
+    lda SPR_I, x
     sta SPR_I, y
 
     ; r-index := old l-index
@@ -397,7 +397,7 @@ merge_sort
     ldy SORT_L
     ldx SPR_I, y
     cmp SPR_Y, x    ; M: l-elem
-    ; swap if A < M 
+    ; swap if A < M
     +bult .swap_dec_l
 
 sort_r_end=*+1
@@ -409,4 +409,3 @@ sort_r_end=*+1
 .out
     rts
 }
-
