@@ -259,13 +259,10 @@ EMPTY_INTERRUPT = *-1
     rol .addr
 }
 
-!warn "bytes wasted: ", SPR_I-*
 
-!align 255, 0
 !zone {
-SPR_I
-    !by $00, $01, $02, $03, $04, $05, $06, $07, $08, $09, $0a, $0b, $0c, $0d, $0e, $0f
-
+!warn "bytes wasted: ", .x_msb_table-*
+!align 255, 0
 .x_msb_table
     !by %00000000, %00000011, %00001100, %00001111
     !by %00110000, %00110011, %00111100, %00111111
@@ -322,10 +319,6 @@ DISPLAY_SPRITE_STRIP
 
     rts
 
-    !if >.ld_index != >SPR_I {
-        !error ".ld_index and SPR_I in different pages"
-    }
-
     !if >.ld_x_msb_table != >.x_msb_table {
         !error ".ld_x_msb_table and .x_msb_table in different pages"
     }
@@ -347,6 +340,60 @@ SPR_SORT !zone {
         stx SPR_I + .i*2 + 1
 +
     }
+
+    !macro merge .i, .j, .num {
+        +set .i, SORT_I
+        +set .j, SORT_J
+        lda #.num
+        sta SORT_I_NUM
+        sta SORT_J_NUM
+        jsr merge_sort
+    }
+
+    +merge  0,  2, 2
+    +merge  4,  6, 2
+    +merge  8, 10, 2
+    +merge 12, 14, 2
+    +merge  0,  4, 4
+    +merge  8, 12, 4
+    +merge  0,  8, 8
+
+    rts
+
+.swap_inc_j
+    ; swap
+    ldy SPR_I, x
+    stx SPR_I, y
+
+    ldx SORT_J
+    ldy SPR_I, x
+    lda TMP_J
+    sta SPR_I, y
+
+    inc SORT_J
+    dec SORT_J_NUM
+    bmi .out
+
+merge_sort
+    rts
+
+    ldy SORT_J
+    ldx SPR_I, y
+    stx TMP_J
+    lda SPR_Y, x; A: right elem
+
+    ldy SORT_I
+    ldx SPR_I, y
+    cmp SPR_Y, x; M: left  elem
+    ; swap if A < M 
+    ; skip if A >= M
+    +buge .swap_inc_j
+
+    inc SORT_I
+    dec SORT_I_NUM
+    bmi .out
+    jmp merge_sort
+.out
     rts
 }
 

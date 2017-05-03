@@ -5,7 +5,15 @@
 RAM_ROM_SWITCH      = $01
 TMP_SPR_X_MSB       = $02
 TMP_CONTROL_Y       = $03
-SORT_CUR_MIN        = $04
+SORT_I              = $04
+SORT_J              = $05
+SORT_I_NUM          = $06
+SORT_J_NUM          = $07
+TMP_J               = $08
+
+SPR_I               = $10; - $1f  sprite y-coord
+SPR_Y               = $20; - $2f  sprite y-coord
+
 ;
 ; CPU stack: $0100 - $01ff
 ;
@@ -17,11 +25,10 @@ CPU_STACK           = $0100
 ;
 
 SPR_X               = $0700; - $070f  sprite x-coord
-SPR_Y               = $0710; - $071f  sprite y-coord
-SPR_A               = $0720; - $072f  sprite color A
-SPR_B               = $0730; - $073f  sprite color B
-SPR_F               = $0740; - $074f  sprite frame pointer
-SPR_E               = $0750; - $075f  sprite expand x/y
+SPR_A               = $0710; - $071f  sprite color A
+SPR_B               = $0720; - $072f  sprite color B
+SPR_F               = $0730; - $073f  sprite frame pointer
+SPR_E               = $0740; - $074f  sprite expand x/y
 
 ; 
 ; CPU stack: $0100 - $01ff
