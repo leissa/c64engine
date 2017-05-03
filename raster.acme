@@ -349,13 +349,13 @@ SPR_SORT !zone {
     }
 
     !macro merge .l, .num {
-        lda #.l
-        sta SORT_L
-        lda #.l + .num
+        lda #.l - 1
         sta sort_l_end
-        sta SORT_R
-        lda #.l + 2*.num
+        lda #.l + .num - 1
+        sta SORT_L
         sta sort_r_end
+        lda #.l + 2*.num - 1
+        sta SORT_R
         jsr merge_sort
     }
 
@@ -368,7 +368,7 @@ SPR_SORT !zone {
     +merge  0, 8
     rts
 
-.swap_inc_j
+.swap_dec_l
     ; swap
     ; y still holds SORT_L
     ; x still holds l-index
@@ -383,11 +383,11 @@ SPR_SORT !zone {
     lda TMP_I_L
     sta SPR_I, x
 
-sort_r_end=*+1
+sort_l_end=*+1
     lda #0
-    sec
-    isc SORT_R
+    dcp SORT_L
     beq .out
+    ; fall-through
 
 merge_sort
     ldy SORT_R
@@ -398,12 +398,11 @@ merge_sort
     ldx SPR_I, y
     cmp SPR_Y, x    ; M: l-elem
     ; swap if A < M 
-    +bult .swap_inc_j
+    +bult .swap_dec_l
 
-sort_l_end=*+1
+sort_r_end=*+1
     lda #0
-    sec
-    isc SORT_L
+    dcp SORT_R
     beq .out
     jmp merge_sort
 
