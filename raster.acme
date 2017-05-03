@@ -243,6 +243,7 @@ SOFT_Y = *+1
     +set_raster_line_8 LINE_0
     +set16 IRQ, VECTOR_IRQ
     jsr JOY
+    +wait_loop 63 * 8
     inc VIC_BORDER
     jsr SPR_SORT
     dec VIC_BORDER
@@ -330,6 +331,21 @@ DISPLAY_SPRITE_STRIP
 }
 
 SPR_SORT !zone {
+    ; merge sort
+
+    ; first sort all pairs
+    !for .i, 0, 7 {
+        ldx SPR_I + .i*2
+        ldy SPR_I + .i*2 + 1
+        lda SPR_Y, y; A: right elem
+        cmp SPR_Y, x; M: left  elem
+        ; swap if A < M 
+        ; skip if A >= M
+        +buge +
+        sty SPR_I + .i*2
+        stx SPR_I + .i*2 + 1
++
+    }
     rts
 }
 
