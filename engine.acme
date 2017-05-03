@@ -142,6 +142,8 @@ START               = $080b
 !source "joystick.acme"
 !source "raster.acme"
 
+!warn "code ends on: ", *-1
+
 *=HIRES
 
 !for .i, $0000, $1fff {
