@@ -258,7 +258,7 @@ EMPTY_INTERRUPT = *-1
 
 !align 255, 0
 !zone {
-SPR_INDEX
+SPR_I
     !by $00, $01, $02, $03, $04, $05, $06, $07, $08, $09, $0a, $0b, $0c, $0d, $0e, $0f
 
 .x_msb_table
@@ -271,29 +271,29 @@ DISPLAY_SPRITE_STRIP
     !for .j, 0, 3 {
         !set .i = 3-.j
         ; index
-        ldy SPR_INDEX + .i, x
+        ldy SPR_I + .i, x
 
         ; y-coord
-        lda SPR_0_Y, y
+        lda SPR_Y, y
         asl
         sta VIC_SPR_0_Y + 4*.i
         sta VIC_SPR_0_Y + 4*.i + 2
 
         ; x-coord
-        lda SPR_0_X, y
+        lda SPR_X, y
         asl
         rol TMP_SPR_X_MSB
         sta VIC_SPR_0_X + 4*.i
         sta VIC_SPR_0_X + 4*.i + 2
     
         ; colors
-        lda SPR_0_COLOR_A, y
+        lda SPR_A, y
         sta VIC_SPR_0_COLOR + .i*2
-        lda SPR_0_COLOR_B, y
+        lda SPR_B, y
         sta VIC_SPR_0_COLOR + .i*2 + 1
 
         ; set sprite pointers
-        lda SPR_0_PTR, y
+        lda SPR_F, y
         sta SPR_PTR + .i*2 + 1
         clc
         adc #1
@@ -301,9 +301,9 @@ DISPLAY_SPRITE_STRIP
     }
 
     ; fist y of next strip
-    ldy SPR_INDEX + 4, x
+    ldy SPR_I + 4, x
 .ld_index=*-1
-    lda SPR_0_Y, y
+    lda SPR_Y, y
     asl
     sec
     sbc #7
@@ -316,8 +316,8 @@ DISPLAY_SPRITE_STRIP
 
     rts
 
-    !if >.ld_index != >SPR_INDEX {
-        !error ".ld_index and SPR_INDEX in different pages"
+    !if >.ld_index != >SPR_I {
+        !error ".ld_index and SPR_I in different pages"
     }
 
     !if >.ld_x_msb_table != >.x_msb_table {
@@ -326,24 +326,6 @@ DISPLAY_SPRITE_STRIP
 }
 
 SPR_SORT !zone {
-    lda #0
-    sta SORT_CUR_MIN
-    ldy #$ff
-    ldx #$f
-.loop
-    !for .i, $0, $f {
-        cpy SPR_0_Y + .i
-        +buge +
-        cpy SORT_CUR_MIN
-        +bult +
-        ldy SPR_0_Y + .i
-        lda #.i
-+
-    }
-    sty SORT_CUR_MIN
-    ;sta SPR_INDEX, x
-    dex
-    +lbpl .loop
     rts
 }
 
