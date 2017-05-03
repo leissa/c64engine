@@ -273,36 +273,37 @@ SPR_I
     !by %11110000, %11110011, %11111100, %11111111
 
 DISPLAY_SPRITE_STRIP 
-    !for .j, 0, 3 {
-        !set .i = 3-.j
+    +set 0, TMP_SPR_X_MSB
+    !for .i, 0, 3 {
+        !set .r = 3-.i
         ; index
         ldy SPR_I + .i, x
 
         ; y-coord
         lda SPR_Y, y
         asl
-        sta VIC_SPR_0_Y + 4*.i
-        sta VIC_SPR_0_Y + 4*.i + 2
+        sta VIC_SPR_0_Y + 4*.r
+        sta VIC_SPR_0_Y + 4*.r + 2
 
         ; x-coord
         lda SPR_X, y
         asl
         rol TMP_SPR_X_MSB
-        sta VIC_SPR_0_X + 4*.i
-        sta VIC_SPR_0_X + 4*.i + 2
+        sta VIC_SPR_0_X + 4*.r
+        sta VIC_SPR_0_X + 4*.r + 2
     
         ; colors
         lda SPR_A, y
-        sta VIC_SPR_0_COLOR + .i*2
+        sta VIC_SPR_0_COLOR + .r*2
         lda SPR_B, y
-        sta VIC_SPR_0_COLOR + .i*2 + 1
+        sta VIC_SPR_0_COLOR + .r*2 + 1
 
         ; set sprite pointers
         lda SPR_F, y
-        sta SPR_PTR + .i*2 + 1
+        sta SPR_PTR + .r*2 + 1
         clc
         adc #1
-        sta SPR_PTR + .i*2
+        sta SPR_PTR + .r*2
     }
 
     ; fist y of next strip
