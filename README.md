@@ -24,5 +24,4 @@ Use joystick in port 2 to run the demo.
     
 * Sprite-Multiplexer
 
-    Current implementation is rough and needs a rewrite and must be merged into the main engine.
-    Planned is 16 x 2 sprites. This means 16 virtual multi-color sprites where each sprite is overlayed with a single-color sprite for more colors and better resolution.
+    Multiplixing 16 x 2 sprites. This means 16 virtual multi-color sprites where each sprite is overlayed with a single-color sprite for more colors and better resolution.
