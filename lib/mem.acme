@@ -11,6 +11,7 @@ SORT_R_NUM          = $07
 
 SPR_I               = $10; - $1f  sprite y-coord
 SPR_Y               = $20; - $2f  sprite y-coord
+SPR_X_MSB           = $30; $34, $38, $3c
 
 ;
 ; CPU stack: $0100 - $01ff
