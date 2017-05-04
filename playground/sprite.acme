@@ -290,7 +290,7 @@ CACHE_SPRITE_STRIP !zone {
 ;-------------------------------------------------------------------------------
 
 INTERRUPT_STRIP_0 
-    +save_regs
+    +save_regs .out_0
     jsr DISPLAY_SPRITE_STRIP
 
     lda FRAME_COUNTER
@@ -302,9 +302,12 @@ INTERRUPT_STRIP_0
 +
     +cache_sprite_strip 2
     +set16 INTERRUPT_STRIP_2, VECTOR_IRQ
+
+.out_0
     +ack_restore_rti
+
 INTERRUPT_STRIP_1 
-    +save_regs
+    +save_regs .out_1
     jsr DISPLAY_SPRITE_STRIP
 
     lda FRAME_COUNTER
@@ -312,13 +315,16 @@ INTERRUPT_STRIP_1
     beq +
     +cache_sprite_strip 2
     +set16 INTERRUPT_STRIP_2, VECTOR_IRQ
-    +ack_restore_rti
+    jmp .out_1
 +
     +cache_sprite_strip 3
     +set16 INTERRUPT_STRIP_3, VECTOR_IRQ
+
+.out_1
     +ack_restore_rti
+
 INTERRUPT_STRIP_2 
-    +save_regs
+    +save_regs .out_2
     jsr DISPLAY_SPRITE_STRIP
 
     lda FRAME_COUNTER
@@ -326,7 +332,7 @@ INTERRUPT_STRIP_2
     beq +
     +cache_sprite_strip 3
     +set16 INTERRUPT_STRIP_3, VECTOR_IRQ
-    +ack_restore_rti
+    jmp .out_2
 +
     +inc_frame_counter
     lda FRAME_COUNTER
@@ -335,14 +341,17 @@ INTERRUPT_STRIP_2
     +cache_sprite_strip 0
         +set_raster_line_8 TOP_RASTER_LINE
     +set16 INTERRUPT_STRIP_0, VECTOR_IRQ
-    +ack_restore_rti
+    jmp .out_2
 +
     +cache_sprite_strip 1
         +set_raster_line_8 TOP_RASTER_LINE
     +set16 INTERRUPT_STRIP_1, VECTOR_IRQ
+
+.out_2
     +ack_restore_rti
+
 INTERRUPT_STRIP_3 
-    +save_regs
+    +save_regs .out_3
     jsr DISPLAY_SPRITE_STRIP
 
     +inc_frame_counter
@@ -352,11 +361,13 @@ INTERRUPT_STRIP_3
     +cache_sprite_strip 0
         +set_raster_line_8 TOP_RASTER_LINE
     +set16 INTERRUPT_STRIP_0, VECTOR_IRQ
-    +ack_restore_rti
+    jmp .out_3
 +
     +cache_sprite_strip 1
         +set_raster_line_8 TOP_RASTER_LINE
     +set16 INTERRUPT_STRIP_1, VECTOR_IRQ
+
+.out_3
     +ack_restore_rti
 
 ;-------------------------------------------------------------------------------
