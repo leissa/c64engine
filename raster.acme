@@ -68,7 +68,7 @@ sort_r_end=*+1
 }
 
 !macro spr_sort {
-    ; first sort all quads via a sorting network - then use merge sort
+    ; first sort all four sixes via a sorting network - then use merge sort
 
     !macro cmp_and_swp .l, .r {
         ldx SPR_I + .l
@@ -85,31 +85,38 @@ sort_r_end=*+1
 
     !for .i, 0, 3 {
         ; see http://pages.ripco.net/~jgamble/nw.html for magic numbers
-        +cmp_and_swp 0 + .i*4, 1 + .i*4
-        +cmp_and_swp 2 + .i*4, 3 + .i*4
-        +cmp_and_swp 0 + .i*4, 2 + .i*4
-        +cmp_and_swp 1 + .i*4, 3 + .i*4
-        +cmp_and_swp 1 + .i*4, 2 + .i*4
+        +cmp_and_swp 1 + .i*6, 2 + .i*6
+        +cmp_and_swp 4 + .i*6, 5 + .i*6
+        +cmp_and_swp 0 + .i*6, 2 + .i*6
+        +cmp_and_swp 3 + .i*6, 5 + .i*6
+        +cmp_and_swp 0 + .i*6, 1 + .i*6
+        +cmp_and_swp 3 + .i*6, 4 + .i*6
+        +cmp_and_swp 2 + .i*6, 5 + .i*6
+        +cmp_and_swp 0 + .i*6, 3 + .i*6
+        +cmp_and_swp 1 + .i*6, 4 + .i*6
+        +cmp_and_swp 2 + .i*6, 4 + .i*6
+        +cmp_and_swp 1 + .i*6, 3 + .i*6
+        +cmp_and_swp 2 + .i*6, 3 + .i*6
     }
 
-    !macro merge .l, .num {
+    !macro merge .l, .m, .r {
         ldy #.l - 1
         sty sort_l_end
-        ldy #.l + .num - 1
+        ldy #.m - 1
         sty SORT_L
         sty sort_r_end
-        ldy #.l + 2*.num - 1
+        ldy #.r - 1
         sty SORT_R
         jsr MERGE_SORT
     }
 
-    +merge  0, 4
-    +merge  8, 4
-    +merge  0, 8
+    +merge  0,  6, 12
+    +merge 12, 18, 24
+    +merge  0, 12, 24
 }
 
 !macro spr_x {
-    !for .i, 0, 3 {
+    !for .i, 0, 5 {
         ldx #0
 
         !for .j, 0, 3 {
@@ -311,7 +318,7 @@ SOFT_Y = *+1
     pha
 
     ;inc VIC_BORDER
-    ldx #$00
+    ldx #0
     jsr DISPLAY_SPRITE_STRIP
     ;dec VIC_BORDER
 
@@ -329,22 +336,18 @@ SOFT_Y = *+1
     ;stx $ff00
     sta VIC_CONTROL_Y
 
-;-------------------------------------------------------------------------------
-; sprite multiplexing
-;-------------------------------------------------------------------------------
-
-    ;dec VIC_BORDER
-    ;ldx #$00
-    ;jsr DISPLAY_SPRITE_STRIP
-    ;dec VIC_BORDER
     +set16 .strip_1, VECTOR_IRQ
 .out_0
     +ack_restore_rti
 
+;-------------------------------------------------------------------------------
+; sprite multiplexing
+;-------------------------------------------------------------------------------
+
 .strip_1
     +save_regs .out_1
     inc VIC_BORDER
-    ldx #$04
+    ldx #4
     jsr DISPLAY_SPRITE_STRIP
     dec VIC_BORDER
     +set16 .strip_2, VECTOR_IRQ
@@ -354,7 +357,7 @@ SOFT_Y = *+1
 .strip_2
     +save_regs .out_2
     inc VIC_BORDER
-    ldx #$08
+    ldx #8
     jsr DISPLAY_SPRITE_STRIP
     dec VIC_BORDER
     +set16 .strip_3, VECTOR_IRQ
@@ -364,20 +367,37 @@ SOFT_Y = *+1
 .strip_3
     +save_regs .out_3
     inc VIC_BORDER
-    ldx #$0c
+    ldx #12
     jsr DISPLAY_SPRITE_STRIP
     dec VIC_BORDER
-    +set_raster_line_8 LINE_0
-    +set16 IRQ, VECTOR_IRQ
+    +set16 .strip_4, VECTOR_IRQ
+.out_3
+    +ack_restore_rti
+
+.strip_4
+    +save_regs .out_4
+    inc VIC_BORDER
+    ldx #16
+    jsr DISPLAY_SPRITE_STRIP
+    dec VIC_BORDER
+    +set16 .strip_5, VECTOR_IRQ
+.out_4
+    +ack_restore_rti
+
+.strip_5
+    +save_regs .out_5
+    inc VIC_BORDER
+    ldx #20
+    jsr DISPLAY_SPRITE_STRIP
+    dec VIC_BORDER
+
     jsr JOY
 
     ; just for testing worst-case
-    !for .i, 0, 15 {
+    !for .i, 0, 23 {
         lda #.i
         sta SPR_I + .i
     }
-
-    +wait 63*8*6
 
     inc VIC_BORDER
 AAA
@@ -386,7 +406,10 @@ AAA
     dec VIC_BORDER
     +spr_x
 
-.out_3
+    +set_raster_line_8 LINE_0
+    +set16 IRQ, VECTOR_IRQ
+
+.out_5
     +ack_restore_rti
 EMPTY_INTERRUPT = *-1
 }
