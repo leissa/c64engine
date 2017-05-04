@@ -1,15 +1,13 @@
-; 
+;
 ; zero page: $0000 - $00ff
 ;
 
 RAM_ROM_SWITCH      = $01
-TMP_SPR_X_MSB       = $02
-TMP_CONTROL_Y       = $03
+IRQ_TMP             = $02
 SORT_L              = $04
 SORT_R              = $05
 SORT_L_NUM          = $06
 SORT_R_NUM          = $07
-TMP_I_L             = $08
 
 SPR_I               = $10; - $1f  sprite y-coord
 SPR_Y               = $20; - $2f  sprite y-coord
@@ -30,15 +28,15 @@ SPR_B               = $0720; - $072f  sprite color B
 SPR_F               = $0730; - $073f  sprite frame pointer
 SPR_E               = $0740; - $074f  sprite expand x/y
 
-; 
+;
 ; CPU stack: $0100 - $01ff
 ;
 
 CPU_STACK   = $0100; - $01ff
 
-; 
+;
 ; VIC area
-; 
+;
 
 VIC_BANK        = $4000; - $7fff
 HIRES           = $4000; - $5fff

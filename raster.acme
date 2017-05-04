@@ -116,7 +116,7 @@ SOFT_Y = *+1
     and #%00000111                          ;  2
     ora #CONTROL_Y_INVALID                  ;  2
     ; spill pre-computed value
-    sta TMP_CONTROL_Y                       ;  3
+    pha                                     ;  3
                                             ;--> 13
 
     ;wait till just before LINE_O + 3 == FIRST_BADLINE
@@ -178,10 +178,10 @@ SOFT_Y = *+1
 ;-------------------------------------------------------------------------------
 
     ; reload pre-computed VIC_CONTROL_Y value
-    lda TMP_CONTROL_Y
+    pla
     sta VIC_CONTROL_Y
     and #CONTROL_Y_MASK
-    sta TMP_CONTROL_Y
+    pha
 
     ;inc VIC_BORDER
     ldx #$00
@@ -191,7 +191,7 @@ SOFT_Y = *+1
     ;ldx CIA2_DATA_PORT_A
     ;dex
 
-    lda TMP_CONTROL_Y
+    pla
     ; wait till end of AGSP region
     ldy #FIRST_BADLINE+25+8
 -
@@ -244,12 +244,6 @@ SOFT_Y = *+1
     +set16 IRQ, VECTOR_IRQ
     jsr JOY
 
-    ; just for testing
-    !for .i, 0, 15 {
-        lda #.i
-        sta SPR_I + .i
-    }
-
     inc VIC_BORDER
     jsr SPR_SORT
     dec VIC_BORDER
@@ -277,7 +271,7 @@ EMPTY_INTERRUPT = *-1
     !by %11110000, %11110011, %11111100, %11111111
 
 DISPLAY_SPRITE_STRIP
-    +set 0, TMP_SPR_X_MSB
+    +set 0, IRQ_TMP
     !for .i, 0, 3 {
         !set .r = 3-.i
         ; index
@@ -292,7 +286,7 @@ DISPLAY_SPRITE_STRIP
         ; x-coord
         lda SPR_X, y
         asl
-        rol TMP_SPR_X_MSB
+        rol IRQ_TMP
         sta VIC_SPR_0_X + 4*.r
         sta VIC_SPR_0_X + 4*.r + 2
 
@@ -319,7 +313,7 @@ DISPLAY_SPRITE_STRIP
     sbc #7
     +set_raster_line_8
 
-    ldx TMP_SPR_X_MSB
+    ldx IRQ_TMP
     lda .x_msb_table, x
 .ld_x_msb_table=*-1
     sta VIC_SPR_X_MSB
@@ -372,7 +366,7 @@ SPR_SORT !zone {
     ; swap
     ; y still holds SORT_L
     ; x still holds l-index
-    stx TMP_I_L     ; spill old l-index
+    stx IRQ_TMP     ; spill old l-index
 
     ; l-index := r-index
     ldx SORT_R
@@ -380,7 +374,7 @@ SPR_SORT !zone {
     sta SPR_I, y
 
     ; r-index := old l-index
-    lda TMP_I_L
+    lda IRQ_TMP
     sta SPR_I, x
 
 sort_l_end=*+1
