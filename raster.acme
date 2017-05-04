@@ -1,20 +1,12 @@
-!macro inc_vic_control_y {
-    lda VIC_CONTROL_Y                       ;  4
-    clc                                     ;  2
-    adc #1                                  ;  2
-    and #%00000111                          ;  2
-    adc #CONTROL_Y_INVALID                  ;  2
-    sta VIC_CONTROL_Y                       ;  4
-}                                           ;--> 16
-
 X_MSB_TABLE
     !by %00000000, %00000011, %00001100, %00001111
     !by %00110000, %00110011, %00111100, %00111111
     !by %11000000, %11000011, %11001100, %11001111
     !by %11110000, %11110011, %11111100, %11111111
 
-!warn "bytes wasted: ", IRQ-*
-
+!if DEBUG {
+    !warn "bytes wasted: ", IRQ-*
+}
 
 !zone {
 .swap_dec_l
@@ -230,6 +222,16 @@ SOFT_Y = *+1
 ;-------------------------------------------------------------------------------
 ;   FLD & line crunch
 ;-------------------------------------------------------------------------------
+
+!macro inc_vic_control_y {
+        lda VIC_CONTROL_Y                   ;  4
+        clc                                 ;  2
+        adc #1                              ;  2
+        and #%00000111                      ;  2
+        adc #CONTROL_Y_INVALID              ;  2
+        sta VIC_CONTROL_Y                   ;  4
+}                                           ;--> 16
+
 
 .fld_loop
     cpx #0                                  ;  2

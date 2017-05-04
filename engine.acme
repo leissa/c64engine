@@ -8,6 +8,7 @@
 !source "lib/cia.acme"
 !source "lib/std.acme"
 
+DEBUG               = 0
 CONTROL_X           = %00010000
 CONTROL_Y           = %00110000
 CONTROL_Y_INVALID   = %01110000
@@ -152,7 +153,9 @@ START               = $080b
 !source "joystick.acme"
 !source "raster.acme"
 
-!warn "code ends on: ", *-1
+!if DEBUG {
+    !warn "code ends on: ", *-1
+}
 
 *=HIRES
 
