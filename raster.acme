@@ -26,7 +26,7 @@ X_MSB_TABLE
 
 
 !macro spr_sort {
-    ; this is a sorting network generated with: 
+    ; this is a sorting network generated with:
     ; http://pages.ripco.net/~jgamble/nw.html
 
     !macro cmp_and_swp .l, .r {
@@ -381,9 +381,7 @@ AAA
     +spr_sort
     !warn *-AAA
     dec VIC_BORDER
-    inc VIC_BORDER
     +spr_x
-    dec VIC_BORDER
 
 .out_3
     +ack_restore_rti
