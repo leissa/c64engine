@@ -371,9 +371,8 @@ SOFT_Y = *+1
     +set16 IRQ, VECTOR_IRQ
     jsr JOY
 
+    ; just for testing worst-case
     !for .i, 0, 15 {
-        lda _spr_y + .i
-        sta SPR_Y + .i
         lda #.i
         sta SPR_I + .i
     }
