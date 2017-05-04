@@ -8,6 +8,23 @@ X_MSB_TABLE
     !warn "bytes wasted: ", IRQ-*
 }
 
+!macro cmp_and_swp_const .l, .r {
+    ldx SPR_I + .l
+    ldy SPR_I + .r
+    lda SPR_Y, y    ; A: r-elem
+    cmp SPR_Y, x    ; M: l-elem
+    ; swap if A < M
+    +bult .swap
+    +wait 4
+    jmp ++
+.swap
+    sty SPR_I + .l
+    stx SPR_I + .r
+++
+}
+; total 23
+
+
 !macro spr_sort {
     ; this is a sorting network generated with: 
     ; http://pages.ripco.net/~jgamble/nw.html
