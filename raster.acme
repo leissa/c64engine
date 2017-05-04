@@ -24,10 +24,51 @@ X_MSB_TABLE
 }
 ; total 23
 
+!zone {
+.swap_dec_l
+    ; y still holds SORT_L
+    ; x still holds l-index
+    stx IRQ_TMP     ; spill old l-index
+
+    ; l-index := r-index
+    ldx SORT_R
+    lda SPR_I, x
+    sta SPR_I, y
+
+    ; r-index := old l-index
+    lda IRQ_TMP
+    sta SPR_I, x
+
+sort_l_end=*+1
+    lda #0
+    dcp SORT_L
+    beq .out
+    ; fall-through
+
+.loop
+    ldy SORT_R
+MERGE_SORT
+    ldx SPR_I, y
+    lda SPR_Y, x    ; A: r-elem
+
+    ldy SORT_L
+    ldx SPR_I, y
+    cmp SPR_Y, x    ; M: l-elem
+    ; swap if A < M
+    +bult .swap_dec_l
+
+sort_r_end=*+1
+    lda #0
+    dcp SORT_R
+    beq .out
+    jmp .loop
+
+.out
+    rts
+}
 
 !macro spr_sort {
-    ; this is a sorting network generated with:
-    ; http://pages.ripco.net/~jgamble/nw.html
+    ; first sort all quads via a sorting network - then use merge sort
 
     !macro cmp_and_swp .l, .r {
         ldx SPR_I + .l
@@ -42,66 +83,29 @@ X_MSB_TABLE
 +
     }
 
-    +cmp_and_swp  0,  1
-    +cmp_and_swp  2,  3
-    +cmp_and_swp  4,  5
-    +cmp_and_swp  6,  7
-    +cmp_and_swp  8,  9
-    +cmp_and_swp 10, 11
-    +cmp_and_swp 12, 13
-    +cmp_and_swp 14, 15
-    +cmp_and_swp  0,  2
-    +cmp_and_swp  4,  6
-    +cmp_and_swp  8, 10
-    +cmp_and_swp 12, 14
-    +cmp_and_swp  1,  3
-    +cmp_and_swp  5,  7
-    +cmp_and_swp  9, 11
-    +cmp_and_swp 13, 15
-    +cmp_and_swp  0,  4
-    +cmp_and_swp  8, 12
-    +cmp_and_swp  1,  5
-    +cmp_and_swp  9, 13
-    +cmp_and_swp  2,  6
-    +cmp_and_swp 10, 14
-    +cmp_and_swp  3,  7
-    +cmp_and_swp 11, 15
-    +cmp_and_swp  0,  8
-    +cmp_and_swp  1,  9
-    +cmp_and_swp  2, 10
-    +cmp_and_swp  3, 11
-    +cmp_and_swp  4, 12
-    +cmp_and_swp  5, 13
-    +cmp_and_swp  6, 14
-    +cmp_and_swp  7, 15
-    +cmp_and_swp  5, 10
-    +cmp_and_swp  6,  9
-    +cmp_and_swp  3, 12
-    +cmp_and_swp 13, 14
-    +cmp_and_swp  7, 11
-    +cmp_and_swp  1,  2
-    +cmp_and_swp  4,  8
-    +cmp_and_swp  1,  4
-    +cmp_and_swp  7, 13
-    +cmp_and_swp  2,  8
-    +cmp_and_swp 11, 14
-    +cmp_and_swp  5,  6
-    +cmp_and_swp  9, 10
-    +cmp_and_swp  2,  4
-    +cmp_and_swp 11, 13
-    +cmp_and_swp  3,  8
-    +cmp_and_swp  7, 12
-    +cmp_and_swp  6,  8
-    +cmp_and_swp 10, 12
-    +cmp_and_swp  3,  5
-    +cmp_and_swp  7,  9
-    +cmp_and_swp  3,  4
-    +cmp_and_swp  5,  6
-    +cmp_and_swp  7,  8
-    +cmp_and_swp  9, 10
-    +cmp_and_swp 11, 12
-    +cmp_and_swp  6,  7
-    +cmp_and_swp  8,  9
+    !for .i, 0, 3 {
+        ; see http://pages.ripco.net/~jgamble/nw.html for magic numbers
+        +cmp_and_swp 0 + .i*4, 1 + .i*4
+        +cmp_and_swp 2 + .i*4, 3 + .i*4
+        +cmp_and_swp 0 + .i*4, 2 + .i*4
+        +cmp_and_swp 1 + .i*4, 3 + .i*4
+        +cmp_and_swp 1 + .i*4, 2 + .i*4
+    }
+
+    !macro merge .l, .num {
+        ldy #.l - 1
+        sty sort_l_end
+        ldy #.l + .num - 1
+        sty SORT_L
+        sty sort_r_end
+        ldy #.l + 2*.num - 1
+        sty SORT_R
+        jsr MERGE_SORT
+    }
+
+    +merge  0, 4
+    +merge  8, 4
+    +merge  0, 8
 }
 
 !macro spr_x {
@@ -374,7 +378,7 @@ SOFT_Y = *+1
         sta SPR_I + .i
     }
 
-    +wait 63*8*7
+    +wait 63*8*6
 
     inc VIC_BORDER
 AAA
