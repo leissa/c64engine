@@ -9,6 +9,87 @@
 
 !warn "bytes wasted: ", IRQ-*
 
+
+!zone {
+.swap_dec_l
+    ; y still holds SORT_L
+    ; x still holds l-index
+    stx IRQ_TMP     ; spill old l-index
+
+    ; l-index := r-index
+    ldx SORT_R
+    lda SPR_I, x
+    sta SPR_I, y
+
+    ; r-index := old l-index
+    lda IRQ_TMP
+    sta SPR_I, x
+
+sort_l_end=*+1
+    lda #0
+    dcp SORT_L
+    beq .out
+    ; fall-through
+
+.loop
+    ldy SORT_R
+MERGE_SORT
+    ldx SPR_I, y
+    lda SPR_Y, x    ; A: r-elem
+
+    ldy SORT_L
+    ldx SPR_I, y
+    cmp SPR_Y, x    ; M: l-elem
+    ; swap if A < M
+    +bult .swap_dec_l
+
+sort_r_end=*+1
+    lda #0
+    dcp SORT_R
+    beq .out
+    jmp .loop
+
+.out
+    rts
+}
+
+!macro spr_sort {
+    ; merge sort
+
+    ; first sort all pairs
+    !for .i, 0, 7 {
+        ldx SPR_I + .i*2
+        ldy SPR_I + .i*2 + 1
+        lda SPR_Y, y    ; A: r-elem
+        cmp SPR_Y, x    ; M: l-elem
+        ; swap if A < M
+        ; skip if A >= M
+        +buge +
+        sty SPR_I + .i*2
+        stx SPR_I + .i*2 + 1
++
+    }
+
+    !macro merge .l, .num {
+        ldy #.l - 1
+        sty sort_l_end
+        ldy #.l + .num - 1
+        sty SORT_L
+        sty sort_r_end
+        ldy #.l + 2*.num - 1
+        sty SORT_R
+        jsr MERGE_SORT
+    }
+
+    +merge  0, 2
+    +merge  4, 2
+    +merge  8, 2
+    +merge 12, 2
+    +merge  0, 4
+    +merge  8, 4
+    +merge  0, 8
+}
+
 !align 255, 0
 IRQ !zone {
 ;-------------------------------------------------------------------------------
@@ -244,8 +325,15 @@ SOFT_Y = *+1
     +set16 IRQ, VECTOR_IRQ
     jsr JOY
 
+    !for .i, 0, 15 {
+        lda _spr_y + .i
+        sta SPR_Y + .i
+        lda #.i
+        sta SPR_I + .i
+    }
+
     inc VIC_BORDER
-    jsr SPR_SORT
+    +spr_sort
     dec VIC_BORDER
 
 .out_3
@@ -323,83 +411,4 @@ DISPLAY_SPRITE_STRIP
     !if >.ld_x_msb_table != >.x_msb_table {
         !error ".ld_x_msb_table and .x_msb_table in different pages"
     }
-}
-
-SPR_SORT !zone {
-    ; merge sort
-
-    ; first sort all pairs
-    !for .i, 0, 7 {
-        ldx SPR_I + .i*2
-        ldy SPR_I + .i*2 + 1
-        lda SPR_Y, y    ; A: r-elem
-        cmp SPR_Y, x    ; M: l-elem
-        ; swap if A < M
-        ; skip if A >= M
-        +buge +
-        sty SPR_I + .i*2
-        stx SPR_I + .i*2 + 1
-+
-    }
-
-    !macro merge .l, .num {
-        lda #.l - 1
-        sta sort_l_end
-        lda #.l + .num - 1
-        sta SORT_L
-        sta sort_r_end
-        lda #.l + 2*.num - 1
-        sta SORT_R
-        jsr merge_sort
-    }
-
-    +merge  0, 2
-    +merge  4, 2
-    +merge  8, 2
-    +merge 12, 2
-    +merge  0, 4
-    +merge  8, 4
-    +merge  0, 8
-    rts
-
-.swap_dec_l
-    ; swap
-    ; y still holds SORT_L
-    ; x still holds l-index
-    stx IRQ_TMP     ; spill old l-index
-
-    ; l-index := r-index
-    ldx SORT_R
-    lda SPR_I, x
-    sta SPR_I, y
-
-    ; r-index := old l-index
-    lda IRQ_TMP
-    sta SPR_I, x
-
-sort_l_end=*+1
-    lda #0
-    dcp SORT_L
-    beq .out
-    ; fall-through
-
-merge_sort
-    ldy SORT_R
-    ldx SPR_I, y
-    lda SPR_Y, x    ; A: r-elem
-
-    ldy SORT_L
-    ldx SPR_I, y
-    cmp SPR_Y, x    ; M: l-elem
-    ; swap if A < M
-    +bult .swap_dec_l
-
-sort_r_end=*+1
-    lda #0
-    dcp SORT_R
-    beq .out
-    jmp merge_sort
-
-.out
-    rts
 }
