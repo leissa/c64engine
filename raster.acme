@@ -85,18 +85,15 @@ sort_r_end=*+1
 
     !for .i, 0, 3 {
         ; see http://pages.ripco.net/~jgamble/nw.html for magic numbers
-        +cmp_and_swp 1 + .i*6, 2 + .i*6
-        +cmp_and_swp 4 + .i*6, 5 + .i*6
-        +cmp_and_swp 0 + .i*6, 2 + .i*6
-        +cmp_and_swp 3 + .i*6, 5 + .i*6
-        +cmp_and_swp 0 + .i*6, 1 + .i*6
-        +cmp_and_swp 3 + .i*6, 4 + .i*6
-        +cmp_and_swp 2 + .i*6, 5 + .i*6
-        +cmp_and_swp 0 + .i*6, 3 + .i*6
-        +cmp_and_swp 1 + .i*6, 4 + .i*6
-        +cmp_and_swp 2 + .i*6, 4 + .i*6
-        +cmp_and_swp 1 + .i*6, 3 + .i*6
-        +cmp_and_swp 2 + .i*6, 3 + .i*6
+        +cmp_and_swp 0 + .i*5, 1 + .i*5
+        +cmp_and_swp 3 + .i*5, 4 + .i*5
+        +cmp_and_swp 2 + .i*5, 4 + .i*5
+        +cmp_and_swp 2 + .i*5, 3 + .i*5
+        +cmp_and_swp 1 + .i*5, 4 + .i*5
+        +cmp_and_swp 0 + .i*5, 3 + .i*5
+        +cmp_and_swp 0 + .i*5, 2 + .i*5
+        +cmp_and_swp 1 + .i*5, 3 + .i*5
+        +cmp_and_swp 1 + .i*5, 2 + .i*5
     }
 
     !macro merge .l, .m, .r {
@@ -110,9 +107,9 @@ sort_r_end=*+1
         jsr MERGE_SORT
     }
 
-    +merge  0,  6, 12
-    +merge 12, 18, 24
-    +merge  0, 12, 24
+    +merge  0,  5, 10
+    +merge 10, 15, 20
+    +merge  0, 10, 20
 }
 
 !macro spr_x {
@@ -380,36 +377,24 @@ SOFT_Y = *+1
     ldx #16
     jsr DISPLAY_SPRITE_STRIP
     dec VIC_BORDER
-    +set16 .strip_5, VECTOR_IRQ
-.out_4
-    +ack_restore_rti
-
-.strip_5
-    +save_regs .out_5
-    inc VIC_BORDER
-    ldx #20
-    jsr DISPLAY_SPRITE_STRIP
-    dec VIC_BORDER
 
     jsr JOY
 
     ; just for testing worst-case
-    !for .i, 0, 23 {
-        lda #.i
-        sta SPR_I + .i
-    }
+    ;!for .i, 0, 19 {
+        ;lda #.i
+        ;sta SPR_I + .i
+    ;}
 
     inc VIC_BORDER
-AAA
     +spr_sort
-    !warn *-AAA
     dec VIC_BORDER
     +spr_x
 
     +set_raster_line_8 LINE_0
     +set16 IRQ, VECTOR_IRQ
 
-.out_5
+.out_4
     +ack_restore_rti
 EMPTY_INTERRUPT = *-1
 }

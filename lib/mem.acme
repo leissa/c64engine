@@ -10,8 +10,8 @@ SORT_L_NUM          = $06
 SORT_R_NUM          = $07
 
 SPR_I               = $10;
-SPR_Y               = $28;
-SPR_X_MSB           = $40;
+SPR_Y               = SPR_I + 20
+SPR_X_MSB           = SPR_Y + 20
 
 ;
 ; CPU stack: $0100 - $01ff
@@ -22,11 +22,6 @@ CPU_STACK           = $0100
 ;
 ;  sprite multiplexer
 ;
-
-SPR_X               = $0700; - $070f  sprite x-coord
-SPR_A               = $0718; - $071f  sprite color A
-SPR_B               = $0730; - $072f  sprite color B
-SPR_F               = $0748; - $073f  sprite frame pointer
 
 ;
 ; CPU stack: $0100 - $01ff

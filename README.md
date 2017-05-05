@@ -24,4 +24,4 @@ Use joystick in port 2 to run the demo.
     
 * Sprite-Multiplexer
 
-    Multiplixing 24 x 2 sprites. This means 24 virtual multi-color sprites where each sprite is overlayed with a single-color sprite for more colors and better resolution.
+    Multiplixing 20 x 2 sprites. This means 20 virtual multi-color sprites where each sprite is overlayed with a single-color sprite for more colors and better resolution.
