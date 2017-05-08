@@ -394,15 +394,13 @@ SOFT_Y = *+1
     jsr JOY
 
     ; just for testing worst-case
-    !for .i, 0, 23 {
-        lda #.i
-        sta SPR_I + .i
-    }
+    ;!for .i, 0, 23 {
+        ;lda #.i
+        ;sta SPR_I + .i
+    ;}
 
     inc VIC_BORDER
-AAA
     +spr_sort
-    !warn *-AAA
     dec VIC_BORDER
     +spr_x
 
@@ -413,14 +411,6 @@ AAA
     +ack_restore_rti
 EMPTY_INTERRUPT = *-1
 }
-
-!macro rol2 .addr {
-    php
-    rol .addr
-    plp
-    rol .addr
-}
-
 
 !zone {
 DISPLAY_SPRITE_STRIP

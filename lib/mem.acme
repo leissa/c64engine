@@ -20,13 +20,8 @@ SPR_X_MSB           = $40;
 CPU_STACK           = $0100
 
 ;
-;  sprite multiplexer
+;  sprite multiplexer: $0700
 ;
-
-SPR_X               = $0700; - $070f  sprite x-coord
-SPR_A               = $0718; - $071f  sprite color A
-SPR_B               = $0730; - $072f  sprite color B
-SPR_F               = $0748; - $073f  sprite frame pointer
 
 ;
 ; CPU stack: $0100 - $01ff
