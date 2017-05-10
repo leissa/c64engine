@@ -8,111 +8,28 @@ X_MSB_TABLE
     !warn "bytes wasted: ", IRQ-*
 }
 
-!macro cmp_and_swp_const .l, .r {
-    ldx SPR_I + .l
-    ldy SPR_I + .r
-    lda SPR_Y, y    ; A: r-elem
-    cmp SPR_Y, x    ; M: l-elem
-    ; swap if A < M
-    +bult .swap
-    +wait 4
-    jmp ++
-.swap
-    sty SPR_I + .l
-    stx SPR_I + .r
-++
-}
-; total 23
-
-!zone {
-.swap_dec_l
-    ; y still holds SORT_L
-    ; x still holds l-index
-    stx IRQ_TMP     ; spill old l-index
-
-    ; l-index := r-index
-    ldx SORT_R
-    lda SPR_I, x
-    sta SPR_I, y
-
-    ; r-index := old l-index
-    lda IRQ_TMP
-    sta SPR_I, x
-
-sort_l_end=*+1
-    lda #0
-    dcp SORT_L
-    beq .out
-    ; fall-through
-
-.loop
-    ldy SORT_R
-MERGE_SORT
-    ldx SPR_I, y
-    lda SPR_Y, x    ; A: r-elem
-
-    ldy SORT_L
-    ldx SPR_I, y
-    cmp SPR_Y, x    ; M: l-elem
-    ; swap if A < M
-    +bult .swap_dec_l
-
-sort_r_end=*+1
-    lda #0
-    dcp SORT_R
-    beq .out
-    jmp .loop
-
-.out
-    rts
-}
-
 !macro spr_sort {
-    ; first sort all four sixes via a sorting network - then use merge sort
-
-    !macro cmp_and_swp .l, .r {
-        ldx SPR_I + .l
-        ldy SPR_I + .r
-        lda SPR_Y, y    ; A: r-elem
-        cmp SPR_Y, x    ; M: l-elem
+    !for .i, 0, 23-1 {
+        ldy SPR_I + .i + 1
+        ldx SPR_I + .i
+        lda SPR_Y, y        ; A: r-elem
+        cmp SPR_Y, x        ; M: l-elem
         ; swap if A < M
         ; skip if A >= M
         +buge +
-        sty SPR_I + .l
-        stx SPR_I + .r
+        stx SPR_I + .i + 1
+        sty SPR_I + .i
+        !if .i = 0 {
+            ; do nothing
+        } else {
+            !if .i = 1 {
+                +bult *-28  ; always true
+            } else {
+                +bult *-30  ; always true
+            }
+        }
 +
     }
-
-    !for .i, 0, 3 {
-        ; see http://pages.ripco.net/~jgamble/nw.html for magic numbers
-        +cmp_and_swp 1 + .i*6, 2 + .i*6
-        +cmp_and_swp 4 + .i*6, 5 + .i*6
-        +cmp_and_swp 0 + .i*6, 2 + .i*6
-        +cmp_and_swp 3 + .i*6, 5 + .i*6
-        +cmp_and_swp 0 + .i*6, 1 + .i*6
-        +cmp_and_swp 3 + .i*6, 4 + .i*6
-        +cmp_and_swp 2 + .i*6, 5 + .i*6
-        +cmp_and_swp 0 + .i*6, 3 + .i*6
-        +cmp_and_swp 1 + .i*6, 4 + .i*6
-        +cmp_and_swp 2 + .i*6, 4 + .i*6
-        +cmp_and_swp 1 + .i*6, 3 + .i*6
-        +cmp_and_swp 2 + .i*6, 3 + .i*6
-    }
-
-    !macro merge .l, .m, .r {
-        ldy #.l - 1
-        sty sort_l_end
-        ldy #.m - 1
-        sty SORT_L
-        sty sort_r_end
-        ldy #.r - 1
-        sty SORT_R
-        jsr MERGE_SORT
-    }
-
-    +merge  0,  6, 12
-    +merge 12, 18, 24
-    +merge  0, 12, 24
 }
 
 !macro spr_x {
@@ -392,12 +309,6 @@ SOFT_Y = *+1
     dec VIC_BORDER
 
     jsr JOY
-
-    ; just for testing worst-case
-    ;!for .i, 0, 23 {
-        ;lda #.i
-        ;sta SPR_I + .i
-    ;}
 
     inc VIC_BORDER
     +spr_sort

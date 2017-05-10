@@ -3,7 +3,6 @@
 ;
 
 RAM_ROM_SWITCH      = $01
-IRQ_TMP             = $02
 SORT_L              = $04
 SORT_R              = $05
 SORT_L_NUM          = $06
