@@ -1,46 +1,74 @@
 JOY !zone {
-!if SLOWDOWN != 0 {
-    inc .slowdown
-    lda .slowdown
-    cmp #SLOWDOWN
-    beq +
-    rts
+    !if SLOWDOWN != 0 {
+        inc .slowdown
+        lda .slowdown
+        cmp #SLOWDOWN
+        beq +
+        rts
 +
-    lda #0
-    sta .slowdown
-}
+        lda #0
+        sta .slowdown
+    }
+
+    ldx CUR_SPR
+    inc SPR_A, x
+
     lda CIA1_PORT_2
 .up
-    lsr 
+    lsr
     bcs .down
     pha
     jsr SCROLL_U
     pla
+
+    ldx CUR_SPR
+    dec SPR_Y, x
+
 .down
     lsr
     bcs .left
     pha
     jsr SCROLL_D
     pla
+
+    ldx CUR_SPR
+    inc SPR_Y, x
+
 .left
     lsr
     bcs .right
     pha
     jsr SCROLL_L
     pla
+
+    ldx CUR_SPR
+    dec SPR_X, x
+
 .right
     lsr
     bcs .fire
     pha
     jsr SCROLL_R
     pla
+
+    ldx CUR_SPR
+    inc SPR_X, x
+
 .fire
     lsr
     bcs +
-    inc SCREEN
+    lda #$ff
+    dcp CUR_SPR
+    bne .no_wrap
+    lda #23
+    sta CUR_SPR
+.no_wrap
 +
     rts
 
 .slowdown !by 0
 }
+
+CUR_SPR
+    !by 23
 
