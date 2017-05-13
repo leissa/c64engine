@@ -344,9 +344,9 @@ DISPLAY_SPRITE_STRIP
 
         ; colors
         lda SPR_A, y
-        sta VIC_SPR_0_COLOR + .r*2
-        lda SPR_B, y
         sta VIC_SPR_0_COLOR + .r*2 + 1
+        lda SPR_B, y
+        sta VIC_SPR_0_COLOR + .r*2
 
         ; set sprite pointers
         lda SPR_F, y
