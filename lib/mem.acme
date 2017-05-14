@@ -10,7 +10,6 @@ SORT_R_NUM          = $07
 
 SPR_I               = $10;
 SPR_Y               = $28;
-SPR_X_MSB           = $40;
 
 ;
 ; CPU stack: $0100 - $01ff

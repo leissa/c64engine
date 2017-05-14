@@ -1,9 +1,3 @@
-X_MSB_TABLE
-    !by %00000000, %00000011, %00001100, %00001111
-    !by %00110000, %00110011, %00111100, %00111111
-    !by %11000000, %11000011, %11001100, %11001111
-    !by %11110000, %11110011, %11111100, %11111111
-
 !if DEBUG {
     !warn "bytes wasted: ", IRQ-*
 }
@@ -29,24 +23,6 @@ X_MSB_TABLE
             }
         }
 +
-    }
-}
-
-!macro spr_x {
-    !for .i, 0, 5 {
-        ldx #0
-
-        !for .j, 0, 3 {
-            ldy SPR_I + .i*4 + .j
-            lda SPR_X, y
-            asl
-            txa
-            rol
-            tax
-        }
-
-        lda X_MSB_TABLE, x
-        sta SPR_X_MSB + .i*4
     }
 }
 
@@ -313,7 +289,6 @@ SOFT_Y = *+1
     inc VIC_BORDER
     +spr_sort
     dec VIC_BORDER
-    +spr_x
 
     +set_raster_line_8 LINE_0
     +set16 IRQ, VECTOR_IRQ
@@ -337,9 +312,20 @@ DISPLAY_SPRITE_STRIP
 
         ; x-coord
         lda SPR_X, y
-        asl
         sta VIC_SPR_0_X + 4*.r
         sta VIC_SPR_0_X + 4*.r + 2
+
+        lda SPR_X_MSB, y
+        beq +
+        lda #%00000011 << .r*2
+        ora VIC_SPR_X_MSB
+        ; always true
+        bne ++
++
+        lda # <(!(%00000011 << .r*2))
+        and VIC_SPR_X_MSB
+++
+        sta VIC_SPR_X_MSB
 
         ; colors
         lda SPR_A, y
@@ -354,9 +340,6 @@ DISPLAY_SPRITE_STRIP
         iny
         sty SPR_PTR + .r*2
     }
-
-    lda SPR_X_MSB, x
-    sta VIC_SPR_X_MSB
 
     ; fist y of next strip
     ldy SPR_I + 4, x
