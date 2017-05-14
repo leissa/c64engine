@@ -34,7 +34,7 @@ IRQ !zone {
 
     ; irq event                             ;  7
     ; last instruction                      ;  1 (min)
-    +save_regs .out_0                       ; 12
+    +save_regs out                          ; 12
                                             ;--> 20
 
     ; ack interrupt
@@ -201,7 +201,7 @@ SOFT_Y = *+1
     dec VIC_CONTROL_Y
 
 ;-------------------------------------------------------------------------------
-; soft scroll
+; prepare soft scroll
 ;-------------------------------------------------------------------------------
 
     ; reload pre-computed VIC_CONTROL_Y value
@@ -210,13 +210,53 @@ SOFT_Y = *+1
     and #CONTROL_Y_MASK
     pha
 
-    ;inc VIC_BORDER
-    ldx #0
-    jsr DISPLAY_SPRITE_STRIP
-    ;dec VIC_BORDER
+;-------------------------------------------------------------------------------
+; use wait time to setup first sprite strip
+;-------------------------------------------------------------------------------
 
-    ;ldx CIA2_DATA_PORT_A
-    ;dex
+    lda #0          ; x_msb
+    !for .i, 0, 3 {
+        !set .r = 3-.i
+        ; index
+        ldy SPR_I + .i
+
+        ; y-coord
+        ldx SPR_Y, y
+        stx VIC_SPR_0_Y + 4*.r
+        stx VIC_SPR_0_Y + 4*.r + 2
+
+        ; x-coord
+        ldx SPR_X, y
+        stx VIC_SPR_0_X + 4*.r
+        stx VIC_SPR_0_X + 4*.r + 2
+
+        ; x-coord MSB
+        ldx SPR_X_MSB, y
+        beq +
+        !if .i = 0 {
+            lda #%00000011 << .r*2
+        } else {
+            ora #%00000011 << .r*2
+        }
++
+        ; set sprite pointers
+        ldx SPR_F, y
+        stx SPR_PTR + .r*2 + 1
+        inx
+        stx SPR_PTR + .r*2
+
+        ; colors
+        ldx SPR_A, y
+        stx VIC_SPR_0_COLOR + .r*2 + 1
+        ldx SPR_B, y
+        stx VIC_SPR_0_COLOR + .r*2
+    }
+
+    sta VIC_SPR_X_MSB
+
+;-------------------------------------------------------------------------------
+; issue soft scroll
+;-------------------------------------------------------------------------------
 
     pla
     ; wait till end of AGSP region
@@ -229,61 +269,93 @@ SOFT_Y = *+1
     ;stx $ff00
     sta VIC_CONTROL_Y
 
-    +set16 .strip_1, VECTOR_IRQ
-.out_0
-    +ack_restore_rti
-
 ;-------------------------------------------------------------------------------
 ; sprite multiplexing
 ;-------------------------------------------------------------------------------
 
-.strip_1
-    +save_regs .out_1
     inc VIC_BORDER
     ldx #4
-    jsr DISPLAY_SPRITE_STRIP
-    dec VIC_BORDER
-    +set16 .strip_2, VECTOR_IRQ
-.out_1
-    +ack_restore_rti
+    stx SPR_COUNTER
 
-.strip_2
-    +save_regs .out_2
-    inc VIC_BORDER
-    ldx #8
-    jsr DISPLAY_SPRITE_STRIP
-    dec VIC_BORDER
-    +set16 .strip_3, VECTOR_IRQ
-.out_2
-    +ack_restore_rti
+rotate
+    !for .i, 0, 3 {
+        !set r = 3-.i
+        !zone {
+            lda VIC_SPR_0_Y + r*4
+            clc
+            adc #21 + 2     ; carry clear - so add one extra for borrow
+            sbc VIC_RASTER
+            +bult .display_sprite
 
-.strip_3
-    +save_regs .out_3
-    inc VIC_BORDER
-    ldx #12
-    jsr DISPLAY_SPRITE_STRIP
-    dec VIC_BORDER
-    +set16 .strip_4, VECTOR_IRQ
-.out_3
-    +ack_restore_rti
+            ; don't issue next interrupt to early - let's have 3 raster lines safety
+            cmp #5
+            +buge +
+            lda #5
++
+            clc
+            adc VIC_RASTER
+            sta VIC_RASTER
 
-.strip_4
-    +save_regs .out_4
-    inc VIC_BORDER
-    ldx #16
-    jsr DISPLAY_SPRITE_STRIP
-    dec VIC_BORDER
-    +set16 .strip_5, VECTOR_IRQ
-.out_4
-    +ack_restore_rti
+            +set16 .next_irq, VECTOR_IRQ
+            stx SPR_COUNTER
+            jmp out_x
 
-.strip_5
-    +save_regs .out_5
-    inc VIC_BORDER
-    ldx #20
-    jsr DISPLAY_SPRITE_STRIP
-    dec VIC_BORDER
+.next_irq
+            +save_regs out
+            inc VIC_BORDER
+            ldx SPR_COUNTER
 
+.display_sprite
+            ldy SPR_I, x
+
+            ; y-coord
+            lda SPR_Y, y
+
+            ; are we too late?
+            cmp VIC_RASTER
+            +bult .skip
+
+            sta VIC_SPR_0_Y + r*4
+            sta VIC_SPR_0_Y + r*4 + 2
+
+            ; x-coord
+            lda SPR_X, y
+            sta VIC_SPR_0_X + r*4
+            sta VIC_SPR_0_X + r*4 + 2
+
+            ; x-msb
+            lda SPR_X_MSB, y
+            beq .no
+            lda # %00000011 << 2*r
+            ora VIC_SPR_X_MSB
+            jmp +
+.no
+            lda # <!(%00000011 << 2*r)
+            and VIC_SPR_X_MSB
++
+            sta VIC_SPR_X_MSB
+
+            ; colors
+            lda SPR_A, y
+            sta VIC_SPR_0_COLOR + r*2 + 1
+            lda SPR_B, y
+            sta VIC_SPR_0_COLOR + r*2
+
+            ; sprite frames
+            lda SPR_F, y
+            sta SPR_PTR + r*2 + 1
+            tay
+            iny
+            sty SPR_PTR + r*2
+.skip
+            inx
+            cpx #24
+            +jeq last_irq
+        }
+    }
+    jmp rotate
+
+last_irq
     jsr JOY
 
     inc VIC_BORDER
@@ -293,61 +365,9 @@ SOFT_Y = *+1
     +set_raster_line_8 LINE_0
     +set16 IRQ, VECTOR_IRQ
 
-.out_5
+out_x
+    dec VIC_BORDER
+out
     +ack_restore_rti
 EMPTY_INTERRUPT = *-1
-}
-
-!zone {
-DISPLAY_SPRITE_STRIP
-    !for .i, 0, 3 {
-        !set .r = 3-.i
-        ; index
-        ldy SPR_I + .i, x
-
-        ; y-coord
-        lda SPR_Y, y
-        sta VIC_SPR_0_Y + 4*.r
-        sta VIC_SPR_0_Y + 4*.r + 2
-
-        ; x-coord
-        lda SPR_X, y
-        sta VIC_SPR_0_X + 4*.r
-        sta VIC_SPR_0_X + 4*.r + 2
-
-        lda SPR_X_MSB, y
-        beq +
-        lda #%00000011 << .r*2
-        ora VIC_SPR_X_MSB
-        ; always true
-        bne ++
-+
-        lda # <(!(%00000011 << .r*2))
-        and VIC_SPR_X_MSB
-++
-        sta VIC_SPR_X_MSB
-
-        ; colors
-        lda SPR_A, y
-        sta VIC_SPR_0_COLOR + .r*2 + 1
-        lda SPR_B, y
-        sta VIC_SPR_0_COLOR + .r*2
-
-        ; set sprite pointers
-        lda SPR_F, y
-        tay
-        sty SPR_PTR + .r*2 + 1
-        iny
-        sty SPR_PTR + .r*2
-    }
-
-    ; fist y of next strip
-    ldy SPR_I + 4, x
-.ld_index=*-1
-    lda SPR_Y, y
-    sec
-    sbc #5
-    +set_raster_line_8
-
-    rts
 }

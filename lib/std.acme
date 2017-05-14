@@ -5,42 +5,42 @@
 ; far branches
 ;-------------------------------------------------------------------------------
 
-!macro lbcc .t {
+!macro jcc .t {
     bcs * + 5
     jmp .t
 }
 
-!macro lbcs .t {
+!macro jcs .t {
     bcc * + 5
     jmp .t
 }
 
-!macro lbeq .t {
+!macro jeq .t {
     bne * + 5
     jmp .t
 }
 
-!macro lbne .t {
+!macro jne .t {
     beq * + 5
     jmp .t
 }
 
-!macro lbmi .t {
+!macro jmi .t {
     bpl * + 5
 	jmp .t
 }
 
-!macro lbpl .t {
+!macro jpl .t {
     bmi * + 5
 	jmp .t
 }
 
-!macro lbvc .t {
+!macro jvc .t {
     bvs * + 5
 	jmp .t
 }
 
-!macro lbvs .t {
+!macro jvs .t {
     bvc * + 5
 	jmp .t
 }
@@ -64,13 +64,13 @@
 }
 
 ; long branch if borrow clear
-!macro lbbc .l {
+!macro jbc .l {
     bcc * + 5
     jmp .l
 }
 
 ; long branch if borrow set
-!macro lbbs .l {
+!macro jbs .l {
     bcs * + 5
     jmp .l
 }
@@ -134,7 +134,7 @@
 
 !macro bcc {
 .checkmark
-    bcc +                               
+    bcc +
 +
     !if >.checkmark != >* {
         !warn "page boundary crossed"
@@ -143,7 +143,7 @@
 
 !macro bcs {
 .checkmark
-    bcs +                               
+    bcs +
 +
     !if >.checkmark != >* {
         !warn "page boundary crossed"
@@ -152,7 +152,7 @@
 
 !macro beq {
 .checkmark
-    beq +                               
+    beq +
 +
     !if >.checkmark != >* {
         !warn "page boundary crossed"
@@ -161,7 +161,7 @@
 
 !macro bne {
 .checkmark
-    bne +                               
+    bne +
 +
     !if >.checkmark != >* {
         !warn "page boundary crossed"
@@ -170,7 +170,7 @@
 
 !macro bpl {
 .checkmark
-    bpl +                               
+    bpl +
 +
     !if >.checkmark != >* {
         !warn "page boundary crossed"
@@ -179,7 +179,7 @@
 
 !macro bmi {
 .checkmark
-    bmi +                               
+    bmi +
 +
     !if >.checkmark != >* {
         !warn "page boundary crossed"
@@ -188,7 +188,7 @@
 
 !macro bvc {
 .checkmark
-    bvc +                               
+    bvc +
 +
     !if >.checkmark != >* {
         !warn "page boundary crossed"
@@ -197,7 +197,7 @@
 
 !macro bvs {
 .checkmark
-    bvs +                               
+    bvs +
 +
     !if >.checkmark != >* {
         !warn "page boundary crossed"
@@ -317,7 +317,7 @@ VECTOR_IRQ   = $fffe
     !if .rest = 1 {
         !set .num_iters = .num_iters - 1
         !set .rest = .rest + 5
-    } 
+    }
 
     !if .num_iters > 255 {
         !error "loop to large"
