@@ -332,7 +332,6 @@ DISPLAY_SPRITE_STRIP
 
         ; y-coord
         lda SPR_Y, y
-        asl
         sta VIC_SPR_0_Y + 4*.r
         sta VIC_SPR_0_Y + 4*.r + 2
 
@@ -363,7 +362,6 @@ DISPLAY_SPRITE_STRIP
     ldy SPR_I + 4, x
 .ld_index=*-1
     lda SPR_Y, y
-    asl
     sec
     sbc #5
     +set_raster_line_8
