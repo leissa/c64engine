@@ -24,6 +24,9 @@ CPU_STACK           = $0100
 
 CPU_STACK   = $0100; - $01ff
 
+INIT_SONG   = $2000
+PLAY_SONG   = $2003
+
 ;
 ; VIC area
 ;
