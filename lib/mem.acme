@@ -3,11 +3,7 @@
 ;
 
 RAM_ROM_SWITCH      = $01
-SORT_L              = $04
-SORT_R              = $05
-SORT_L_NUM          = $06
-SORT_R_NUM          = $07
-SPR_COUNTER         = $08
+SPR_COUNTER         = $02
 
 SPR_I               = $10;
 SPR_Y               = $28;

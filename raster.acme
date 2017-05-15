@@ -1,29 +1,5 @@
-!if DEBUG {
+!ifdef DEBUG {
     !warn "bytes wasted: ", IRQ-*
-}
-
-!macro spr_sort {
-    !for .i, 0, 23-1 {
-        ldy SPR_I + .i + 1
-        ldx SPR_I + .i
-        lda SPR_Y, y        ; A: r-elem
-        cmp SPR_Y, x        ; M: l-elem
-        ; swap if A < M
-        ; skip if A >= M
-        +buge +
-        stx SPR_I + .i + 1
-        sty SPR_I + .i
-        !if .i = 0 {
-            ; do nothing
-        } else {
-            !if .i = 1 {
-                +bult *-28  ; always true
-            } else {
-                +bult *-30  ; always true
-            }
-        }
-+
-    }
 }
 
 !align 255, 0
@@ -214,6 +190,9 @@ SOFT_Y = *+1
 ; use wait time to setup first sprite strip
 ;-------------------------------------------------------------------------------
 
+    !ifdef DEBUG {
+        inc VIC_BORDER
+    }
     lda #0          ; x_msb
     !for .i, 0, 3 {
         !set .r = 3-.i
@@ -253,6 +232,9 @@ SOFT_Y = *+1
     }
 
     sta VIC_SPR_X_MSB
+    !ifdef DEBUG {
+        dec VIC_BORDER
+    }
 
 ;-------------------------------------------------------------------------------
 ; issue soft scroll
@@ -273,7 +255,9 @@ SOFT_Y = *+1
 ; sprite multiplexing
 ;-------------------------------------------------------------------------------
 
-    inc VIC_BORDER
+    !ifdef DEBUG {
+        inc VIC_BORDER
+    }
     ldx #4
     stx SPR_COUNTER
 
@@ -288,21 +272,22 @@ rotate
             +bult .display_sprite
 
             ; don't issue next interrupt to early - let's have 3 raster lines safety
-            cmp #5
+            cmp #3
             +buge +
-            lda #5
+            lda #3
 +
             clc
             adc VIC_RASTER
             sta VIC_RASTER
 
             +set16 .next_irq, VECTOR_IRQ
-            stx SPR_COUNTER
             jmp out_x
 
 .next_irq
             +save_regs out
-            inc VIC_BORDER
+            !ifdef DEBUG {
+                inc VIC_BORDER
+            }
             ldx SPR_COUNTER
 
 .display_sprite
@@ -325,14 +310,15 @@ rotate
 
             ; x-msb
             lda SPR_X_MSB, y
-            beq .no
+            beq .clear_x_msb
+.set_x_msb
             lda # %00000011 << 2*r
             ora VIC_SPR_X_MSB
-            jmp +
-.no
+            bne .store_x_msb    ; always true
+.clear_x_msb
             lda # <!(%00000011 << 2*r)
             and VIC_SPR_X_MSB
-+
+.store_x_msb
             sta VIC_SPR_X_MSB
 
             ; colors
@@ -349,24 +335,61 @@ rotate
             sty SPR_PTR + r*2
 .skip
             inx
-            cpx #24
-            +jeq last_irq
+            !if r = 0 {
+                cpx #24
+                beq last_irq
+                jmp rotate
+            }
         }
     }
-    jmp rotate
+
+;-------------------------------------------------------------------------------
+; we are finishing the last irq this frame
+;-------------------------------------------------------------------------------
 
 last_irq
     jsr JOY
 
-    inc VIC_BORDER
-    +spr_sort
-    dec VIC_BORDER
+;-------------------------------------------------------------------------------
+; sort sprites
+;-------------------------------------------------------------------------------
+
+    !ifdef DEBUG {
+        inc VIC_BORDER
+    }
+    !for .i, 0, 23-1 {
+        ldy SPR_I + .i + 1
+        ldx SPR_I + .i
+        lda SPR_Y, y        ; A: r-elem
+        cmp SPR_Y, x        ; M: l-elem
+        ; swap if A < M
+        ; skip if A >= M
+        +buge +
+        stx SPR_I + .i + 1
+        sty SPR_I + .i
+        !if .i = 0 {
+            ; do nothing
+        } else {
+            !if .i = 1 {
+                +bult *-28  ; always true
+            } else {
+                +bult *-30  ; always true
+            }
+        }
++
+    }
+    !ifdef DEBUG {
+        dec VIC_BORDER
+    }
 
     +set_raster_line_8 LINE_0
     +set16 IRQ, VECTOR_IRQ
 
 out_x
-    dec VIC_BORDER
+    stx SPR_COUNTER
+    !ifdef DEBUG {
+        dec VIC_BORDER
+    }
 out
     +ack_restore_rti
 EMPTY_INTERRUPT = *-1
