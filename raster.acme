@@ -298,7 +298,7 @@ rotate
 
             ; are we too late?
             cmp VIC_RASTER
-            +bult .skip
+            +bule .skip
 
             sta VIC_SPR_0_Y + r*4
             sta VIC_SPR_0_Y + r*4 + 2
