@@ -271,7 +271,7 @@ rotate
             sbc VIC_RASTER
             +bult .display_sprite
 
-            ; don't issue next interrupt to early - let's have 3 raster lines safety
+            ; don't issue next interrupt too early - let's have 3 raster lines safety
             cmp #3
             +buge +
             lda #3
