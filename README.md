@@ -25,3 +25,10 @@ Use joystick in port 2 to run the demo.
 * Sprite-Multiplexer
 
     Multiplixing 24 x 2 sprites. This means 24 virtual multi-color sprites where each sprite is overlayed with a single-color sprite for more colors and better resolution.
+
+## Useful Links
+
+* [Spritemate](http://spritemate.com/)
+* [Commodore 64 memory map](http://sta.c64.org/cbm64mem.html)
+* [ca65 macro assembler from cc65](http://www.cc65.org/doc/ca65.html): I consider switching over from ACME.
+    
