@@ -29,6 +29,7 @@ Use joystick in port 2 to run the demo.
 ## Useful Links
 
 * [Spritemate](http://spritemate.com/)
+* [Secret colour of the Commodore 64](http://www.aaronbell.com/secret-colours-of-the-commodore-64/)
 * [Commodore 64 memory map](http://sta.c64.org/cbm64mem.html)
 * [ca65 macro assembler from cc65](http://www.cc65.org/doc/ca65.html): I consider switching over from ACME.
     
