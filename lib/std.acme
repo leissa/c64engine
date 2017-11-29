@@ -309,6 +309,14 @@ VECTOR_IRQ   = $fffe
     }
 }
 
+!macro wait_evan .w {
+    !if .w % 2 = 0 {
+        +wait .w
+    } else {
+        +wait .w + 1
+    }
+}
+
 !macro wait_loop .w {
     !set .v = .w - 2 ; because of the ldy below
     !set .num_iters = (.v+1) / 5
