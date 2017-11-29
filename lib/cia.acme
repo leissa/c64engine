@@ -23,7 +23,7 @@ CIA1_INTERRUPT_CONTROL = $DC0D
     ;   * Bit 5: DATA OUT
     ;Bit 6..7: serial bus Input (0=Low/Active, 1=High/Inactive)
     ;   * Bit 6: CLOCK IN
-    ;   * Bit 7: DATA IN 
+    ;   * Bit 7: DATA IN
 CIA2_DATA_PORT_A = $DD00
 
 CIA2_TIMER_A_LO = $DD04
@@ -37,12 +37,4 @@ CIA2_CONTROL_TIMER_A = $DD0E
     lda #%01111111
     sta CIA1_INTERRUPT_CONTROL
     sta CIA2_INTERRUPT_CONTROL
-}
-
-!macro clear_timer {
-    lda #0
-    sta CIA1_TIMER_A_LO
-    sta CIA1_TIMER_A_HI
-    sta CIA2_TIMER_A_LO
-    sta CIA2_TIMER_A_HI
 }
