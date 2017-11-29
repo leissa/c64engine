@@ -11,14 +11,8 @@ IRQ !zone {
     ; irq event                             ;  7
     ; last instruction                      ;  1 (min)
     +save_regs out                          ; 12
-XXX
-    lda VIC_RASTER
-    cmp #LINE_0
-    beq +
-    jam
-+
-                                            ;--> 20
-
+    +assert LINE_0, VIC_RASTER              ;  9
+                                            ;--> 29
     ; ack interrupt
     inc VIC_IRQ_STATUS                      ;  6
 
@@ -33,7 +27,7 @@ XXX
                                             ;--> 4
 
     ; somewhere here the next interrupt will hit
-    +wait 63 - 20 - 24 - 4 + 1     -10              ; +1 to make the wait time even so we only get nops
+    +wait_evan 63 - 29 - 24 - 4 + 1         ; +1 to make the wait time even so we only get nops
 
 ;-------------------------------------------------------------------------------
 ;   LINE_0 + 1
