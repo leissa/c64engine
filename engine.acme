@@ -25,19 +25,15 @@ START               = $080d
 ;-------------------------------------------------------------------------------
 ;   disable all basic, kernal and irq crap
 ;-------------------------------------------------------------------------------
+    ; set empty interrupt routine
+    +set16 EMPTY_INTERRUPT, VECTOR_NMI
+    +set16 EMPTY_INTERRUPT, VECTOR_IRQ
+
     ; disable IRQs
     sei
 
     ; disable ROMs
-    +set RAM_ROM_ALL_RAM_WITH_IO, RAM_ROM_SELECTION
-
-    ; ack all interrupts which might have happend
-    +set $ff, VIC_IRQ_STATUS
-    lda CIA1_INTERRUPT_CONTROL
-    lda CIA2_INTERRUPT_CONTROL
-
-    ; set empty interrupt routine
-    +set16 EMPTY_INTERRUPT, VECTOR_NMI
+    +set ALL_RAM_WITH_IO, RAM_ROM_SELECTION
     +disable_timer_interrupts
 
     lda #0
@@ -57,9 +53,6 @@ START               = $080d
 
     ; just clear this flag and never ever touch this again
     cld
-
-    ; enable IRQs
-    cli
 
     ; -> NMI is disabled as soon as EMPTY_INTERRUPT has been triggered since we will never ever ack NMI again
     ; -> zero page completely free on this spot except for the special regs $00 and $01
@@ -124,7 +117,7 @@ START               = $080d
 ;   setup sound
 ;-------------------------------------------------------------------------------
 
-    +set RAM_ROM_ALL_RAM, RAM_ROM_SELECTION
+    +set ALL_RAM, RAM_ROM_SELECTION
 
     ; copy over 4k of song data to RAM beneath I/O area
     ldy #$10
@@ -142,15 +135,20 @@ START               = $080d
     lda #0       ; starting from 0
     jsr INIT_SONG
 
-    +set RAM_ROM_ALL_RAM_WITH_IO, RAM_ROM_SELECTION
+    +set ALL_RAM_WITH_IO, RAM_ROM_SELECTION
 
 ;-------------------------------------------------------------------------------
 ;   setup raster irq
 ;-------------------------------------------------------------------------------
 
+    ; ack all interrupts which might have happend
+    +set $ff, VIC_IRQ_STATUS
+
     +set16 IRQ, VECTOR_IRQ
     +set_raster_line_9 LINE_0
     +set 1, VIC_IRQ_CONTROL
+    ; enable IRQs
+    cli
 
 -
     ; some 7 cycle garbage instructions

@@ -11,6 +11,12 @@ IRQ !zone {
     ; irq event                             ;  7
     ; last instruction                      ;  1 (min)
     +save_regs out                          ; 12
+XXX
+    lda VIC_RASTER
+    cmp #LINE_0
+    beq +
+    jam
++
                                             ;--> 20
 
     ; ack interrupt
@@ -27,7 +33,7 @@ IRQ !zone {
                                             ;--> 4
 
     ; somewhere here the next interrupt will hit
-    +wait 63 - 20 - 24 - 4 + 1              ; +1 to make the wait time even so we only get nops
+    +wait 63 - 20 - 24 - 4 + 1     -10              ; +1 to make the wait time even so we only get nops
 
 ;-------------------------------------------------------------------------------
 ;   LINE_0 + 1
@@ -349,9 +355,9 @@ rotate
 last_irq
     jsr JOY
 
-    +set RAM_ROM_ALL_RAM, RAM_ROM_SELECTION
+    +set ALL_RAM, RAM_ROM_SELECTION
     jsr PLAY_SONG
-    +set RAM_ROM_ALL_RAM_WITH_IO, RAM_ROM_SELECTION
+    +set ALL_RAM_WITH_IO, RAM_ROM_SELECTION
     ldx #$1a
 -
     lda SID_GHOST_REGS, x
