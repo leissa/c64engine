@@ -339,7 +339,7 @@ VECTOR_IRQ   = $fffe
 RAM_ROM_SELECTION            = $01
 RAM_ROM_DEFAULT	             = %00110111
 RAM_ROM_ALL_RAM_WITH_IO      = %00110101
-RAM_ROM_ALL_RAM              = %00110000
+RAM_ROM_ALL_RAM              = %00110100
 
 !macro set .value, .addr {
     lda #.value

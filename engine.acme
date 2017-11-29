@@ -55,8 +55,10 @@ START               = $080d
     +set16 EMPTY_INTERRUPT, VECTOR_NMI
     +disable_timer_interrupts
 
-    ; set timer A to 0
     lda #0
+    ; no IRQs
+    sta VIC_IRQ_CONTROL
+    ; set timer A to 0
     sta CIA2_TIMER_A_LO
     sta CIA2_TIMER_A_HI
 
@@ -100,9 +102,6 @@ START               = $080d
 ;   setup test stuff
 ;-------------------------------------------------------------------------------
 
-    lda #0       ; starting from 0
-    jsr INIT_SONG
-
     !for .i, 0, 23 {
         lda _spr_y + .i
         sta SPR_Y + .i
@@ -137,14 +136,36 @@ START               = $080d
     bne -
 
 ;-------------------------------------------------------------------------------
+;   setup sound
+;-------------------------------------------------------------------------------
+
+    +set RAM_ROM_ALL_RAM, RAM_ROM_SELECTION
+
+    ; copy over 4k of song data to RAM beneath I/O area
+    ldy #$10
+    ldx #$00
+.loop
+    lda $2000, x
+    sta $d000, x
+    dex
+    bne .loop
+    inc .loop + 2
+    inc .loop + 5
+    dey
+    bne .loop
+
+    lda #0       ; starting from 0
+    jsr INIT_SONG
+
+    +set RAM_ROM_ALL_RAM_WITH_IO, RAM_ROM_SELECTION
+
+;-------------------------------------------------------------------------------
 ;   setup raster irq
 ;-------------------------------------------------------------------------------
 
-    sei
-        +set16 IRQ, VECTOR_IRQ
-        +set_raster_line_9 LINE_0
-        +set 1, VIC_IRQ_CONTROL
-    cli
+    +set16 IRQ, VECTOR_IRQ
+    +set_raster_line_9 LINE_0
+    +set 1, VIC_IRQ_CONTROL
 
 -
     ; some 7 cycle garbage instructions
@@ -166,7 +187,7 @@ START               = $080d
     !warn "code ends on: ", *-1
 }
 
-*=INIT_SONG
+*=$2000
 !bin "snd/transylvanian.bin"
 
 *=HIRES

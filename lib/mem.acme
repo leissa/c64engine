@@ -5,8 +5,9 @@
 RAM_ROM_SWITCH      = $01
 SPR_COUNTER         = $02
 
-SPR_I               = $10;
-SPR_Y               = $28;
+SPR_I               = $20
+SPR_Y               = $38
+SID_GHOST_REGS      = $50
 
 ;
 ; CPU stack: $0100 - $01ff
@@ -19,15 +20,6 @@ CPU_STACK           = $0100
 ;
 
 ;
-; CPU stack: $0100 - $01ff
-;
-
-CPU_STACK   = $0100; - $01ff
-
-INIT_SONG   = $2000
-PLAY_SONG   = $2003
-
-;
 ; VIC area
 ;
 
@@ -36,3 +28,10 @@ HIRES           = $4000; - $5fff
 SPR_FR          = $6000; - $7bff -> 112 sprite frames
 SCREEN          = $7c00; - $7fff
 SPR_PTR         = SCREEN + $0400 - 8
+
+;
+; music sits under I/O area
+;
+
+INIT_SONG   = $d000
+PLAY_SONG   = INIT_SONG+3
