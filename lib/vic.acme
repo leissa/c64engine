@@ -155,3 +155,20 @@ LIGHT_GREY      = $f
 }
 
 COLOR_RAM = $D800
+
+COLOR_BLACK     = $0
+COLOR_WHITE     = $1
+COLOR_RED_2     = $2
+COLOR_CYAN      = $3
+COLOR_PURPLE    = $4
+COLOR_GREEN_2   = $5
+COLOR_BLUE_2    = $6
+COLOR_YELLOW    = $7
+COLOR_ORANGE    = $8
+COLOR_BROWN     = $9
+COLOR_RED_1     = $a
+COLOR_GREY_3    = $b
+COLOR_GREY_2    = $c
+COLOR_GREEN_1   = $d
+COLOR_BLUE_1    = $e
+COLOR_GREY_1    = $f
