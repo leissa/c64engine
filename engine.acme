@@ -152,11 +152,11 @@ START               = $080d
 
 -
     ; some 7 cycle garbage instructions
-    lda ($ff), y
-    lda ($ff, x)
-    lda ($ff), y
-    lda ($ff, x)
-    lda ($ff), y
+    lda ($f0), y
+    lda ($f0, x)
+    lda ($f0), y
+    lda ($f0, x)
+    lda ($f0), y
     sec     ; 2
     +bcs    ; 3
     jmp -
