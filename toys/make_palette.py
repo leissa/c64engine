@@ -3,22 +3,22 @@
 import math
 
 colors = [
-    ([  0,   0,   0], "Black"       ),
-    ([255, 255, 255], "White"       ),
-    ([136,   0,   0], "Red"         ),
-    ([170, 255, 238], "Cyan"        ),
-    ([204,  68, 204], "Purple"      ),
-    ([  0, 204,  85], "Green"       ),
-    ([  0,   0, 170], "Blue"        ),
-    ([238, 238, 119], "Yellow"      ),
-    ([221, 136,  85], "Orange"      ),
-    ([102,  68,   0], "Brown"       ),
-    ([255, 119, 119], "Light Red"   ),
-    ([ 51,  51,  51], "Dark Grey"   ),
-    ([119, 119, 119], "Grey"        ),
-    ([170, 255, 102], "Light Green" ),
-    ([  0, 136, 255], "Light Blue"  ),
-    ([187, 187, 187], "Light Grey"  ),
+    ([0x00, 0x00, 0x00], "Black"       ),
+    ([0xFF, 0xFF, 0xFF], "White"       ),
+    ([0x68, 0x37, 0x2B], "Red"         ),
+    ([0x70, 0xA4, 0xB2], "Cyan"        ),
+    ([0x6F, 0x3D, 0x86], "Purple"      ),
+    ([0x58, 0x8D, 0x43], "Green"       ),
+    ([0x35, 0x28, 0x79], "Blue"        ),
+    ([0xB8, 0xC7, 0x6F], "Yellow"      ),
+    ([0x6F, 0x4F, 0x25], "Orange"      ),
+    ([0x43, 0x39, 0x00], "Brown"       ),
+    ([0x9A, 0x67, 0x59], "Light Red"   ),
+    ([0x44, 0x44, 0x44], "Dark Grey"   ),
+    ([0x6C, 0x6C, 0x6C], "Grey"        ),
+    ([0x9A, 0xD2, 0x84], "Light Green" ),
+    ([0x6C, 0x5E, 0xB5], "Light Blue"  ),
+    ([0x95, 0x95, 0x95], "Light Grey"  ),
 ]
 
 BLACK       = 0x0
@@ -64,7 +64,7 @@ mix.sort(key=lambda dist: dist[0])
 
 print("GIMP Palette")
 print("Name: C64 Palette")
-print("Columns: 0")
+print("Columns: 16")
 
 for col in colors:
     dump_col(col)
