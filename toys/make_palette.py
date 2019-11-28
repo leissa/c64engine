@@ -45,6 +45,9 @@ def distance(x, y):
     f = lambda x, y: int((x + y)/2 + 0.5)
     return (dist, [f(xr, yr), f(xg, yg), f(xb, yb)], "{} - {}: {}".format(x_name, y_name, int(dist + 0.5)))
 
+def mix(i, j):
+    return distance(colors[i], colors[j])
+
 def dump_col(col):
     (r, g, b), name = col
     print("{} {} {} {}".format(r, g, b, name))
@@ -54,13 +57,44 @@ def dump_mix(mix):
     print("{} {} {} {}".format(r, g, b, name))
 
 # calculate all possible color mixes
-mix = []
+mixes = []
 
-for i in range(0, 15):
-    for j in range(i + 1, 16):
-        mix.append(distance(colors[i], colors[j]))
+#for i in range(0, 15):
+    #for j in range(i + 1, 16):
+        #mixes.append(distance(colors[i], colors[j]))
 
-mix.sort(key=lambda dist: dist[0])
+# see http://unusedino.de/ec64/technical/misc/vic656x/colors/
+mixes.append(mix(0x2, 0x6))
+mixes.append(mix(0x2, 0x9))
+mixes.append(mix(0x2, 0xb))
+mixes.append(mix(0x6, 0x9))
+mixes.append(mix(0x6, 0xb))
+mixes.append(mix(0x9, 0xb))
+
+mixes.append(mix(0x4, 0x5))
+mixes.append(mix(0x4, 0x8))
+mixes.append(mix(0x4, 0xa))
+mixes.append(mix(0x4, 0xc))
+mixes.append(mix(0x4, 0xe))
+mixes.append(mix(0x5, 0x8))
+mixes.append(mix(0x5, 0xa))
+mixes.append(mix(0x5, 0xc))
+mixes.append(mix(0x5, 0xe))
+mixes.append(mix(0x8, 0xa))
+mixes.append(mix(0x8, 0xc))
+mixes.append(mix(0x8, 0xe))
+mixes.append(mix(0xa, 0xc))
+mixes.append(mix(0xa, 0xe))
+mixes.append(mix(0xc, 0xe))
+
+mixes.append(mix(0x3, 0x7))
+mixes.append(mix(0x3, 0xd))
+mixes.append(mix(0x3, 0xf))
+mixes.append(mix(0x7, 0xd))
+mixes.append(mix(0x7, 0xd))
+mixes.append(mix(0xd, 0xd))
+
+#mixes.sort(key=lambda dist: dist[0])
 
 print("GIMP Palette")
 print("Name: C64 Palette")
@@ -69,5 +103,5 @@ print("Columns: 16")
 for col in colors:
     dump_col(col)
 
-for m in mix:
+for m in mixes:
     dump_mix(m)
