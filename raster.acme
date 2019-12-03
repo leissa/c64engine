@@ -192,45 +192,47 @@ SOFT_Y = *+1
     !ifdef DEBUG {
         inc VIC_BORDER
     }
-    lda #0          ; x_msb
     !for .i, 0, 3 {
         !set .r = 3-.i
         ; index
         ldy SPR_I + .i
 
         ; y-coord
-        ldx SPR_Y, y
-        stx VIC_SPR_0_Y + 4*.r
-        stx VIC_SPR_0_Y + 4*.r + 2
+        lda SPR_Y, y
+        sta VIC_SPR_0_Y + 4*.r
+        sta VIC_SPR_0_Y + 4*.r + 2
 
         ; x-coord
-        ldx SPR_X, y
-        stx VIC_SPR_0_X + 4*.r
-        stx VIC_SPR_0_X + 4*.r + 2
+        lda SPR_X, y
+        asl
+        sta VIC_SPR_0_X + 4*.r
+        sta VIC_SPR_0_X + 4*.r + 2
 
         ; x-coord MSB
-        ldx SPR_X_MSB, y
-        beq +
-        !if .i = 0 {
-            lda #%00000011 << .r*2
-        } else {
-            ora #%00000011 << .r*2
+        !if .i != 0 {
+            txa
         }
-+
-        ; set sprite pointers
-        ldx SPR_F, y
-        stx SPR_PTR + .r*2 + 1
-        inx
-        stx SPR_PTR + .r*2
+        php
+        rol
+        plp
+        rol
+        tax
 
         ; colors
-        ldx SPR_A, y
-        stx VIC_SPR_0_COLOR + .r*2 + 1
-        ldx SPR_B, y
-        stx VIC_SPR_0_COLOR + .r*2
+        lda SPR_A, y
+        sta VIC_SPR_0_COLOR + .r*2 + 1
+        lda SPR_B, y
+        sta VIC_SPR_0_COLOR + .r*2
+
+        ; set sprite pointers
+        lda SPR_F, y
+        tay
+        sty SPR_PTR + .r*2 + 1
+        iny
+        sty SPR_PTR + .r*2
     }
 
-    sta VIC_SPR_X_MSB
+    stx VIC_SPR_X_MSB
     !ifdef DEBUG {
         dec VIC_BORDER
     }
@@ -304,20 +306,20 @@ rotate
 
             ; x-coord
             lda SPR_X, y
+            asl
             sta VIC_SPR_0_X + r*4
             sta VIC_SPR_0_X + r*4 + 2
 
             ; x-msb
-            lda SPR_X_MSB, y
-            beq .clear_x_msb
+            bcc .clear_x_msb
 .set_x_msb
             lda # %00000011 << 2*r
             ora VIC_SPR_X_MSB
-            bne .store_x_msb    ; always true
+            bne +    ; always true
 .clear_x_msb
             lda # <!(%00000011 << 2*r)
             and VIC_SPR_X_MSB
-.store_x_msb
++
             sta VIC_SPR_X_MSB
 
             ; colors
