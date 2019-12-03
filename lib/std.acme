@@ -309,7 +309,7 @@ VECTOR_IRQ   = $fffe
     }
 }
 
-!macro wait_evan .w {
+!macro wait_even .w {
     !if .w % 2 = 0 {
         +wait .w
     } else {

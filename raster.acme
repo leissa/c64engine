@@ -27,7 +27,7 @@ IRQ !zone {
                                             ;--> 4
 
     ; somewhere here the next interrupt will hit
-    +wait_evan 63 - 29 - 24 - 4 + 1         ; +1 to make the wait time even so we only get nops
+    +wait_even 63 - 29 - 24 - 4
 
 ;-------------------------------------------------------------------------------
 ;   LINE_0 + 1
