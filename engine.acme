@@ -1,6 +1,5 @@
 !to "engine.prg", cbm   ; output program
 !sl "labels.l"          ; create label file for vice
-!cpu 6510               ; for illegal opcodes
 !convtab scr            ; for conversion to c64 screen codes
 
 !source "lib/mem.acme"
@@ -8,18 +7,49 @@
 !source "lib/cia.acme"
 !source "lib/std.acme"
 
-DEBUG               = 1
-CONTROL_X           = %00010000
-CONTROL_Y           = %00110000
-CONTROL_Y_INVALID   = %01110000
-CONTROL_Y_MASK      = %10111111
-LINE_0              = FIRST_BADLINE-3
-SCROLL_SPEED        = 2
-SLOWDOWN            = 2
+; acme -DSYSTEM=64 engine.acme
+; exomizer sfx sys engine.prg -x1 -o scroll.prg
 
-START               = $080d
-+create_basic_starter START
-*=START
+!ifdef DEBUG {
+    CONTROL_X           = %00011000 ; 40 cols
+    CONTROL_Y_INVALID   = %00111000 ; 25 rows
+} else {
+    CONTROL_X           = %00010000 ; multi color
+    CONTROL_Y_INVALID   = %01110000 ; invalid mode
+}
+
+CONTROL_Y_MASK      = %10111111 ; bitmap mode
+LINE_0              = FIRST_BADLINE-3
+;SCROLL_SPEED        = 2
+SCROLL_SPEED        = 1
+TILE_COLS           = 3
+TILE_ROWS           = 2
+SCR_COLS            = 40
+SCR_ROWS            = 25
+MAP_WIDTH           = 256
+MAP_HEIGHT          = 96
+SPRITES             = 24
+
+*=SPR_DATA
+
+_spr_y
+    !by $fa, $f8, $f6, $f4, $da, $d8, $d6, $d4, $ba, $b8, $b6, $b4, $9a, $98, $96, $94, $7a, $78, $76, $74, $5a, $58, $56, $54
+SPR_X
+    !by $10, $20, $30, $40, $50, $60, $70, $80, $10, $20, $30, $40, $50, $60, $70, $80, $10, $20, $30, $40, $50, $60, $70, $80
+SPR_A
+    !by $0a, $0a, $02, $03, $04, $05, $06, $07, $08, $09, $0a, $0a, $0a, $0d, $0e, $0f, $00, $01, $02, $03, $04, $05, $06, $07
+SPR_B
+    !by $00, $00, $0d, $0c, $0b, $0a, $09, $08, $07, $06, $05, $00, $00, $02, $01, $00, $0f, $0e, $0d, $0c, $0b, $0a, $09, $08
+SPR_F
+    !by SPR_FR_BASE+$00, SPR_FR_BASE+$02, SPR_FR_BASE+$04, SPR_FR_BASE+$06
+    !by SPR_FR_BASE+$08, SPR_FR_BASE+$0a, SPR_FR_BASE+$0c, SPR_FR_BASE+$0e
+    !by SPR_FR_BASE+$10, SPR_FR_BASE+$12, SPR_FR_BASE+$14, SPR_FR_BASE+$00
+    !by SPR_FR_BASE+$02, SPR_FR_BASE+$1a, SPR_FR_BASE+$1c, SPR_FR_BASE+$1e
+    !by SPR_FR_BASE+$04, SPR_FR_BASE+$04, SPR_FR_BASE+$04, SPR_FR_BASE+$06
+    !by SPR_FR_BASE+$08, SPR_FR_BASE+$0a, SPR_FR_BASE+$0c, SPR_FR_BASE+$0e
+
++create_basic_starter CODE_START
+*=CODE_START
 
 !zone {
 ;-------------------------------------------------------------------------------
@@ -61,14 +91,13 @@ START               = $080d
 ;   setup VIC
 ;-------------------------------------------------------------------------------
 
-    ; select VIC area: bank 1
+    ; select VIC area: bank 3
     lda CIA2_DATA_PORT_A
     and #%11111100
-    ora #%00000010
     sta CIA2_DATA_PORT_A
 
-    ; select screen bank 15, hires-bank 0
-    lda #%11110000
+    ; select screen bank 8, hires-bank 0
+    lda #%10000000
     sta VIC_ADDR_SELECT
 
     +set %10101010, VIC_SPR_MULTI
@@ -80,62 +109,99 @@ START               = $080d
 ;   setup test stuff
 ;-------------------------------------------------------------------------------
 
-    !for .i, 0, 23 {
+    !for .i, 0, SPRITES-1 {
         lda _spr_y + .i
         sta SPR_Y + .i
         lda #.i
         sta SPR_I + .i
     }
 
-    ; zero-fill sprite frame
-    lda #0
-    ldx #63
--
-    sta VIC_BANK - 128, x
-    dex
-    bpl -
-
-    ; set sprite pointers in that bank
-    lda #$fe
-    ldx # (SPR_FR % $4000) / 64
-    !for .i, 0, 7 {
-        sta SPR_PTR - $4000 + .i
-    }
-
-    ; fill color ram
+    ;---can be done at compile time?---
     ldx #0
--
-    txa
-    sta COLOR_RAM + $0000, x
-    sta COLOR_RAM + $0100, x
-    sta COLOR_RAM + $0200, x
-    sta COLOR_RAM + $0300, x
-    dex
-    bne -
+    stx IGNORE_DIR
+    stx IGNORE_COUNT
+    stx SCROLL_U_D
+    stx SCROLL_L_R
+
+    ldx #$ff
+    stx C_COPY_PIX
+    stx R_COPY_PIX
+
+    ldx #COLOR_BLACK
+    stx VIC_BACKGROUND_0
+    stx VIC_BORDER
+
+    ldx #0
+    stx TILE_COL
+    ldx #1
+    stx TILE_ROW
+
+;    ldx #<TILE_MAP
+;    ldx #$80
+    ldx #$f3
+    stx C_MAP_POS_LO
+    stx R_MAP_POS_LO
+;    ldx #>TILE_MAP
+;    ldx #$40
+    ldx #$42
+    stx C_MAP_POS_HI
+    stx R_MAP_POS_HI
+
+    ldx #0
+    stx C_SCR_POS_LO
+    stx C_SCR_POS_HI
+    stx R_SCR_POS_LO
+    stx R_SCR_POS_HI
+    stx C_PIX_POS_LO
+    stx C_PIX_POS_HI
+    stx R_PIX_POS_LO
+    stx R_PIX_POS_HI
+    ;----------------------------------
+
+    +clear_screen 0, SCREEN
 
 ;-------------------------------------------------------------------------------
 ;   setup sound
 ;-------------------------------------------------------------------------------
 
-    +set ALL_RAM, RAM_ROM_SELECTION
-
-    ; copy over 4k of song data to RAM beneath I/O area
-    ldy #$10
-    ldx #$00
-.loop
-    lda $2000, x
-    sta $d000, x
-    dex
-    bne .loop
-    inc .loop + 2
-    inc .loop + 5
-    dey
-    bne .loop
-
     lda #0       ; starting from 0
     jsr INIT_SONG
 
-    +set ALL_RAM_WITH_IO, RAM_ROM_SELECTION
+;-------------------------------------------------------------------------------
+;   setup multiplication tables
+;-------------------------------------------------------------------------------
+
+!macro multiplication_table .multiplier, .address_lo, .address_hi {
+    ldx #0
+
+.multiply_next_entry
+    stx TEMP_HI
+    ldy #.multiplier
+    sty TEMP_LO
+
+    lda #0
+    ldy #8
+    lsr TEMP_LO
+.add
+    bcc .rotate
+    clc
+    adc TEMP_HI
+.rotate
+    ror
+    ror TEMP_LO
+    dey
+    bne .add
+
+    sta .address_hi, x
+    lda TEMP_LO
+    sta .address_lo, x
+
+    inx
+    bne .multiply_next_entry
+}
+
+    +multiplication_table TILE_COLS*TILE_ROWS, MTABLE_TILES_LO, MTABLE_TILES_HI
+    +multiplication_table TILE_COLS*TILE_ROWS*8, MTABLE_BYTES_LO, MTABLE_BYTES_HI
 
 ;-------------------------------------------------------------------------------
 ;   setup raster irq
@@ -165,34 +231,28 @@ START               = $080d
 !source "scroll.acme"
 !source "joystick.acme"
 !source "raster.acme"
+!source "tiles.acme"
 
 !ifdef DEBUG {
     !warn "code ends on: ", *-1
 }
 
-*=$1e00
-
-SPR_X
-    !by $10, $20, $30, $40, $50, $60, $70, $80, $10, $20, $30, $40, $50, $60, $70, $80, $10, $20, $30, $40, $50, $60, $70, $80
-SPR_A
-    !by $0a, $0a, $02, $03, $04, $05, $06, $07, $08, $09, $0a, $0a, $0a, $0d, $0e, $0f, $00, $01, $02, $03, $04, $05, $06, $07
-SPR_B
-    !by $00, $00, $0d, $0c, $0b, $0a, $09, $08, $07, $06, $05, $00, $00, $02, $01, $00, $0f, $0e, $0d, $0c, $0b, $0a, $09, $08
-SPR_F
-    !by $80, $82, $84, $86, $88, $8a, $8c, $8e, $90, $92, $94, $80, $82, $9a, $9c, $9e, $84, $84, $84, $86, $88, $8a, $8c, $8e
-_spr_y
-    !by $fa, $f8, $f6, $f4, $da, $d8, $d6, $d4, $ba, $b8, $b6, $b4, $9a, $98, $96, $94, $7a, $78, $76, $74, $5a, $58, $56, $54
-
-
-*=$2000
+*=SONG_DATA
 !bin "snd/transylvanian.bin"
 
-*=HIRES
+*=TILE_MAP
+!bin "map.bin"
 
-!for .i, $0000, $1fff {
-    !by <.i
-}
+*=TILE_CLR
+!bin "colors.bin"
 
+*=TILE_SCR
+!bin "screen.bin"
+
+*=TILE_PIX
+!bin "pixels.bin"
+
+*=SPR_FR
 !bin "spr/hero.raw", 64*4
 
 !for .i, 0, 15 {
@@ -244,8 +304,6 @@ _spr_y
     !by $00; padding
 }
 
-*=SCREEN
-
-!for .i, $0000, $03ff {
-    !by <.i
+!ifdef DEBUG {
+    !warn "frames end on: ", *-1
 }

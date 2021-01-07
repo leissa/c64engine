@@ -1,37 +1,90 @@
-;
+DO_NOT_USE      = $00
+RAM_ROM_SWITCH  = $01
+ITERATIONS      = $02
+PLAY_SONG_REG1  = $03
+PLAY_SONG_REG2  = $04
+TILE_COL        = $05
+TILE_ROW        = $06
+C_TILE_POS      = $07
+R_TILE_POS      = $08
+C_MAP_POS_LO    = $09
+C_MAP_POS_HI    = $0a
+R_MAP_POS_LO    = $0b
+R_MAP_POS_HI    = $0c
+C_MAP_POS_LO_T  = $0d
+R_MAP_POS_LO_T  = $0e
+C_SCR_POS_LO    = $0f
+C_SCR_POS_HI    = $10
+R_SCR_POS_LO    = $11
+R_SCR_POS_HI    = $12
+C_SCR_POS_LO_T  = $13
+C_SCR_POS_HI1_T = $14
+C_SCR_POS_HI2_T = $15
+R_SCR_POS_LO_T  = $16
+R_SCR_POS_HI1_T = $17
+R_SCR_POS_HI2_T = $18
+C_PIX_POS_LO    = $19
+C_PIX_POS_HI    = $1a
+R_PIX_POS_LO    = $1b
+R_PIX_POS_HI    = $1c
+C_PIX_POS_LO_T  = $1d
+C_PIX_POS_HI_T  = $1e
+R_PIX_POS_LO_T  = $1f
+R_PIX_POS_HI_T  = $20
+C_COPY_PIX      = $21
+R_COPY_PIX      = $22
+SCROLL_U_D      = $23
+SCROLL_L_R      = $24
+C_PIXELS_SRC    = $25
+C_PIXELS_DST    = $26
+C_SCREEN_SRC    = $27
+C_SCREEN_DST    = $28
+C_COLORS_SRC    = $29
+C_COLORS_DST    = $2a
+R_PIXELS_SRC    = $2b
+R_PIXELS_DST    = $2c
+R_SCREEN_SRC    = $2d
+R_SCREEN_DST    = $2e
+R_COLORS_SRC    = $2f
+R_COLORS_DST    = $30
+TEMP_LO         = $31
+TEMP_HI         = $32
+IGNORE_DIR      = $33
+IGNORE_COUNT    = $34
+SPR_COUNTER     = $35
+PLAY            = $36
+
+SPR_I           = $40; - $57
+SPR_Y           = $58; - $6f
+
 ; zero page: $0000 - $00ff
-;
+; cpu stack: $0100 - $01ff
+; work area: $0200 - $0400
+;----------------------------------1k
+MTABLE_TILES_LO = $0400; - $04ff
+MTABLE_TILES_HI = $0500; - $05ff
+MTABLE_BYTES_LO = $0600; - $06ff
+MTABLE_BYTES_HI = $0700; - $07ff
+;----------------------------------1k
 
-RAM_ROM_SWITCH      = $01
-SPR_COUNTER         = $02
+SPR_DATA        = $080d; - $0883
+CODE_START      = $0885; - $1fff,  6k
+SONG_DATA       = $2000; - $2fff,  4k
+;---------------------------------12k
 
-SPR_I               = $20
-SPR_Y               = $38
-SID_GHOST_REGS      = $50
+TILE_MAP        = $3000; - $8fff, 24k
+TILE_CLR        = $9000; - $95ff,  1.5k
+TILE_SCR        = $9600; - $9bff,  1.5k
+TILE_PIX        = $9c00; - $bfff,  9k
+;---------------------------------36k
 
-;
-; CPU stack: $0100 - $01ff
-;
+VIC_BANK        = $c000;
+HIRES           = $c000; - $dfff,  8k, 4k under I/O area
+SCREEN          = $e000; - $e3ff,  1k
+SPR_FR          = $e400; - $ffbf,  7k 111 sprite frames
+;---------------------------------16k
 
-CPU_STACK           = $0100
-
-;
-;  sprite multiplexer: $0700
-;
-
-;
-; VIC area
-;
-
-VIC_BANK        = $4000; - $7fff
-HIRES           = $4000; - $5fff
-SPR_FR          = $6000; - $7bff -> 112 sprite frames
-SCREEN          = $7c00; - $7fff
-SPR_PTR         = SCREEN + $0400 - 8
-
-;
-; music sits under I/O area
-;
-
-INIT_SONG   = $d000
-PLAY_SONG   = INIT_SONG+3
+SPR_FR_BASE     = (SPR_FR-VIC_BANK)/64
+SPR_PTR         = SCREEN+$0400-8
+INIT_SONG       = SONG_DATA
+PLAY_SONG       = INIT_SONG+3

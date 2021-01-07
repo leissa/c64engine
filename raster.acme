@@ -40,7 +40,7 @@ IRQ !zone {
                                             ;--> 10-11
 
     ; calculate the number of nops to skip in VSP
-    lda #39                                 ;  2
+    lda #SCR_COLS-1                         ;  2
     sec                                     ;  2
 HARD_X = *+1
     sbc #0                                  ;  2
@@ -70,9 +70,9 @@ SOFT_X = *+1
 
     ; switch to VIC bank 0
     ;inc CIA2_DATA_PORT_A                    ;  6
-    inc $ff00
+    ;inc $ff00
 
-    +wait 63-11-12-11-10-6-6
+    +wait 63-11-12-11-10-6
 
     ; wobble check
     lda #LINE_0 + 2                         ;  2
@@ -92,7 +92,7 @@ SOFT_X = *+1
     sta VIC_CONTROL_Y                       ;  4
                                             ;-->  6
 
-    lda #25                                 ;  2
+    lda #SCR_ROWS                           ;  2
     sec                                     ;  2
 HARD_Y = *+1
     sbc #0                                  ;  2
@@ -100,7 +100,7 @@ HARD_Y = *+1
                                             ;-->  8
 
     ; pre-compute VIC_CONTROL_Y value for soft-scrolling
-    lda #7 + (25+1) % 8                     ;  2
+    lda #7 + (SCR_ROWS+1) % 8               ;  2
     sec                                     ;  2
 SOFT_Y = *+1
     sbc #0                                  ;  2
@@ -134,6 +134,9 @@ SOFT_Y = *+1
     +inc_vic_control_y                      ; 16
                                             ;--> 20
     +wait_loop 63 - 20 - 2 - 3
+;+wait_loop 63 - 20 - 2 - 3 - 6
+;inc VIC_BORDER
+
     dex                                     ;  2
     jmp .fld_loop                           ;  3
 +
@@ -145,8 +148,10 @@ SOFT_Y = *+1
     beq +                                   ;  2 (in this loop)
     +inc_vic_control_y                      ; 16
                                             ;--> 20
+    +wait_loop 63 - 20 - 2 - 3
+;+wait_loop 63 - 20 - 2 - 3 - 6
+;dec VIC_BORDER
 
-    +wait 63 - 20 - 2 - 3
     dex                                     ;  2
     jmp .crunch_loop                        ;  3
 +
@@ -157,9 +162,9 @@ SOFT_Y = *+1
 ;   VSP
 ;-------------------------------------------------------------------------------
     ; make VSP line not a bad line
-    inc VIC_CONTROL_Y
-    +wait 5
-    sec
+    inc VIC_CONTROL_Y                       ;6
+    +wait 5                                 ;5
+    sec                                     ;2
     ; introduce an extra cycle if 39 - HARD_X is odd
 .self_modifying_branch__lsb
     +bcs                                    ;2-3
@@ -173,7 +178,9 @@ SOFT_Y = *+1
     !error "critical irq code in different pages"
 }
     ; generate bad line
-    dec VIC_CONTROL_Y
+    dec VIC_CONTROL_Y                       ;6
+
+    ; 6 + 5 + 2 + 2/3 + 3 + 0/38 + 6 = 24/63
 
 ;-------------------------------------------------------------------------------
 ; prepare soft scroll
@@ -185,12 +192,16 @@ SOFT_Y = *+1
     and #CONTROL_Y_MASK
     pha
 
+;stx VIC_BORDER    ;4
+
 ;-------------------------------------------------------------------------------
 ; use wait time to setup first sprite strip
 ;-------------------------------------------------------------------------------
 
     !ifdef DEBUG {
-        inc VIC_BORDER
+        ldx #1
+        stx VIC_BORDER
+;        inc VIC_BORDER
     }
     !for .i, 0, 3 {
         !set .r = 3-.i
@@ -234,7 +245,9 @@ SOFT_Y = *+1
 
     stx VIC_SPR_X_MSB
     !ifdef DEBUG {
-        dec VIC_BORDER
+        ldx #2
+        stx VIC_BORDER
+;        dec VIC_BORDER
     }
 
 ;-------------------------------------------------------------------------------
@@ -243,7 +256,7 @@ SOFT_Y = *+1
 
     pla
     ; wait till end of AGSP region
-    ldy #FIRST_BADLINE+25+8
+    ldy #FIRST_BADLINE+SCR_ROWS+8
 -
     cpy VIC_RASTER
     bne -
@@ -257,10 +270,15 @@ SOFT_Y = *+1
 ;-------------------------------------------------------------------------------
 
     !ifdef DEBUG {
-        inc VIC_BORDER
+        ldx #3
+        stx VIC_BORDER
+;        inc VIC_BORDER
     }
     ldx #4
     stx SPR_COUNTER
+
+    ldy #1
+    sty PLAY
 
 rotate
     !for .i, 0, 3 {
@@ -277,19 +295,38 @@ rotate
             +buge +
             lda #3
 +
+            tay
+
             clc
             adc VIC_RASTER
             sta VIC_RASTER
 
             +set16 .next_irq, VECTOR_IRQ
+
+            cpy #24 ; play routine needs about 21 lines, add 3 for safety
+            +bult .exit
+            ldy PLAY
+            beq .exit
+            dec PLAY
+
+            txa
+            pha
+            jsr PLAY_SONG
+            pla
+            tax
+
+.exit
             jmp out_x
 
 .next_irq
             +save_regs out
-            !ifdef DEBUG {
-                inc VIC_BORDER
-            }
+;            !ifdef DEBUG {
+;                inc VIC_BORDER
+;            }
             ldx SPR_COUNTER
+            !ifdef DEBUG {
+                stx VIC_BORDER
+            }
 
 .display_sprite
             ldy SPR_I, x
@@ -337,7 +374,7 @@ rotate
 .skip
             inx
             !if r = 0 {
-                cpx #24
+                cpx #SPRITES
                 beq last_irq
                 jmp rotate
             }
@@ -349,26 +386,24 @@ rotate
 ;-------------------------------------------------------------------------------
 
 last_irq
-    jsr JOY
+    jsr JOYSTICK
+    jsr COPY_TILES
 
-    +set ALL_RAM, RAM_ROM_SELECTION
+    ldy PLAY
+    beq +
     jsr PLAY_SONG
-    +set ALL_RAM_WITH_IO, RAM_ROM_SELECTION
-    ldx #$1a
--
-    lda SID_GHOST_REGS, x
-    sta $d400, x
-    dex
-    bpl -
++
 
 ;-------------------------------------------------------------------------------
 ; sort sprites
 ;-------------------------------------------------------------------------------
 
     !ifdef DEBUG {
-        inc VIC_BORDER
+        ldx #2
+        stx VIC_BORDER
+;        inc VIC_BORDER
     }
-    !for .i, 0, 23-1 {
+    !for .i, 0, SPRITES-2 {
         ldy SPR_I + .i + 1
         !if .i % 2 = 0 {
             !set .back_0 = *
@@ -395,7 +430,9 @@ last_irq
 +
     }
     !ifdef DEBUG {
-        dec VIC_BORDER
+        ldx #1
+        stx VIC_BORDER
+;        dec VIC_BORDER
     }
 
     +set_raster_line_8 LINE_0
@@ -404,7 +441,9 @@ last_irq
 out_x
     stx SPR_COUNTER
     !ifdef DEBUG {
-        dec VIC_BORDER
+        ldx #0
+        stx VIC_BORDER
+;        dec VIC_BORDER
     }
 out
     +ack_restore_rti

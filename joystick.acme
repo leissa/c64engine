@@ -1,52 +1,52 @@
-JOY !zone {
-    !if SLOWDOWN != 0 {
-        inc .slowdown
-        lda .slowdown
-        cmp #SLOWDOWN
-        beq +
-        rts
-+
-        lda #0
-        sta .slowdown
-    }
+COUNT=2
 
+!macro ignore .l, .a {
+!if SCROLL_SPEED = 2 {
+    ldy IGNORE_DIR
+!if .a = 1 {
+    bne +
+    ldy #1
+} else {
+    beq +
+    ldy #0
+}
+    sty IGNORE_DIR
+    ldy #COUNT
+    sty IGNORE_COUNT
++
+    ldy IGNORE_COUNT
+    beq .l
+    dec IGNORE_COUNT
+    rts
+}
+}
+
+JOYSTICK !zone {
     ldx CUR_SPR
     inc SPR_A, x
 
     lda CIA1_PORT_2
-.up
-    lsr
-    bcs .down
+    asl
+    asl
+    asl
+
+.fire
+    asl
     pha
-    jsr SCROLL_U
-    pla
-
-    ldx CUR_SPR
-    dec SPR_Y, x
-
-.down
-    lsr
-    bcs .left
-    pha
-    jsr SCROLL_D
-    pla
-
-    ldx CUR_SPR
-    inc SPR_Y, x
-
-.left
-    lsr
     bcs .right
-    pha
-    jsr SCROLL_L
-    pla
-
-    ldx CUR_SPR
-    dec SPR_X, x
+    dec CUR_SPR
+    bpl .right
+    lda #SPRITES-1
+    sta CUR_SPR
 
 .right
-    lsr
-    bcs .fire
+    pla
+    asl
+    bcs .left
+
++ignore .continue4, 0
+.continue4
+
     pha
     jsr SCROLL_R
     pla
@@ -54,21 +54,62 @@ JOY !zone {
     ldx CUR_SPR
     inc SPR_X, x
 
-.fire
-    lsr
-    bcs +
-    lda #$ff
-    dcp CUR_SPR
-    bne .no_wrap
-    lda #23
-    sta CUR_SPR
-.no_wrap
-+
+!if SCROLL_SPEED = 2 {
     rts
+}
 
-.slowdown !by 0
+.left
+    asl
+    bcs .down
+
++ignore .continue3, 0
+.continue3
+
+    pha
+    jsr SCROLL_L
+    pla
+
+    ldx CUR_SPR
+    dec SPR_X, x
+
+!if SCROLL_SPEED = 2 {
+    rts
+}
+
+.down
+    asl
+    bcs .up
+
++ignore .continue2, 1
+.continue2
+
+    pha
+    jsr SCROLL_D
+    pla
+
+    ldx CUR_SPR
+    inc SPR_Y, x
++
+
+!if SCROLL_SPEED = 2 {
+    rts
+}
+
+.up
+    asl
+    bcs .exit
+
++ignore .continue1, 1
+.continue1
+
+    jsr SCROLL_U
+
+    ldx CUR_SPR
+    dec SPR_Y, x
+
+.exit
+    rts
 }
 
 CUR_SPR
-    !by 23
-
+    !by SPRITES-1
