@@ -1,6 +1,9 @@
+SCROLL_COLS = SCR_COLS
+SCROLL_ROWS = SCR_ROWS-2
+
 INC_HARD_Y !zone {
     inc HARD_Y
-    lda #26
+    lda #SCR_ROWS+1
     cmp HARD_Y
     bne .return
 
@@ -12,8 +15,8 @@ INC_HARD_Y !zone {
     sbc #16
     sta HARD_X
     clc
-    adc #40
-    cmp #40 
+    adc #SCR_COLS
+    cmp #SCR_COLS
     +buge .return    ; jmp if A < 40
     sta HARD_X
     inc HARD_Y
@@ -26,7 +29,7 @@ DEC_HARD_Y !zone {
     dec HARD_Y
     bpl .return
 
-    lda #25
+    lda #SCR_ROWS
     sta HARD_Y
 
     lda HARD_X
@@ -34,7 +37,7 @@ DEC_HARD_Y !zone {
     adc #16
     sta HARD_X
     sec
-    sbc #40
+    sbc #SCR_COLS
     bmi .return
     sta HARD_X
     dec HARD_Y
@@ -47,7 +50,7 @@ DEC_HARD_Y !zone {
     lda .mem
     clc
     adc #.inc
-    and #.and-1
+    and #.and-1 ; assumes 2^x = .and
     sta .mem
     bne .l
 }
@@ -56,47 +59,138 @@ DEC_HARD_Y !zone {
     lda .mem
     sec
     sbc #.dec
-    and #.and-1
+    and #.and-1 ; assumes 2^x = .and
     sta .mem
     +bbc .l
 }
 
-SCROLL_U !zone {
-    inc HIRES
-    lda VIC_SPR_0_Y
-    cmp #73
-    beq+
-    !for .i, 0, 7 {
-        ;dec VIC_SPR_0_Y + .i*2
-    }
-+
-    +wrap_dec SOFT_Y, SCROLL_SPEED, 8, .return
-    jsr DEC_HARD_Y
+!macro wrap_add .lo, .hi, .add, .and {
+    clc
 
-.return
+    lda .lo
+    adc #(.add % 256)
+    sta .lo
+    lda .hi
+    adc #(.add / 256)
+    and #.and-1 ; assumes 2^x = .and
+    sta .hi
+}
+
+!macro wrap_sub .lo, .hi, .sub, .and {
+    sec
+
+    lda .lo
+    sbc #(.sub % 256)
+    sta .lo
+    lda .hi
+    sbc #(.sub / 256)
+    and #.and-1 ; assumes 2^x = .and
+    sta .hi
+}
+
+SCROLL_U !zone {
+;    lda VIC_SPR_0_Y
+;    cmp #73
+;    beq+
+;    !for .i, 0, 7 {
+;        ;dec VIC_SPR_0_Y + .i*2
+;    }
+;+
+
+    +wrap_dec SOFT_Y, SCROLL_SPEED, 8, .check_copy_tiles
+    jsr DEC_HARD_Y
+    rts
+
+.check_copy_tiles
+    lda SOFT_Y
+    !if SCROLL_SPEED = 2 { cmp #2 } else { cmp #3 }
+    beq .prepare_copy_tiles
+    rts
+.prepare_copy_tiles
+    lda #9
+    sta C_COPY_PIX
+
+    lda TILE_ROW
+    sec
+    sbc #1
+    sta TILE_ROW
+    bpl +
+    clc
+    adc #TILE_ROWS
+    sta TILE_ROW
+    +wrap_sub C_MAP_POS_LO, C_MAP_POS_HI, MAP_WIDTH, 256
+    +wrap_sub R_MAP_POS_LO, R_MAP_POS_HI, MAP_WIDTH, 256
++
+    +wrap_sub C_SCR_POS_LO, C_SCR_POS_HI, SCROLL_COLS, 4
+    +wrap_sub R_SCR_POS_LO, R_SCR_POS_HI, SCROLL_COLS, 4
+    +wrap_sub C_PIX_POS_LO, C_PIX_POS_HI, 8*SCROLL_COLS, 8*4
+    +wrap_sub R_PIX_POS_LO, R_PIX_POS_HI, 8*SCROLL_COLS, 8*4
+
+    lda SCROLL_U_D
+    beq +
+    +wrap_sub C_MAP_POS_LO, C_MAP_POS_HI, MAP_WIDTH*(SCROLL_ROWS-1)/2, 256
+    +wrap_sub C_SCR_POS_LO, C_SCR_POS_HI, (SCROLL_ROWS-1)*SCROLL_COLS, 4
+    +wrap_sub C_PIX_POS_LO, C_PIX_POS_HI, 8*(SCROLL_ROWS-1)*SCROLL_COLS, 8*4
+    lda #0
+    sta SCROLL_U_D
++
     rts
 }
 
 SCROLL_D !zone {
-    !for .i, 0, 7 {
-        ;inc VIC_SPR_0_Y + .i*2
-    }
+;    !for .i, 0, 7 {
+;        ;inc VIC_SPR_0_Y + .i*2
+;    }
 
-    +wrap_inc SOFT_Y, SCROLL_SPEED, 8, .return
+    +wrap_inc SOFT_Y, SCROLL_SPEED, 8, .check_copy_tiles
     jsr INC_HARD_Y
-.return
+    rts
+
+.check_copy_tiles
+    lda SOFT_Y
+    cmp #4
+    beq .prepare_copy_tiles
+    rts
+.prepare_copy_tiles
+    lda #9
+    sta C_COPY_PIX
+
+    lda TILE_ROW
+    clc
+    adc #1
+    cmp #TILE_ROWS
+    sta TILE_ROW
+    bmi +
+    sec
+    sbc #TILE_ROWS
+    sta TILE_ROW
+    +wrap_add C_MAP_POS_LO, C_MAP_POS_HI, MAP_WIDTH, 256
+    +wrap_add R_MAP_POS_LO, R_MAP_POS_HI, MAP_WIDTH, 256
++
+    +wrap_add C_SCR_POS_LO, C_SCR_POS_HI, SCROLL_COLS, 4
+    +wrap_add R_SCR_POS_LO, R_SCR_POS_HI, SCROLL_COLS, 4
+    +wrap_add C_PIX_POS_LO, C_PIX_POS_HI, 8*SCROLL_COLS, 8*4
+    +wrap_add R_PIX_POS_LO, R_PIX_POS_HI, 8*SCROLL_COLS, 8*4
+
+    lda SCROLL_U_D
+    bne +
+    +wrap_add C_MAP_POS_LO, C_MAP_POS_HI, MAP_WIDTH*(SCROLL_ROWS-1)/2, 256
+    +wrap_add C_SCR_POS_LO, C_SCR_POS_HI, (SCROLL_ROWS-1)*SCROLL_COLS, 4
+    +wrap_add C_PIX_POS_LO, C_PIX_POS_HI, 8*(SCROLL_ROWS-1)*SCROLL_COLS, 8*4
+    lda #1
+    sta SCROLL_U_D
++
     rts
 }
 
 SCROLL_L !zone {
-    !for .i, 0, 7 {
-        ;dec VIC_SPR_0_X + .i*2
-    }
+;    !for .i, 0, 7 {
+;        ;dec VIC_SPR_0_X + .i*2
+;    }
 
-    +wrap_inc SOFT_X, SCROLL_SPEED, 8, .return
-
+    +wrap_inc SOFT_X, SCROLL_SPEED, 8, .check_copy_tiles
     inc HARD_X
-    lda #40
+    lda #SCR_COLS
     cmp HARD_X
     bne +
 
@@ -104,24 +198,92 @@ SCROLL_L !zone {
     sta HARD_X
     jsr DEC_HARD_Y
 +
-.return
+    rts
+
+.check_copy_tiles
+    lda SOFT_X
+    cmp #4
+    beq .prepare_copy_tiles
+    rts
+.prepare_copy_tiles
+    lda #9
+    sta R_COPY_PIX
+
+    lda TILE_COL
+    sec
+    sbc #1
+    sta TILE_COL
+    bpl +
+    clc
+    adc #TILE_COLS
+    sta TILE_COL
+    +wrap_sub C_MAP_POS_LO, C_MAP_POS_HI, 1, 256
+    +wrap_sub R_MAP_POS_LO, R_MAP_POS_HI, 1, 256
++
+    +wrap_sub C_SCR_POS_LO, C_SCR_POS_HI, 1, 4
+    +wrap_sub R_SCR_POS_LO, R_SCR_POS_HI, 1, 4
+    +wrap_sub C_PIX_POS_LO, C_PIX_POS_HI, 8, 8*4
+    +wrap_sub R_PIX_POS_LO, R_PIX_POS_HI, 8, 8*4
+
+    lda SCROLL_L_R
+    beq +
+    +wrap_sub R_MAP_POS_LO, R_MAP_POS_HI, (SCROLL_COLS-1) / TILE_COLS, 256
+    +wrap_sub R_SCR_POS_LO, R_SCR_POS_HI, SCROLL_COLS-1, 4
+    +wrap_sub R_PIX_POS_LO, R_PIX_POS_HI, 8*(SCROLL_COLS-1), 8*4
+    lda #0
+    sta SCROLL_L_R
++
     rts
 }
 
 SCROLL_R !zone {
-    !for .i, 0, 7 {
-        ;inc VIC_SPR_0_X + .i*2
-    }
+;    !for .i, 0, 7 {
+;        ;inc VIC_SPR_0_X + .i*2
+;    }
 
-    +wrap_dec SOFT_X, SCROLL_SPEED, 8, .return
-
+    +wrap_dec SOFT_X, SCROLL_SPEED, 8, .check_copy_tiles
     dec HARD_X
     bpl +
 
-    lda #39
+    lda #SCR_COLS-1
     sta HARD_X
     jsr INC_HARD_Y
 +
-.return
+    rts
+
+.check_copy_tiles
+    lda SOFT_X
+    !if SCROLL_SPEED = 2 { cmp #2 } else { cmp #3 }
+    beq .prepare_copy_tiles
+    rts
+.prepare_copy_tiles
+    lda #9
+    sta R_COPY_PIX
+
+    lda TILE_COL
+    clc
+    adc #1
+    cmp #TILE_COLS
+    sta TILE_COL
+    bmi +
+    sec
+    sbc #TILE_COLS
+    sta TILE_COL
+    +wrap_add C_MAP_POS_LO, C_MAP_POS_HI, 1, 256
+    +wrap_add R_MAP_POS_LO, R_MAP_POS_HI, 1, 256
++
+    +wrap_add C_SCR_POS_LO, C_SCR_POS_HI, 1, 4
+    +wrap_add R_SCR_POS_LO, R_SCR_POS_HI, 1, 4
+    +wrap_add C_PIX_POS_LO, C_PIX_POS_HI, 8, 8*4
+    +wrap_add R_PIX_POS_LO, R_PIX_POS_HI, 8, 8*4
+
+    lda SCROLL_L_R
+    bne +
+    +wrap_add R_MAP_POS_LO, R_MAP_POS_HI, (SCROLL_COLS-1)/TILE_COLS, 256
+    +wrap_add R_SCR_POS_LO, R_SCR_POS_HI, SCROLL_COLS-1, 4
+    +wrap_add R_PIX_POS_LO, R_PIX_POS_HI, 8*(SCROLL_COLS-1), 8*4
+    lda #1
+    sta SCROLL_L_R
++
     rts
 }
