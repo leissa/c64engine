@@ -6,9 +6,7 @@
 !source "lib/vic.acme"
 !source "lib/cia.acme"
 !source "lib/std.acme"
-
-; acme -DSYSTEM=64 engine.acme
-; exomizer sfx sys engine.prg -x1 -o scroll.prg
+!source "symbols.inc"
 
 !ifdef DEBUG {
     CONTROL_X           = %00011000 ; 40 cols
@@ -53,8 +51,22 @@ SPR_F
 
 !zone {
 ;-------------------------------------------------------------------------------
+;   install 1541 code (credits for the disk loader go to Krill)
+;-------------------------------------------------------------------------------
+
+    jsr install
+    bcc +
+    ldx #0
+-
+    sta $d020
+    stx $d020
+    jmp -
++
+
+;-------------------------------------------------------------------------------
 ;   disable all basic, kernal and irq crap
 ;-------------------------------------------------------------------------------
+
     ; set empty interrupt routine
     +set16 EMPTY_INTERRUPT, VECTOR_NMI
     +set16 EMPTY_INTERRUPT, VECTOR_IRQ
@@ -88,12 +100,28 @@ SPR_F
     ; -> zero page completely free on this spot except for the special regs $00 and $01
 
 ;-------------------------------------------------------------------------------
+;   copy loader code to work area $0200 ~ $0400
+;-------------------------------------------------------------------------------
+
+    ; copy 2 pages
+    ldy #2
+    ldx #0
+.copy_loop
+    lda DISK_LOADER_SRC, x
+    sta DISK_LOADER, x
+    dex
+    bne .copy_loop
+    inc .copy_loop + 2
+    inc .copy_loop + 5
+    dey
+    bne .copy_loop
+
+;-------------------------------------------------------------------------------
 ;   setup VIC
 ;-------------------------------------------------------------------------------
 
     ; select VIC area: bank 3
-    lda CIA2_DATA_PORT_A
-    and #%11111100
+    lda #0; upper 6 bits must always be 0
     sta CIA2_DATA_PORT_A
 
     ; select screen bank 8, hires-bank 0
@@ -204,6 +232,59 @@ SPR_F
     +multiplication_table TILE_COLS*TILE_ROWS*8, MTABLE_BYTES_LO, MTABLE_BYTES_HI
 
 ;-------------------------------------------------------------------------------
+;   load map data
+;-------------------------------------------------------------------------------
+
+    jmp .load
+
+.load_error
+    ldx #0
+-
+    sta $d020
+    stx $d020
+    jmp -
+
+!convtab pet {
+tile_map
+    !tx "map"
+    !by 0
+tile_clr
+    !tx "colors"
+    !by 0
+tile_scr
+    !tx "screen"
+    !by 0
+tile_pix
+    !tx "pixels"
+    !by 0
+}
+
+.load
+    ldx #<tile_map
+    ldy #>tile_map
+    jsr loadcompd
+;    jsr loadraw
+    bcs .load_error
+
+    ldx #<tile_clr
+    ldy #>tile_clr
+    jsr loadcompd
+;    jsr loadraw
+    bcs .load_error
+
+    ldx #<tile_scr
+    ldy #>tile_scr
+    jsr loadcompd
+;    jsr loadraw
+    bcs .load_error
+
+    ldx #<tile_pix
+    ldy #>tile_pix
+    jsr loadcompd
+;    jsr loadraw
+    bcs .load_error
+
+;-------------------------------------------------------------------------------
 ;   setup raster irq
 ;-------------------------------------------------------------------------------
 
@@ -240,17 +321,23 @@ SPR_F
 *=SONG_DATA
 !bin "snd/transylvanian.bin"
 
-*=TILE_MAP
-!bin "map.bin"
+*=DISK_LOADER_SRC;
+!bin "loader-c64.prg",,2
 
-*=TILE_CLR
-!bin "colors.bin"
+*=DISK_INSTALLER
+!bin "install-c64.prg",,2
 
-*=TILE_SCR
-!bin "screen.bin"
+;*=TILE_MAP
+;!bin "map.bin"
 
-*=TILE_PIX
-!bin "pixels.bin"
+;*=TILE_CLR
+;!bin "colors.bin"
+
+;*=TILE_SCR
+;!bin "screen.bin"
+
+;*=TILE_PIX
+;!bin "pixels.bin"
 
 *=SPR_FR
 !bin "spr/hero.raw", 64*4
