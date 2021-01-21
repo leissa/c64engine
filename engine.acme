@@ -263,25 +263,21 @@ tile_pix
     ldx #<tile_map
     ldy #>tile_map
     jsr loadcompd
-;    jsr loadraw
     bcs .load_error
 
     ldx #<tile_clr
     ldy #>tile_clr
     jsr loadcompd
-;    jsr loadraw
     bcs .load_error
 
     ldx #<tile_scr
     ldy #>tile_scr
     jsr loadcompd
-;    jsr loadraw
     bcs .load_error
 
     ldx #<tile_pix
     ldy #>tile_pix
     jsr loadcompd
-;    jsr loadraw
     bcs .load_error
 
 ;-------------------------------------------------------------------------------
