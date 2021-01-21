@@ -318,10 +318,10 @@ tile_pix
 !bin "snd/transylvanian.bin"
 
 *=DISK_LOADER_SRC;
-!bin "loader-c64.prg",,2
+!bin "loader-v184/loader/build/loader-c64.prg",,2
 
 *=DISK_INSTALLER
-!bin "install-c64.prg",,2
+!bin "loader-v184/loader/build/install-c64.prg",,2
 
 ;*=TILE_MAP
 ;!bin "map.bin"
