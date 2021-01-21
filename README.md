@@ -10,7 +10,7 @@ acme engine.acme
 ## Run
 
 ```bash
-x64sc engine.prg
+x64sc -device8 0 +iecdevice8 -truedrive -8 ~/c64engine/c64engine.d64
 ```
 
 Use joystick in port 2 to run the demo.
