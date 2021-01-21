@@ -4,7 +4,7 @@ a game engine for the c64
 ## Building
 
 ```bash
-acme engine.acme
+./make.sh
 ```
 
 ## Run
@@ -37,6 +37,8 @@ Use joystick in port 2 to run the demo.
     Color 0 (the shared background color) is black, but this can of course be changed to any of the 16 colors. If you are generating
     your own tile data, it is adviced to give priority to color number 3. In this way it is possible to reduce the problem of the
     sprite pointers overwriting the screen colors if certain tiles use only 2 colors (color 0 & color 3).
+
+* Map loader (credits for the loader go to Krill)
 
 ## Useful Links
 
