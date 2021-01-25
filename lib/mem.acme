@@ -59,7 +59,7 @@ SPR_Y           = $58; - $6f
 
 ; zero page: $0000 - $00ff
 ; cpu stack: $0100 - $01ff
-; work area: $0200 - $0400
+DISK_LOADER     = $0200; ~ $0400
 ;----------------------------------1k
 MTABLE_TILES_LO = $0400; - $04ff
 MTABLE_TILES_HI = $0500; - $05ff
@@ -72,6 +72,8 @@ CODE_START      = $0885; - $1fff,  6k
 SONG_DATA       = $2000; - $2fff,  4k
 ;---------------------------------12k
 
+DISK_LOADER_SRC = $3000; ~ $3200
+DISK_INSTALLER  = $4000; ~ $5b00
 TILE_MAP        = $3000; - $8fff, 24k
 TILE_CLR        = $9000; - $95ff,  1.5k
 TILE_SCR        = $9600; - $9bff,  1.5k
