@@ -1,4 +1,4 @@
-!to "engine.prg", cbm   ; output program
+;!to "engine.prg", cbm   ; output program
 !sl "labels.l"          ; create label file for vice
 !convtab scr            ; for conversion to c64 screen codes
 
@@ -318,10 +318,10 @@ tile_pix
 !bin "snd/transylvanian.bin"
 
 *=DISK_LOADER_SRC;
-!bin "loader-v184/loader/build/loader-c64.prg",,2
+!bin "krill/loader/build/loader-c64.prg",,2
 
 *=DISK_INSTALLER
-!bin "loader-v184/loader/build/install-c64.prg",,2
+!bin "krill/loader/build/install-c64.prg",,2
 
 ;*=TILE_MAP
 ;!bin "map.bin"
