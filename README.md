@@ -1,16 +1,17 @@
 # c64engine
-a game engine for the c64
+
+A game engine for the c64.
 
 ## Building
 
 Dependencies:
-    * [acme](https://sourceforge.net/projects/acme-crossass/)
-    * [cc65](https://github.com/cc65/cc65)
+* [acme](https://sourceforge.net/projects/acme-crossass/)
+* [cc65](https://github.com/cc65/cc65)
 
 The following dependencies are automatically dealt with by the `Makefile`:
-    * [Krill's loader](https://csdb.dk/release/?id=189130)
-    * [exomizer](https://github.com/exomiser/Exomiser) (using Krill's intree sources)
-    * [tinycrunch](https://csdb.dk/release/?id=168629) (using Krill's intree sources)
+* [Krill's loader](https://csdb.dk/release/?id=189130)
+* [exomizer](https://github.com/exomiser/Exomiser) (using Krill's intree sources)
+* [tinycrunch](https://csdb.dk/release/?id=168629) (using Krill's intree sources)
 
 ```bash
 cp config.default.template config.default
