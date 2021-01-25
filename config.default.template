@@ -1,0 +1,6 @@
+ACME   := /usr/bin/acme
+MAKE   := /usr/bin/make
+MKDIR  := /usr/bin/mkdir
+UNZIP  := /usr/bin/unzip
+WGET   := /usr/bin/wget
+X64    := /usr/bin/x64sc

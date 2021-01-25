@@ -3,14 +3,26 @@ a game engine for the c64
 
 ## Building
 
+Dependencies:
+    * [acme](https://sourceforge.net/projects/acme-crossass/)
+    * [cc65](https://github.com/cc65/cc65)
+
+The following dependencies are automatically dealt with by the `Makefile`:
+    * [Krill's loader](https://csdb.dk/release/?id=189130)
+    * [exomizer](https://github.com/exomiser/Exomiser) (using Krill's intree sources)
+    * [tinycrunch](https://csdb.dk/release/?id=168629) (using Krill's intree sources)
+
 ```bash
-./make.sh
+cp config.default.template config.default
+vim config.default # edit
+make
 ```
 
-## Run
+## Running
 
+Before running in VICE, make sure 'True drive emulation' is enabled and 'IEC-device' is -disabled-.
 ```bash
-x64sc -device8 0 +iecdevice8 -truedrive -8 ~/c64engine/c64engine.d64
+make run
 ```
 
 Use joystick in port 2 to run the demo.

@@ -1,3 +1,7 @@
-*.prg
+*.d64
+*.exo
 *.l
-.directory
+*.prg
+*.tc
+config.default
+krill
