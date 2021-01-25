@@ -28,6 +28,7 @@ ENGINE_EXO := $(filter %.exo, $(ENGINE_OBJ:.obj=.exo))
 ENGINE_PRG := $(filter %.prg, $(ENGINE_BIN:.bin=.prg))
 ENGINE_TC  := $(filter %.tc,  $(ENGINE_PRG:.prg=.tc))
 
+# use 'make Q=' to get a verbose output of all commands
 Q ?= @
 
 all: $(D64)

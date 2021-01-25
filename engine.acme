@@ -6,7 +6,7 @@
 !source "lib/vic.acme"
 !source "lib/cia.acme"
 !source "lib/std.acme"
-!source "symbols.inc"
+!source "krill/loader/build/loadersymbols-c64.inc"
 
 !ifdef DEBUG {
     CONTROL_X           = %00011000 ; 40 cols
