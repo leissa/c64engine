@@ -16,10 +16,10 @@ ENGINE_BIN += colors.bin
 ENGINE_BIN += screen.bin
 ENGINE_BIN += pixels.bin
 
-map.bin.addr    := '\000\060'
-colors.bin.addr := '\000\220'
-screen.bin.addr := '\000\226'
-pixels.bin.addr := '\000\234'
+map.bin.addr    := '\x00\x30'
+colors.bin.addr := '\x00\x90'
+screen.bin.addr := '\x00\x96'
+pixels.bin.addr := '\x00\x9c'
 
 ENGINE_ACME := engine.acme
 ENGINE_OBJ := $(filter %.obj, $(ENGINE_ACME:.acme=.obj))
