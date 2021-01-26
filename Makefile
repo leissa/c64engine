@@ -10,23 +10,18 @@ CC1541    ?= $(KRILL)/loader/tools/cc1541/cc1541
 EXO       ?= $(KRILL)/loader/tools/exomizer-3/src/exomizer
 TC        ?= $(KRILL)/loader/tools/tinycrunch_v1.2/tc_encode.py
 
-ENGINE_BIN :=
-ENGINE_BIN += map.bin
-ENGINE_BIN += colors.bin
-ENGINE_BIN += screen.bin
-ENGINE_BIN += pixels.bin
+ENGINE_ACME := engine.acme
+ENGINE_OBJ := $(filter %.obj, $(ENGINE_ACME:.acme=.obj))
+ENGINE_EXO := $(filter %.exo, $(ENGINE_OBJ:.obj=.exo))
+
+ENGINE_BIN := $(wildcard *.bin)
+ENGINE_PRG := $(filter %.prg, $(ENGINE_BIN:.bin=.prg))
+ENGINE_TC  := $(filter %.tc,  $(ENGINE_PRG:.prg=.tc))
 
 map.bin.addr    := '\x00\x30'
 colors.bin.addr := '\x00\x90'
 screen.bin.addr := '\x00\x96'
 pixels.bin.addr := '\x00\x9c'
-
-ENGINE_ACME := engine.acme
-ENGINE_OBJ := $(filter %.obj, $(ENGINE_ACME:.acme=.obj))
-ENGINE_EXO := $(filter %.exo, $(ENGINE_OBJ:.obj=.exo))
-
-ENGINE_PRG := $(filter %.prg, $(ENGINE_BIN:.bin=.prg))
-ENGINE_TC  := $(filter %.tc,  $(ENGINE_PRG:.prg=.tc))
 
 # use 'make Q=' to get a verbose output of all commands
 Q ?= @
