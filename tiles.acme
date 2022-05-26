@@ -1,300 +1,173 @@
-COPY_COLS = SCROLL_COLS
-COPY_ROWS = SCROLL_ROWS
+!macro copy_tile_char .char {
+    ldy #0
+    lda TILE_CLR+(.char*TILES), x
+    sta (CLR_POS_LO_T), y
 
-!align 255, 0
-copy_pixels_cols_block !zone {
-    +set ALL_RAM, RAM_ROM_SELECTION
+    lda TILE_SCR+(.char*TILES), x
+    sta (SCR_POS_LO_T), y
 
-pixels_cols
-    !for .col, 0, COPY_COLS-1 {
-        lda TILE_PIX, y
-        sta HIRES, y
+    lda #ALL_RAM
+    sta RAM_ROM_SELECTION
+
+    !for .row, 0, 7 {
+        lda TILE_PIX+(.char*8*TILES)+(.row*TILES), x
+        sta (PIX_POS_LO_T), y
+        !if .row != 7 {
+            iny
+        }
     }
 
-    +set ALL_RAM_WITH_IO, RAM_ROM_SELECTION
-    rts
-}
-
-!align 255, 0
-copy_screen_cols_block !zone {
-    +set ALL_RAM, RAM_ROM_SELECTION
-
-screen_cols
-    !for .col, 0, COPY_COLS-1 {
-        lda TILE_SCR
-        sta SCREEN
-    }
-
-    +set ALL_RAM_WITH_IO, RAM_ROM_SELECTION
-    rts
-}
-
-!align 255, 0
-copy_colors_cols_block !zone {
-
-colors_cols
-    !for .col, 0, COPY_COLS-1 {
-        lda TILE_CLR
-        sta COLOR_RAM
-    }
+    lda #ALL_RAM_WITH_IO
+    sta RAM_ROM_SELECTION
 
     rts
 }
 
-!align 255, 0
-copy_pixels_rows_block !zone {
-    +set ALL_RAM, RAM_ROM_SELECTION
+copy_tile_char0 !zone { +copy_tile_char 0 }
+copy_tile_char1 !zone { +copy_tile_char 1 }
+copy_tile_char2 !zone { +copy_tile_char 2 }
+copy_tile_char3 !zone { +copy_tile_char 3 }
+copy_tile_char4 !zone { +copy_tile_char 4 }
+copy_tile_char5 !zone { +copy_tile_char 5 }
 
-pixels_rows
-    !for .row, 0, COPY_ROWS-1 {
-        lda TILE_PIX, y
-        sta HIRES, y
-    }
-
-    +set ALL_RAM_WITH_IO, RAM_ROM_SELECTION
-    rts
-}
-
-!align 255, 0
-copy_screen_rows_block !zone {
-    +set ALL_RAM, RAM_ROM_SELECTION
-
-screen_rows
-    !for .row, 0, COPY_ROWS-1 {
-        lda TILE_SCR
-        sta SCREEN
-    }
-
-    +set ALL_RAM_WITH_IO, RAM_ROM_SELECTION
-    rts
-}
-
-!align 255, 0
-copy_colors_rows_block !zone {
-
-colors_rows
-    !for .row, 0, COPY_ROWS-1 {
-        lda TILE_CLR
-        sta COLOR_RAM
-    }
-
-    rts
-}
-
-!macro prepare_pointers .offset, .lo, .hi {
-    lda .offset ; 2 bytes
-    sta .lo + 1 ; 3 bytes
-    adc #1      ; 2 bytes
-    sta .hi + 1 ; 3 bytes
-    adc #5      ; 2 bytes
-    sta .offset ; 2 bytes
-}
-
-!macro destination_pointers .cols {
+!macro iterate_source_pointers .cols, .map_pos {
 !if .cols = 1 {
-    !set .pixels = pixels_cols
-    !set .screen = screen_cols
-    !set .colors = colors_cols
-    !set .pixels_dst = C_PIXELS_DST
-    !set .screen_dst = C_SCREEN_DST
-    !set .colors_dst = C_COLORS_DST
-    !set .pix_pos_lo_t = C_PIX_POS_LO_T
-    !set .pix_pos_hi_t = C_PIX_POS_HI_T
-    !set .scr_pos_lo_t = C_SCR_POS_LO_T
+    !set .tile_char = C_TILE_COL
 } else {
-    !set .pixels = pixels_rows
-    !set .screen = screen_rows
-    !set .colors = colors_rows
-    !set .pixels_dst = R_PIXELS_DST
-    !set .screen_dst = R_SCREEN_DST
-    !set .colors_dst = R_COLORS_DST
-    !set .pix_pos_lo_t = R_PIX_POS_LO_T
-    !set .pix_pos_hi_t = R_PIX_POS_HI_T
-    !set .scr_pos_lo_t = R_SCR_POS_LO_T
+    !set .tile_char = R_TILE_ROW
 }
-    +prepare_pointers .pixels_dst, .pixels_lo, .pixels_hi
-    +prepare_pointers .screen_dst, .screen_lo, .screen_hi
-    +prepare_pointers .colors_dst, .colors_lo, .colors_hi
 
-    ; pixel pointer
-    lda .pix_pos_lo_t
-.pixels_lo
-    sta .pixels
-    adc #(8*.cols % 256) ; + 64
-    sta .pix_pos_lo_t
-
-    lda .pix_pos_hi_t
-.pixels_hi
-    sta .pixels
-    adc #(8*.cols / 256) ; + 256
-    and #%11011111 ; modulo 8192 (but keep upper bits)
-    sta .pix_pos_hi_t ; next pixel position to start from
-
-    ; color pointers
-    lda .scr_pos_lo_t
-.screen_lo
-    sta .screen
-.colors_lo
-    sta .colors
-.screen_hi
-    stx .screen
-.colors_hi
-    sty .colors
-    adc #.cols
-    sta .scr_pos_lo_t ; next screen position to start from
+!if .cols = 1 or TILE_ROWS != 2 {
+    lda .tile_char
+    adc #1
+    !if .cols = 1 {
+        cmp #TILE_COLS
+    } else {
+        cmp #TILE_ROWS
+    }
+    sta .tile_char
     bcc +
     clc
+    lda #0
+    sta .tile_char
+}
 
-    inx
-    txa
-    and #%11111011 ; modulo 1024 (but keep upper bits)
-    tax
+!if .cols = 1 {
+    inc .map_pos + 1
+} else {
+    !if TILE_ROWS = 2 {
+        lda .tile_char
+        adc #1
+        and #1
+        sta .tile_char
+        bne +
+    }
 
-    iny
-    tya
-    and #%11111011 ; module 1024 (but keep upper bits)
-    tay
+    inc .map_pos + 2
+}
 +
 }
 
-!macro source_pointers .cols {
-!if .cols = 1 {
-    !set .pixels = pixels_cols
-    !set .screen = screen_cols
-    !set .colors = colors_cols
-    !set .pixels_src = C_PIXELS_SRC
-    !set .screen_src = C_SCREEN_SRC
-    !set .colors_src = C_COLORS_SRC
-    !set .tile_pos = C_TILE_POS
-} else {
-    !set .pixels = pixels_rows
-    !set .screen = screen_rows
-    !set .colors = colors_rows
-    !set .pixels_src = R_PIXELS_SRC
-    !set .screen_src = R_SCREEN_SRC
-    !set .colors_src = R_COLORS_SRC
-    !set .tile_pos = R_TILE_POS
-}
-    +prepare_pointers .pixels_src, .pixels_lo, .pixels_hi
-    +prepare_pointers .screen_src, .screen_lo, .screen_hi
-    +prepare_pointers .colors_src, .colors_lo, .colors_hi
-
-.map_pos
-    ldx TILE_MAP, y        ; x = tile index
-
+!macro iterate_destination_pointers .cols {
     ; pixel pointer
-    lda .tile_pos
-    asl
-    asl
-    asl                    ; a = 8 * TILE_POS
-    adc MTABLE_BYTES_LO, x ; a = a + LO of #tiles * 8 * tile index
-.pixels_lo
-    sta .pixels
-    lda MTABLE_BYTES_HI, x ; a = HI of #tiles * 8 * tile index
-    adc #>TILE_PIX
-.pixels_hi
-    sta .pixels
-
+    lda PIX_POS_LO_T
+    adc #(8*.cols % 256) ; + 64
+    sta PIX_POS_LO_T
+!if .cols = 1 {
+    bcc+
+}
+    lda PIX_POS_HI_T
+    adc #(8*.cols / 256) ; + 256
+    and #%11011111 ; modulo 8192 (but keep upper bits)
+    sta PIX_POS_HI_T ; next pixel position to start from
++
     ; color pointers
-    lda .tile_pos
-    adc MTABLE_TILES_LO, x ; a = a + LO of #tiles * tile index
-.screen_lo
-    sta .screen
-.colors_lo
-    sta .colors
+    lda SCR_POS_LO_T
+    adc #.cols
+    sta SCR_POS_LO_T ; next screen position to start from
+    sta CLR_POS_LO_T
+    bcc +
 
-    lda MTABLE_TILES_HI, x ; a = HI of #tiles * tile index
+    lda CLR_POS_HI_T
     adc #0
-    tax
-    adc #>TILE_SCR
-.screen_hi
-    sta .screen
-    txa
-    adc #>TILE_CLR
-.colors_hi
-    sta .colors
+    and #%11111011 ; modulo 1024 (but keep upper bits)
+    sta CLR_POS_HI_T
 
-    ; next iteration
-!if .cols = 1 {
-    lda .tile_pos
-    adc #1
-
-    ; todo: depends on TILE_ROWS
-    cmp #TILE_COLS*1
-    bne +
-    lda #TILE_COLS*0
-    beq .do_map_pos ; always true
+    adc #%00001000
+    sta SCR_POS_HI_T
 +
-    cmp #TILE_COLS*2
-    bne +
-    lda #TILE_COLS*1
-.do_map_pos
-    clc
-    iny
-    bne +
-    inc .map_pos + 2
-+
-    sta .tile_pos
-} else {
-    lda .tile_pos
-    adc #TILE_COLS
-    cmp #TILE_COLS*TILE_ROWS
-    bmi +
-
-    sec
-    sbc #TILE_COLS*TILE_ROWS
-    clc
-
-    ; example map is 256 tiles wide
-    ; sta .tile_pos
-    ; lda .map_pos_lo_t
-    ; clc
-    ; adc #MAP_WIDTH
-    ; sta .map_pos_lo_t
-    ; bcc +
-    ; clc
-    inc .map_pos + 2
-+
-    sta .tile_pos
 }
 
-}
+; depends on TILE_COLS and TILE_ROWS
+;select_and_copy_tile_char !zone {
+;    !for .char, 0, 5 {
+;        !if .char != 5 {
+;            !if .char != 0 {
+;                cmp #.char
+;            }
+;            bne +
+;        }
+;        !if .char = 0 { jsr copy_tile_char0 }
+;        !if .char = 1 { jsr copy_tile_char1 }
+;        !if .char = 2 { jsr copy_tile_char2 }
+;        !if .char = 3 { jsr copy_tile_char3 }
+;        !if .char = 4 { jsr copy_tile_char4 }
+;        !if .char = 5 { jsr copy_tile_char5 }
+;        rts
+;+
+;    }
+;}
 
-!macro init_destination_pointers .cols {
+!macro init_pointers .cols {
 !if .cols = 1 {
-    !set .pixels = pixels_cols
-    !set .screen = screen_cols
-    !set .colors = colors_cols
-    !set .pixels_dst = C_PIXELS_DST
-    !set .screen_dst = C_SCREEN_DST
-    !set .colors_dst = C_COLORS_DST
+    !set .tile_col = C_TILE_COL
+    !set .tile_row = C_TILE_ROW
+    !set .map_pos_lo = C_MAP_POS_LO
+    !set .map_pos_hi = C_MAP_POS_HI
     !set .pix_pos_lo = C_PIX_POS_LO
     !set .pix_pos_hi = C_PIX_POS_HI
     !set .scr_pos_lo = C_SCR_POS_LO
     !set .scr_pos_hi = C_SCR_POS_HI
+    !set .map_pos_lo_t = C_MAP_POS_LO_T
+    !set .map_pos_hi_t = C_MAP_POS_HI_T
     !set .pix_pos_lo_t = C_PIX_POS_LO_T
     !set .pix_pos_hi_t = C_PIX_POS_HI_T
     !set .scr_pos_lo_t = C_SCR_POS_LO_T
-    !set .scr_pos_hi1_t = C_SCR_POS_HI1_T
-    !set .scr_pos_hi2_t = C_SCR_POS_HI2_T
+    !set .scr_pos_hi_t = C_SCR_POS_HI_T
+    !set .clr_pos_hi_t = C_CLR_POS_HI_T
 } else {
-    !set .pixels = pixels_rows
-    !set .screen = screen_rows
-    !set .colors = colors_rows
-    !set .pixels_dst = R_PIXELS_DST
-    !set .screen_dst = R_SCREEN_DST
-    !set .colors_dst = R_COLORS_DST
+    !set .tile_col = R_TILE_COL
+    !set .tile_row = R_TILE_ROW
+    !set .map_pos_lo = R_MAP_POS_LO
+    !set .map_pos_hi = R_MAP_POS_HI
     !set .pix_pos_lo = R_PIX_POS_LO
     !set .pix_pos_hi = R_PIX_POS_HI
     !set .scr_pos_lo = R_SCR_POS_LO
     !set .scr_pos_hi = R_SCR_POS_HI
+    !set .map_pos_lo_t = R_MAP_POS_LO_T
+    !set .map_pos_hi_t = R_MAP_POS_HI_T
     !set .pix_pos_lo_t = R_PIX_POS_LO_T
     !set .pix_pos_hi_t = R_PIX_POS_HI_T
     !set .scr_pos_lo_t = R_SCR_POS_LO_T
-    !set .scr_pos_hi1_t = R_SCR_POS_HI1_T
-    !set .scr_pos_hi2_t = R_SCR_POS_HI2_T
+    !set .scr_pos_hi_t = R_SCR_POS_HI_T
+    !set .clr_pos_hi_t = R_CLR_POS_HI_T
 }
+    lda TILE_COL
+    sta .tile_col
+
+    lda TILE_ROW
+    sta .tile_row
+
+    lda .map_pos_lo
+    sta .map_pos_lo_t
+
     clc
+
+    lda .map_pos_hi
+    adc #>TILE_MAP
+    clc
+    sta .map_pos_hi_t
+
     lda .pix_pos_hi
     adc #>HIRES
     sta .pix_pos_hi_t
@@ -304,221 +177,174 @@ colors_rows
 
     lda .scr_pos_hi
     adc #>SCREEN
-    sta .scr_pos_hi1_t
+    sta .scr_pos_hi_t
 
     lda .scr_pos_hi
     adc #>COLOR_RAM
-    sta .scr_pos_hi2_t
+    sta .clr_pos_hi_t
 
     lda .scr_pos_lo
     sta .scr_pos_lo_t
-
-    lda #(.pixels + 4) & $ff
-    sta .pixels_dst
-
-    lda #(.screen + 4) & $ff
-    sta .screen_dst
-
-    lda #(.colors + 4) & $ff
-    sta .colors_dst
 }
 
-!macro init_source_pointers .cols {
+!macro copy_tile_chars .cols, .count {
 !if .cols = 1 {
-    !set .pixels = pixels_cols
-    !set .screen = screen_cols
-    !set .colors = colors_cols
-    !set .pixels_src = C_PIXELS_SRC
-    !set .screen_src = C_SCREEN_SRC
-    !set .colors_src = C_COLORS_SRC
-    !set .map_pos_lo = C_MAP_POS_LO
-    !set .map_pos_hi = C_MAP_POS_HI
+    !set .tile_col_t = C_TILE_COL
+    !set .tile_row_t = C_TILE_ROW
     !set .map_pos_lo_t = C_MAP_POS_LO_T
-    !set .map_pos1 = c_map_pos1
-    !set .tile_pos = C_TILE_POS
+    !set .map_pos_hi_t = C_MAP_POS_HI_T
+    !set .pix_pos_lo_t = C_PIX_POS_LO_T
+    !set .pix_pos_hi_t = C_PIX_POS_HI_T
+    !set .scr_pos_lo_t = C_SCR_POS_LO_T
+    !set .scr_pos_hi_t = C_SCR_POS_HI_T
+    !set .clr_pos_hi_t = C_CLR_POS_HI_T
 } else {
-    !set .pixels = pixels_rows
-    !set .screen = screen_rows
-    !set .colors = colors_rows
-    !set .pixels_src = R_PIXELS_SRC
-    !set .screen_src = R_SCREEN_SRC
-    !set .colors_src = R_COLORS_SRC
-    !set .map_pos_lo = R_MAP_POS_LO
-    !set .map_pos_hi = R_MAP_POS_HI
+    !set .tile_col_t = R_TILE_COL
+    !set .tile_row_t = R_TILE_ROW
     !set .map_pos_lo_t = R_MAP_POS_LO_T
-    !set .map_pos1 = r_map_pos1
-    !set .tile_pos = R_TILE_POS
+    !set .map_pos_hi_t = R_MAP_POS_HI_T
+    !set .pix_pos_lo_t = R_PIX_POS_LO_T
+    !set .pix_pos_hi_t = R_PIX_POS_HI_T
+    !set .scr_pos_lo_t = R_SCR_POS_LO_T
+    !set .scr_pos_hi_t = R_SCR_POS_HI_T
+    !set .clr_pos_hi_t = R_CLR_POS_HI_T
 }
-    clc
-    lda TILE_COL
+    lda .map_pos_lo_t
+    sta .next_tile_char + 1
 
-    ; todo: depends on TILE_ROWS
-    sta .tile_pos
-    ldx TILE_ROW
+    lda .map_pos_hi_t
+    sta .next_tile_char + 2
+
+    lda .scr_pos_lo_t
+    sta SCR_POS_LO_T
+    sta CLR_POS_LO_T
+
+    lda .scr_pos_hi_t
+    sta SCR_POS_HI_T
+
+    lda .clr_pos_hi_t
+    sta CLR_POS_HI_T
+
+    lda .pix_pos_lo_t
+    sta PIX_POS_LO_T
+
+    lda .pix_pos_hi_t
+    sta PIX_POS_HI_T
+
+    lda #.count
+    sta ITERATIONS
+
+    clc
+.next_tile_char
+    ldx TILE_MAP
+
+    ; pixel pointer
+    lda .tile_row_t
     beq +
-    adc #TILE_COLS
-    sta .tile_pos
+    lda #TILE_COLS ; a = TILE_COLS * tile_row (TILE_ROWS = 2)
 +
-    lda .map_pos_lo
+    adc .tile_col_t
+
+;    jsr select_and_copy_tile_char
+
+    !for .char, 0, 5 {
+        !if .char != 5 {
+            !if .char != 0 {
+                cmp #.char
+            }
+            bne +
+        }
+        !if .char = 0 { jsr copy_tile_char0 }
+        !if .char = 1 { jsr copy_tile_char1 }
+        !if .char = 2 { jsr copy_tile_char2 }
+        !if .char = 3 { jsr copy_tile_char3 }
+        !if .char = 4 { jsr copy_tile_char4 }
+        !if .char = 5 { jsr copy_tile_char5 }
+        !if .char != 5 { bne .iterate_pointers }
++
+    }
+
+.iterate_pointers
+    clc
+    +iterate_source_pointers .cols, .next_tile_char
+    +iterate_destination_pointers .cols
+    dec ITERATIONS
+    bne .next_tile_char
+
+.exit
+    lda .next_tile_char + 1
     sta .map_pos_lo_t
 
-    lda .map_pos_hi
-    sta .map_pos1 + ((3*14) + 7 + 2)
+    lda .next_tile_char + 2
+    sta .map_pos_hi_t
 
-    lda #(.pixels + 1) & $ff
-    sta .pixels_src
+    lda SCR_POS_LO_T
+    sta .scr_pos_lo_t
 
-    lda #(.screen + 1) & $ff
-    sta .screen_src
+    lda SCR_POS_HI_T
+    sta .scr_pos_hi_t
 
-    lda #(.colors + 1) & $ff
-    sta .colors_src
+    lda CLR_POS_HI_T
+    sta .clr_pos_hi_t
+
+    lda PIX_POS_LO_T
+    sta .pix_pos_lo_t
+
+    lda PIX_POS_HI_T
+    sta .pix_pos_hi_t
 }
 
-!macro iterate_source_pointers .cols, .count {
-!if .cols = 1 {
-    !set .map_pos1 = c_map_pos1
-    !set .map_pos2 = c_map_pos2
-    !set .map_pos_lo_t = C_MAP_POS_LO_T
-} else {
-    !set .map_pos1 = r_map_pos1
-    !set .map_pos2 = r_map_pos2
-    !set .map_pos_lo_t = R_MAP_POS_LO_T
-}
-    lda #.count
-    sta ITERATIONS
-
-    clc
-    ldy .map_pos_lo_t
--
-    +source_pointers .cols
-    dec ITERATIONS
-    bne -
-
-    sty .map_pos_lo_t
-    ldy .map_pos1 + ((3*14) + 7 + 2)
-    sty .map_pos2 + ((3*14) + 7 + 2)
-}
-
-!macro iterate_destination_pointers .cols, .count {
-!if .cols = 1 {
-    !set .scr_pos_hi1_t = C_SCR_POS_HI1_T
-    !set .scr_pos_hi2_t = C_SCR_POS_HI2_T
-} else {
-    !set .scr_pos_hi1_t = R_SCR_POS_HI1_T
-    !set .scr_pos_hi2_t = R_SCR_POS_HI2_T
-}
-    lda #.count
-    sta ITERATIONS
-
-    clc
-    ldx .scr_pos_hi1_t
-    ldy .scr_pos_hi2_t
--
-    +destination_pointers .cols
-    dec ITERATIONS
-    bne -
-
-    stx .scr_pos_hi1_t
-    sty .scr_pos_hi2_t
-}
-
-set_col_pointers1 !zone {
-    +init_source_pointers 1
-    +init_destination_pointers 1
-c_map_pos1
-    +iterate_source_pointers 1, 10
-    +iterate_destination_pointers 1, 26;
+copy_col_tiles1 !zone {
+    +init_pointers 1
+    +copy_tile_chars 1, SCROLL_COLS / COPY_COL_FRAMES
     rts
 }
 
-set_col_pointers2 !zone {
-c_map_pos2
-    +iterate_source_pointers 1, 30
-    +iterate_destination_pointers 1, 4
+copy_col_tiles2 !zone {
+    +copy_tile_chars 1, SCROLL_COLS / COPY_COL_FRAMES + ((SCROLL_COLS % COPY_COL_FRAMES) != 0)
     rts
 }
 
-!macro set_col_pointers3 {
-    +iterate_destination_pointers 1, 10
+copy_row_tiles1 !zone {
+    +init_pointers SCR_COLS
+    +copy_tile_chars SCR_COLS, SCROLL_ROWS / COPY_ROW_FRAMES
+    rts
 }
 
-!macro set_row_pointers1 {
-    +init_source_pointers SCR_COLS
-    +init_destination_pointers SCR_COLS
-r_map_pos1
-    +iterate_source_pointers SCR_COLS, 13
-    +iterate_destination_pointers SCR_COLS, 13
-}
-
-!macro set_row_pointers2 {
-r_map_pos2
-    +iterate_source_pointers SCR_COLS, 10
-    +iterate_destination_pointers SCR_COLS, 10
-}
-
-!macro copy_blocks .cols {
-!if .cols = 1 {
-    jsr copy_colors_cols_block
-    jsr copy_screen_cols_block
-    ldy C_COPY_PIX
-.copy_loop
-    jsr copy_pixels_cols_block
-    dey
-    bpl .copy_loop
-    sty C_COPY_PIX
-} else {
-    jsr copy_colors_rows_block
-    jsr copy_screen_rows_block
-    ldy R_COPY_PIX
-.copy_loop
-    jsr copy_pixels_rows_block
-    dey
-    bpl .copy_loop
-    sty R_COPY_PIX
-}
+copy_row_tiles2 !zone {
+    +copy_tile_chars SCR_COLS, SCROLL_ROWS / COPY_ROW_FRAMES + ((SCROLL_ROWS % COPY_ROW_FRAMES) != 0)
+    rts
 }
 
 COPY_TILES !zone {
-    ldy C_COPY_PIX
-    bpl .check_pointers1
+    ldy C_COPY
+    bne .check_copy_col_tiles1
     jsr COPY_ROW_TILES
     rts
-.check_pointers1
-    cpy #9
-    bne .check_pointers2
-    jsr set_col_pointers1
-    ldy #8
-    sty C_COPY_PIX
+.check_copy_col_tiles1
+    dey
+    sty C_COPY
+    cpy #COPY_COL_FRAMES-1
+    bne .check_copy_col_tiles2
+    jsr copy_col_tiles1
     rts
-.check_pointers2
-    cpy #8
-    bne .copy_pixels
-    jsr set_col_pointers2
-    ldy #7
-    sty C_COPY_PIX
-    rts
-.copy_pixels
-    +set_col_pointers3
-    +copy_blocks 1
+.check_copy_col_tiles2
+    jsr copy_col_tiles2
     rts
 }
 
 COPY_ROW_TILES !zone {
-    ldy R_COPY_PIX
-    bpl .check_pointers1
+    ldy R_COPY
+    bne .check_copy_row_tiles1
     rts
-.check_pointers1
-    cpy #9
-    beq .set_pointers1
-    jmp .copy_pixels
-.set_pointers1
-    +set_row_pointers1
-    ldy #7
-    sty R_COPY_PIX
+.check_copy_row_tiles1
+    dey
+    sty R_COPY
+    cpy #COPY_ROW_FRAMES-1
+    bne .check_copy_row_tiles2
+    jsr copy_row_tiles1
     rts
-.copy_pixels
-    +set_row_pointers2
-    +copy_blocks SCR_COLS
+.check_copy_row_tiles2
+    jsr copy_row_tiles2
     rts
 }

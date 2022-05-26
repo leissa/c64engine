@@ -17,7 +17,7 @@ INC_HARD_Y !zone {
     clc
     adc #SCR_COLS
     cmp #SCR_COLS
-    +buge .return    ; jmp if A < 40
+    bcs .return    ; jmp if A < 40
     sta HARD_X
     inc HARD_Y
 
@@ -61,7 +61,7 @@ DEC_HARD_Y !zone {
     sbc #.dec
     and #.and-1 ; assumes 2^x = .and
     sta .mem
-    +bbc .l
+    bcs .l
 }
 
 !macro wrap_add .lo, .hi, .add, .and {
@@ -70,10 +70,14 @@ DEC_HARD_Y !zone {
     lda .lo
     adc #(.add % 256)
     sta .lo
+!if .add < 256 {
+    bcc +
+}
     lda .hi
     adc #(.add / 256)
     and #.and-1 ; assumes 2^x = .and
     sta .hi
++
 }
 
 !macro wrap_sub .lo, .hi, .sub, .and {
@@ -82,10 +86,14 @@ DEC_HARD_Y !zone {
     lda .lo
     sbc #(.sub % 256)
     sta .lo
+!if .sub < 256 {
+    bcs +
+}
     lda .hi
     sbc #(.sub / 256)
     and #.and-1 ; assumes 2^x = .and
     sta .hi
++
 }
 
 SCROLL_U !zone {
@@ -102,25 +110,23 @@ SCROLL_U !zone {
     rts
 
 .check_copy_tiles
-    lda SOFT_Y
+;   lda SOFT_Y
     !if SCROLL_SPEED = 2 { cmp #2 } else { cmp #3 }
     beq .prepare_copy_tiles
     rts
 .prepare_copy_tiles
-    lda #9
-    sta C_COPY_PIX
+    lda #COPY_COL_FRAMES
+    sta C_COPY
 
     lda TILE_ROW
     sec
     sbc #1
-    sta TILE_ROW
-    bpl +
-    clc
+    bcs +
     adc #TILE_ROWS
-    sta TILE_ROW
-    +wrap_sub C_MAP_POS_LO, C_MAP_POS_HI, MAP_WIDTH, 256
-    +wrap_sub R_MAP_POS_LO, R_MAP_POS_HI, MAP_WIDTH, 256
+    dec C_MAP_POS_HI
+    dec R_MAP_POS_HI
 +
+    sta TILE_ROW
     +wrap_sub C_SCR_POS_LO, C_SCR_POS_HI, SCROLL_COLS, 4
     +wrap_sub R_SCR_POS_LO, R_SCR_POS_HI, SCROLL_COLS, 4
     +wrap_sub C_PIX_POS_LO, C_PIX_POS_HI, 8*SCROLL_COLS, 8*4
@@ -128,9 +134,14 @@ SCROLL_U !zone {
 
     lda SCROLL_U_D
     beq +
-    +wrap_sub C_MAP_POS_LO, C_MAP_POS_HI, MAP_WIDTH*(SCROLL_ROWS-1)/2, 256
+
+    sec
+    lda C_MAP_POS_HI
+    sbc #(SCROLL_ROWS-1)/TILE_ROWS
+    sta C_MAP_POS_HI
     +wrap_sub C_SCR_POS_LO, C_SCR_POS_HI, (SCROLL_ROWS-1)*SCROLL_COLS, 4
     +wrap_sub C_PIX_POS_LO, C_PIX_POS_HI, 8*(SCROLL_ROWS-1)*SCROLL_COLS, 8*4
+
     lda #0
     sta SCROLL_U_D
 +
@@ -147,26 +158,24 @@ SCROLL_D !zone {
     rts
 
 .check_copy_tiles
-    lda SOFT_Y
+;   lda SOFT_Y
     cmp #4
     beq .prepare_copy_tiles
     rts
 .prepare_copy_tiles
-    lda #9
-    sta C_COPY_PIX
+    lda #COPY_COL_FRAMES
+    sta C_COPY
 
     lda TILE_ROW
     clc
     adc #1
     cmp #TILE_ROWS
-    sta TILE_ROW
-    bmi +
-    sec
+    bcc +
     sbc #TILE_ROWS
-    sta TILE_ROW
-    +wrap_add C_MAP_POS_LO, C_MAP_POS_HI, MAP_WIDTH, 256
-    +wrap_add R_MAP_POS_LO, R_MAP_POS_HI, MAP_WIDTH, 256
+    inc C_MAP_POS_HI
+    inc R_MAP_POS_HI
 +
+    sta TILE_ROW
     +wrap_add C_SCR_POS_LO, C_SCR_POS_HI, SCROLL_COLS, 4
     +wrap_add R_SCR_POS_LO, R_SCR_POS_HI, SCROLL_COLS, 4
     +wrap_add C_PIX_POS_LO, C_PIX_POS_HI, 8*SCROLL_COLS, 8*4
@@ -174,9 +183,14 @@ SCROLL_D !zone {
 
     lda SCROLL_U_D
     bne +
-    +wrap_add C_MAP_POS_LO, C_MAP_POS_HI, MAP_WIDTH*(SCROLL_ROWS-1)/2, 256
+
+    clc
+    lda C_MAP_POS_HI
+    adc #(SCROLL_ROWS-1)/TILE_ROWS
+    sta C_MAP_POS_HI
     +wrap_add C_SCR_POS_LO, C_SCR_POS_HI, (SCROLL_ROWS-1)*SCROLL_COLS, 4
     +wrap_add C_PIX_POS_LO, C_PIX_POS_HI, 8*(SCROLL_ROWS-1)*SCROLL_COLS, 8*4
+
     lda #1
     sta SCROLL_U_D
 +
@@ -201,25 +215,23 @@ SCROLL_L !zone {
     rts
 
 .check_copy_tiles
-    lda SOFT_X
+;   lda SOFT_X
     cmp #4
     beq .prepare_copy_tiles
     rts
 .prepare_copy_tiles
-    lda #9
-    sta R_COPY_PIX
+    lda #COPY_ROW_FRAMES
+    sta R_COPY
 
     lda TILE_COL
     sec
     sbc #1
-    sta TILE_COL
-    bpl +
-    clc
+    bcs +
     adc #TILE_COLS
-    sta TILE_COL
-    +wrap_sub C_MAP_POS_LO, C_MAP_POS_HI, 1, 256
-    +wrap_sub R_MAP_POS_LO, R_MAP_POS_HI, 1, 256
+    dec C_MAP_POS_LO
+    dec R_MAP_POS_LO
 +
+    sta TILE_COL
     +wrap_sub C_SCR_POS_LO, C_SCR_POS_HI, 1, 4
     +wrap_sub R_SCR_POS_LO, R_SCR_POS_HI, 1, 4
     +wrap_sub C_PIX_POS_LO, C_PIX_POS_HI, 8, 8*4
@@ -227,9 +239,14 @@ SCROLL_L !zone {
 
     lda SCROLL_L_R
     beq +
-    +wrap_sub R_MAP_POS_LO, R_MAP_POS_HI, (SCROLL_COLS-1) / TILE_COLS, 256
+
+    sec
+    lda R_MAP_POS_LO
+    sbc #(SCROLL_COLS-1)/TILE_COLS
+    sta R_MAP_POS_LO
     +wrap_sub R_SCR_POS_LO, R_SCR_POS_HI, SCROLL_COLS-1, 4
     +wrap_sub R_PIX_POS_LO, R_PIX_POS_HI, 8*(SCROLL_COLS-1), 8*4
+
     lda #0
     sta SCROLL_L_R
 +
@@ -252,26 +269,24 @@ SCROLL_R !zone {
     rts
 
 .check_copy_tiles
-    lda SOFT_X
+;   lda SOFT_X
     !if SCROLL_SPEED = 2 { cmp #2 } else { cmp #3 }
     beq .prepare_copy_tiles
     rts
 .prepare_copy_tiles
-    lda #9
-    sta R_COPY_PIX
+    lda #COPY_ROW_FRAMES
+    sta R_COPY
 
     lda TILE_COL
     clc
     adc #1
     cmp #TILE_COLS
-    sta TILE_COL
-    bmi +
-    sec
+    bcc +
     sbc #TILE_COLS
-    sta TILE_COL
-    +wrap_add C_MAP_POS_LO, C_MAP_POS_HI, 1, 256
-    +wrap_add R_MAP_POS_LO, R_MAP_POS_HI, 1, 256
+    inc C_MAP_POS_LO
+    inc R_MAP_POS_LO
 +
+    sta TILE_COL
     +wrap_add C_SCR_POS_LO, C_SCR_POS_HI, 1, 4
     +wrap_add R_SCR_POS_LO, R_SCR_POS_HI, 1, 4
     +wrap_add C_PIX_POS_LO, C_PIX_POS_HI, 8, 8*4
@@ -279,9 +294,14 @@ SCROLL_R !zone {
 
     lda SCROLL_L_R
     bne +
-    +wrap_add R_MAP_POS_LO, R_MAP_POS_HI, (SCROLL_COLS-1)/TILE_COLS, 256
+
+    clc
+    lda R_MAP_POS_LO
+    adc #(SCROLL_COLS-1)/TILE_COLS
+    sta R_MAP_POS_LO
     +wrap_add R_SCR_POS_LO, R_SCR_POS_HI, SCROLL_COLS-1, 4
     +wrap_add R_PIX_POS_LO, R_PIX_POS_HI, 8*(SCROLL_COLS-1), 8*4
+
     lda #1
     sta SCROLL_L_R
 +
