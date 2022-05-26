@@ -1,4 +1,6 @@
-;!to "engine.prg", cbm   ; output program
+!ifdef DEVELOP {
+!to "engine.prg", cbm   ; output program
+}
 !sl "labels.l"          ; create label file for vice
 !convtab scr            ; for conversion to c64 screen codes
 
@@ -6,7 +8,9 @@
 !source "lib/vic.acme"
 !source "lib/cia.acme"
 !source "lib/std.acme"
+!ifndef DEVELOP {
 !source "krill/loader/build/loadersymbols-c64.inc"
+}
 
 !ifdef DEBUG {
     CONTROL_X           = %00011000 ; 40 cols
@@ -54,6 +58,7 @@ SPR_F
 ;   install 1541 code (credits for the disk loader go to Krill)
 ;-------------------------------------------------------------------------------
 
+!ifndef DEVELOP {
     jsr install
     bcc +
     ldx #0
@@ -62,6 +67,7 @@ SPR_F
     stx $d020
     jmp -
 +
+}
 
 ;-------------------------------------------------------------------------------
 ;   disable all basic, kernal and irq crap
@@ -103,6 +109,7 @@ SPR_F
 ;   copy loader code to work area $0200 ~ $0400
 ;-------------------------------------------------------------------------------
 
+!ifndef DEVELOP {
     ; copy 2 pages
     ldy #2
     ldx #0
@@ -115,6 +122,7 @@ SPR_F
     inc .copy_loop + 5
     dey
     bne .copy_loop
+}
 
 ;-------------------------------------------------------------------------------
 ;   setup VIC
@@ -235,6 +243,7 @@ SPR_F
 ;   load map data
 ;-------------------------------------------------------------------------------
 
+!ifndef DEVELOP {
     jmp .load
 
 .load_error
@@ -279,6 +288,7 @@ tile_pix
     ldy #>tile_pix
     jsr loadcompd
     bcs .load_error
+}
 
 ;-------------------------------------------------------------------------------
 ;   setup raster irq
@@ -317,23 +327,27 @@ tile_pix
 *=SONG_DATA
 !bin "snd/transylvanian.bin"
 
+!ifndef DEVELOP {
 *=DISK_LOADER_SRC;
 !bin "krill/loader/build/loader-c64.prg",,2
 
 *=DISK_INSTALLER
 !bin "krill/loader/build/install-c64.prg",,2
+}
 
-;*=TILE_MAP
-;!bin "map.bin"
+!ifdef DEVELOP {
+*=TILE_MAP
+!bin "map.bin"
 
-;*=TILE_CLR
-;!bin "colors.bin"
+*=TILE_CLR
+!bin "colors.bin"
 
-;*=TILE_SCR
-;!bin "screen.bin"
+*=TILE_SCR
+!bin "screen.bin"
 
-;*=TILE_PIX
-;!bin "pixels.bin"
+*=TILE_PIX
+!bin "pixels.bin"
+}
 
 *=SPR_FR
 !bin "spr/hero.raw", 64*4
