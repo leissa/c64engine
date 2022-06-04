@@ -385,10 +385,45 @@ rotate
 ; we are finishing the last irq this frame
 ;-------------------------------------------------------------------------------
 
+;!ifndef DEVELOP {
+!source "krill/loader/build/loadersymbols-c64.inc"
+;}
+
+;!convtab pet {
+;tile_map
+;    !tx "map"
+;    !by 0
+;}
+
 last_irq
     jsr JOYSTICK
-    jsr COPY_TILES
 
+lda R_MAP_POS_HI
+cmp #96
+bne .clear_loaded
+
+lda LOADED
+bne .copy_tiles
+;inc VIC_BORDER
+
+lda #$71
+sta VIC_CONTROL_Y
+
+ldx #<tile_map
+ldy #>tile_map
+jsr loadcompd
+
+lda #1
+sta LOADED
+jmp .play_song
+
+.clear_loaded
+lda #0
+sta LOADED
+
+.copy_tiles
+    jsr COPY_TILES
+.play_song
     ldy PLAY
     beq +
     jsr PLAY_SONG

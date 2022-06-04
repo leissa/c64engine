@@ -53,6 +53,7 @@ IGNORE_DIR      = $33
 IGNORE_COUNT    = $34
 SPR_COUNTER     = $35
 PLAY            = $36
+LOADED          = $37
 
 SPR_I           = $40; - $57
 SPR_Y           = $58; - $6f
