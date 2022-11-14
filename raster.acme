@@ -396,6 +396,7 @@ rotate
 ;;}
 
 last_irq
+    inc CURR_FRAME
     jsr JOYSTICK
 
 ;lda R_MAP_POS_HI

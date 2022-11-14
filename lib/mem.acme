@@ -37,26 +37,29 @@ SCROLL_U_D      = $23
 SCROLL_L_R      = $24
 C_PIXELS_SRC    = $25
 C_PIXELS_DST    = $26
-; C_SCREEN_SRC    = $27
-; C_SCREEN_DST    = $28
-; C_COLORS_SRC    = $29
-; C_COLORS_DST    = $2a
-R_PIXELS_SRC    = $2b
-R_PIXELS_DST    = $2c
-; R_SCREEN_SRC    = $2d
-; R_SCREEN_DST    = $2e
-; R_COLORS_SRC    = $2f
-; R_COLORS_DST    = $30
-TEMP_LO         = $31
-TEMP_HI         = $32
-IGNORE_DIR      = $33
-IGNORE_COUNT    = $34
-SPR_COUNTER     = $35
-PLAY            = $36
-;LOADED          = $37
+R_PIXELS_SRC    = $27
+R_PIXELS_DST    = $28
+TEMP_LO         = $29
+TEMP_HI         = $30
+IGNORE_DIR      = $31
+IGNORE_COUNT    = $32
+SPR_COUNTER     = $33
+PLAY            = $34
+;LOADED          = $35
 
 SPR_I           = $40; - $57
 SPR_Y           = $58; - $6f
+
+RESULT          = $70
+PREV_FRAME      = $71
+CURR_FRAME      = $72
+LOOP_LO         = $73
+LOOP_HI         = $74
+TOTAL_LO        = $75
+TOTAL_HI        = $76
+AVG_LO          = $77
+AVG_HI          = $78
+RESULTS         = $80
 
 ; zero page: $0000 - $00ff
 ; cpu stack: $0100 - $01ff

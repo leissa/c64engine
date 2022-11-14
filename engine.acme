@@ -301,18 +301,104 @@ tile_pix
     +set_raster_line_9 LINE_0
     +set 1, VIC_IRQ_CONTROL
     ; enable IRQs
+
+lda #0
+tay
+sta CURR_FRAME
+sta PREV_FRAME
+sta LOOP_LO
+sta LOOP_HI
+
     cli
 
--
+.do_loop
     ; some 7 cycle garbage instructions
-    lda ($f0), y
-    lda ($f0, x)
-    lda ($f0), y
-    lda ($f0, x)
-    lda ($f0), y
-    sec     ; 2
-    +bcs    ; 3
-    jmp -
+    lda CURR_FRAME ; 3
+    cmp PREV_FRAME ; 3
+    clc            ; 2
+    beq .sameframe ; 3
+
+    sta PREV_FRAME ; 3
+    lda LOOP_LO    ; 3
+
+    sta RESULTS, y ; 4
+    tya            ; 2
+    adc #1         ; 2
+    and #$3f       ; 2
+    tay            ; 2
+    bne .next_result
+
+    ldy #$3f
+    lda #0
+    sta TOTAL_LO
+    sta TOTAL_HI
+    clc
+
+-
+    adc RESULTS, y
+    bcc +
+    inc TOTAL_HI
++
+    dey
+    bne -
+
+    sta TOTAL_LO   ; 3
+    clc            ; 2
+    ror TOTAL_HI   ; 5
+    ror TOTAL_LO   ; 5
+    clc            ; 2
+    ror TOTAL_HI   ; 5
+    ror TOTAL_LO   ; 5
+    clc            ; 2
+    ror TOTAL_HI   ; 5
+    ror TOTAL_LO   ; 5
+    clc            ; 2
+    ror TOTAL_HI   ; 5
+    ror TOTAL_LO   ; 5
+    clc            ; 2
+    ror TOTAL_HI   ; 5
+    ror TOTAL_LO   ; 5
+
+    clc            ; 2
+    lda TOTAL_HI   ; 3
+    ror            ; 5
+    sta AVG_HI     ; 3
+
+    lda TOTAL_LO   ; 3
+    ror            ; 5
+    sta AVG_LO     ; 3
+
+.next_result
+    lda #0
+    sta LOOP_LO
+    sta LOOP_HI
+.sameframe
+    lda LOOP_LO    ; 3
+    adc #1         ; 2
+    sta LOOP_LO    ; 3
+    lda LOOP_HI    ; 3
+    adc #0         ; 2
+    sta LOOP_HI    ; 3
+    lda $A000      ; 4
+    lda $A000      ; 4
+    lda $A000      ; 4
+    lda $A000      ; 4
+    lda $A000      ; 4
+    lda $A000      ; 4
+    lda $A000      ; 4
+    lda $A000      ; 4
+    lda $A000      ; 4
+    lda $A000      ; 4
+
+;    lda ($f0), y   ;
+;    lda ($f0, x)
+;    lda ($f0), y
+;    lda ($f0, x)
+;    lda ($f0), y
+;    sec     ; 2
+;    +bcs    ; 3
+
+    jmp .do_loop   ; 3
 }
 
 !source "scroll.acme"
