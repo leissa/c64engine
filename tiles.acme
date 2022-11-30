@@ -178,14 +178,15 @@ colors_rows
 
     ; pixel pointer
     lda .tile_row
-    asl
-    adc .tile_row
+    beq +
+    lda #TILE_COLS         ; a = TILE_COLS * tile_row (TILE_ROWS = 2)
++
     adc .tile_col
     tay
 
     asl
     asl
-    asl                    ; a = 8 * TILE_POS
+    asl                    ; a = 8 * tile_pos
     adc MTABLE_BYTES_LO, x ; a = a + LO of 6 * 8 * tile index
 .pixels_lo
     sta .pixels
@@ -229,14 +230,20 @@ colors_rows
     inc .map_pos + 2
 +
 } else {
-    lda .tile_row
+    lda .tile_row ; tile_row = (tile_row + 1) % 2 (TILE_ROWS = 2)
     adc #1
-    cmp #TILE_ROWS
+    and #1
     sta .tile_row
     bne +
-    clc
-    lda #0
-    sta .tile_row 
+
+;    lda .tile_row
+;    adc #1
+;    cmp #TILE_ROWS
+;    sta .tile_row
+;    bne +
+;    clc
+;    lda #0
+;    sta .tile_row
 
     ; example map is 256 tiles wide
     ; lda .map_pos_lo_t

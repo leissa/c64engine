@@ -102,7 +102,7 @@ SCROLL_U !zone {
     rts
 
 .check_copy_tiles
-    lda SOFT_Y
+;   lda SOFT_Y
     !if SCROLL_SPEED = 2 { cmp #2 } else { cmp #3 }
     beq .prepare_copy_tiles
     rts
@@ -147,7 +147,7 @@ SCROLL_D !zone {
     rts
 
 .check_copy_tiles
-    lda SOFT_Y
+;   lda SOFT_Y
     cmp #4
     beq .prepare_copy_tiles
     rts
@@ -188,6 +188,12 @@ SCROLL_L !zone {
 ;        ;dec VIC_SPR_0_X + .i*2
 ;    }
 
+;lda C_COPY_PIX
+;cmp #$7
+;bmi +
+;    rts
+;+
+
     +wrap_inc SOFT_X, SCROLL_SPEED, 8, .check_copy_tiles
     inc HARD_X
     lda #SCR_COLS
@@ -201,7 +207,7 @@ SCROLL_L !zone {
     rts
 
 .check_copy_tiles
-    lda SOFT_X
+;   lda SOFT_X
     cmp #4
     beq .prepare_copy_tiles
     rts
@@ -252,7 +258,7 @@ SCROLL_R !zone {
     rts
 
 .check_copy_tiles
-    lda SOFT_X
+;   lda SOFT_X
     !if SCROLL_SPEED = 2 { cmp #2 } else { cmp #3 }
     beq .prepare_copy_tiles
     rts

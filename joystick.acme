@@ -44,8 +44,8 @@ JOYSTICK !zone {
     asl
     bcs .left
 
-+ignore .continue4, 0
-.continue4
+;+ignore .continue4, 0
+;.continue4
 
     pha
     jsr SCROLL_R
@@ -54,16 +54,16 @@ JOYSTICK !zone {
     ldx CUR_SPR
     inc SPR_X, x
 
-!if SCROLL_SPEED = 2 {
-    rts
-}
+;!if SCROLL_SPEED = 2 {
+;    rts
+;}
 
 .left
     asl
     bcs .down
 
-+ignore .continue3, 0
-.continue3
+;+ignore .continue3, 0
+;.continue3
 
     pha
     jsr SCROLL_L
@@ -72,16 +72,16 @@ JOYSTICK !zone {
     ldx CUR_SPR
     dec SPR_X, x
 
-!if SCROLL_SPEED = 2 {
-    rts
-}
+;!if SCROLL_SPEED = 2 {
+;    rts
+;}
 
 .down
     asl
     bcs .up
 
-+ignore .continue2, 1
-.continue2
+;+ignore .continue2, 1
+;.continue2
 
     pha
     jsr SCROLL_D
@@ -91,16 +91,16 @@ JOYSTICK !zone {
     inc SPR_Y, x
 +
 
-!if SCROLL_SPEED = 2 {
-    rts
-}
+;!if SCROLL_SPEED = 2 {
+;    rts
+;}
 
 .up
     asl
     bcs .exit
 
-+ignore .continue1, 1
-.continue1
+;+ignore .continue1, 1
+;.continue1
 
     jsr SCROLL_U
 

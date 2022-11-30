@@ -311,7 +311,8 @@ rotate
 
             txa
             pha
-            jsr PLAY_SONG
+    jsr COPY_TILES
+;            jsr PLAY_SONG
             pla
             tax
 
@@ -375,7 +376,8 @@ rotate
             inx
             !if r = 0 {
                 cpx #SPRITES
-                beq last_irq
+                bpl last_irq
+;                beq last_irq
                 jmp rotate
             }
         }
@@ -427,7 +429,8 @@ last_irq
 ;.play_song
     ldy PLAY
     beq +
-    jsr PLAY_SONG
+    jsr COPY_TILES
+;    jsr PLAY_SONG
 +
 
 ;-------------------------------------------------------------------------------

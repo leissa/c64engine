@@ -22,15 +22,15 @@
 
 CONTROL_Y_MASK      = %10111111 ; bitmap mode
 LINE_0              = FIRST_BADLINE-3
-;SCROLL_SPEED        = 2
-SCROLL_SPEED        = 1
+SCROLL_SPEED        = 2
+;SCROLL_SPEED        = 1
 TILE_COLS           = 3
 TILE_ROWS           = 2
 SCR_COLS            = 40
 SCR_ROWS            = 25
 MAP_WIDTH           = 256
 MAP_HEIGHT          = 96
-SPRITES             = 24
+SPRITES             = 8 ; must be at least 8 and a multiple of 4
 
 *=SPR_DATA
 
