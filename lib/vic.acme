@@ -1,8 +1,7 @@
 ; first raster line with backgroundcolor: 51
 ; 12 cycles left border + 40 cycles screen + 11 cycles right border
 
-FIRST_RASTER = 51
-FIRST_BADLINE = FIRST_RASTER-3 ; subtract 3 due to y-softscroll
+FIRST_BADLINE = $30
 
 ; VIC constants
 

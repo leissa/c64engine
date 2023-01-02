@@ -62,6 +62,8 @@ TOTAL_HI        = $76
 AVG_LO          = $77
 AVG_HI          = $78
 RESULTS         = $80
+RASTER_LINE1    = $81
+RASTER_LINE2    = $82
 
 ; zero page: $0000 - $00ff
 ; cpu stack: $0100 - $01ff

@@ -1,3 +1,4 @@
+;COPY_COLS = 29
 COPY_COLS = SCROLL_COLS
 COPY_ROWS = SCROLL_ROWS
 
@@ -398,7 +399,9 @@ set_col_pointers1 !zone {
     +init_destination_pointers 1
 c_map_pos1
     +iterate_source_pointers 1, 10
-    +iterate_destination_pointers 1, 26;
+    +iterate_destination_pointers 1, 26
+;    +iterate_source_pointers 1, 15
+;    +iterate_destination_pointers 1, 10
     rts
 }
 
@@ -406,11 +409,14 @@ set_col_pointers2 !zone {
 c_map_pos2
     +iterate_source_pointers 1, 30
     +iterate_destination_pointers 1, 4
+;    +iterate_source_pointers 1, 14
+;    +iterate_destination_pointers 1, 10
     rts
 }
 
 !macro set_col_pointers3 {
     +iterate_destination_pointers 1, 10
+;    +iterate_destination_pointers 1, 9
 }
 
 !macro set_row_pointers1 {
@@ -460,7 +466,7 @@ COPY_TILES !zone {
     jsr set_col_pointers1
     ldy #8
     sty C_COPY_PIX
-    rts
+;    rts
 .check_pointers2
     cpy #8
     bne .copy_pixels
