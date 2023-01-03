@@ -206,42 +206,6 @@ SPR_F
     jsr INIT_SONG
 
 ;-------------------------------------------------------------------------------
-;   setup multiplication tables
-;-------------------------------------------------------------------------------
-
-!macro multiplication_table .multiplier, .address_lo, .address_hi {
-    ldx #0
-
-.multiply_next_entry
-    stx TEMP_HI
-    ldy #.multiplier
-    sty TEMP_LO
-
-    lda #0
-    ldy #8
-    lsr TEMP_LO
-.add
-    bcc .rotate
-    clc
-    adc TEMP_HI
-.rotate
-    ror
-    ror TEMP_LO
-    dey
-    bne .add
-
-    sta .address_hi, x
-    lda TEMP_LO
-    sta .address_lo, x
-
-    inx
-    bne .multiply_next_entry
-}
-
-    +multiplication_table TILE_COLS*TILE_ROWS, MTABLE_TILES_LO, MTABLE_TILES_HI
-    +multiplication_table TILE_COLS*TILE_ROWS*8, MTABLE_BYTES_LO, MTABLE_BYTES_HI
-
-;-------------------------------------------------------------------------------
 ;   load map data
 ;-------------------------------------------------------------------------------
 

@@ -1,86 +1,5 @@
-;COPY_COLS = 29
 COPY_COLS = SCROLL_COLS
 COPY_ROWS = SCROLL_ROWS
-
-!align 255, 0
-copy_pixels_cols_block !zone {
-    +set ALL_RAM, RAM_ROM_SELECTION
-
-pixels_cols
-    !for .col, 0, COPY_COLS-1 {
-        lda TILE_PIX, y
-        sta HIRES, y
-    }
-
-    +set ALL_RAM_WITH_IO, RAM_ROM_SELECTION
-    rts
-}
-
-!align 255, 0
-copy_screen_cols_block !zone {
-    +set ALL_RAM, RAM_ROM_SELECTION
-
-screen_cols
-    !for .col, 0, COPY_COLS-1 {
-        lda TILE_SCR
-        sta SCREEN
-    }
-
-    +set ALL_RAM_WITH_IO, RAM_ROM_SELECTION
-    rts
-}
-
-!align 255, 4
-copy_colors_cols_block !zone {
-
-colors_cols
-    !for .col, 0, COPY_COLS-1 {
-        lda TILE_CLR
-        sta COLOR_RAM
-    }
-
-    rts
-}
-
-!align 255, 0
-copy_pixels_rows_block !zone {
-    +set ALL_RAM, RAM_ROM_SELECTION
-
-pixels_rows
-    !for .row, 0, COPY_ROWS-1 {
-        lda TILE_PIX, y
-        sta HIRES, y
-    }
-
-    +set ALL_RAM_WITH_IO, RAM_ROM_SELECTION
-    rts
-}
-
-!align 255, 0
-copy_screen_rows_block !zone {
-    +set ALL_RAM, RAM_ROM_SELECTION
-
-screen_rows
-    !for .row, 0, COPY_ROWS-1 {
-        lda TILE_SCR
-        sta SCREEN
-    }
-
-    +set ALL_RAM_WITH_IO, RAM_ROM_SELECTION
-    rts
-}
-
-!align 255, 4
-copy_colors_rows_block !zone {
-
-colors_rows
-    !for .row, 0, COPY_ROWS-1 {
-        lda TILE_CLR
-        sta COLOR_RAM
-    }
-
-    rts
-}
 
 ; TILES could be made equal to 256 so that we have nice page boundaries
 !macro copy_tile_char .char {
@@ -114,25 +33,8 @@ copy_tile_char3 !zone { +copy_tile_char 3 }
 copy_tile_char4 !zone { +copy_tile_char 4 }
 copy_tile_char5 !zone { +copy_tile_char 5 }
 
-!macro prepare_pointers .offset, .pix_lo, .pix_hi, .clr_lo, .clr_hi, .scr_lo, .scr_hi {
-    lda .offset     ; 2 bytes
-    sta .pix_lo + 1 ; 3 bytes
-    sta .clr_lo + 1 ; 3 bytes
-    sta .scr_lo + 1 ; 3 bytes
-    adc #1          ; 2 bytes
-    sta .pix_hi + 1 ; 3 bytes
-    sta .clr_hi + 1 ; 3 bytes
-    sta .scr_hi + 1 ; 3 bytes
-    adc #5          ; 2 bytes
-    sta .offset     ; 2 bytes
-}
-
 !macro destination_pointers .cols {
 !if .cols = 1 {
-;    !set .pixels = pixels_cols
-;    !set .screen = screen_cols
-;    !set .colors = colors_cols
-;    !set .pixels_dst = C_PIXELS_DST
     !set .pix_pos_lo_t = PIX_POS_LO_T
     !set .pix_pos_hi_t = PIX_POS_HI_T
     !set .scr_pos_lo_t = SCR_POS_LO_T
@@ -140,81 +42,49 @@ copy_tile_char5 !zone { +copy_tile_char 5 }
     !set .clr_pos_lo_t = CLR_POS_LO_T
     !set .clr_pos_hi_t = CLR_POS_HI_T
 } else {
-    !set .pixels = pixels_rows
-    !set .screen = screen_rows
-    !set .colors = colors_rows
-    !set .pixels_dst = R_PIXELS_DST
     !set .pix_pos_lo_t = R_PIX_POS_LO_T
     !set .pix_pos_hi_t = R_PIX_POS_HI_T
     !set .scr_pos_lo_t = R_SCR_POS_LO_T
 }
-;    +prepare_pointers .pixels_dst, .pixels_lo, .pixels_hi, .colors_lo, .colors_hi, .screen_lo, .screen_hi
 
     ; pixel pointer
     lda .pix_pos_lo_t
-;.pixels_lo
-;    sta .pixels
     adc #(8*.cols % 256) ; + 64
     sta .pix_pos_lo_t
 
     lda .pix_pos_hi_t
-;.pixels_hi
-;    sta .pixels
     adc #(8*.cols / 256) ; + 256
     and #%11011111 ; modulo 8192 (but keep upper bits)
     sta .pix_pos_hi_t ; next pixel position to start from
 
     ; color pointers
     lda .scr_pos_lo_t
-;.screen_lo
-;    sta .screen
-;.colors_lo
-;    sta .colors
-;.screen_hi
-;    stx .screen
-;.colors_hi
-;    sty .colors
     adc #.cols
     sta .scr_pos_lo_t ; next screen position to start from
     sta .clr_pos_lo_t
     bcc +
     clc
 
-;    inx
-;    txa
     lda .scr_pos_hi_t
     adc #1
     and #%11111011 ; modulo 1024 (but keep upper bits)
     sta .scr_pos_hi_t
-;    tax
 
-;    iny
-;    tya
     lda .clr_pos_hi_t
     adc #1
     and #%11111011 ; module 1024 (but keep upper bits)
     sta .clr_pos_hi_t
-;    tay
 +
 }
 
 !macro source_pointers .cols {
 !if .cols = 1 {
-;    !set .pixels = pixels_cols
-;    !set .screen = screen_cols
-;    !set .colors = colors_cols
-;    !set .pixels_src = C_PIXELS_SRC
     !set .tile_col = C_TILE_COL
     !set .tile_row = C_TILE_ROW
 } else {
-    !set .pixels = pixels_rows
-    !set .screen = screen_rows
-    !set .colors = colors_rows
-    !set .pixels_src = R_PIXELS_SRC
     !set .tile_col = R_TILE_COL
     !set .tile_row = R_TILE_ROW
 }
-;    +prepare_pointers .pixels_src, .pixels_lo, .pixels_hi, .colors_lo, .colors_hi, .screen_lo, .screen_hi
 
 .map_pos
     ldx TILE_MAP           ; x = tile index
@@ -245,43 +115,9 @@ copy_tile_char5 !zone { +copy_tile_char 5 }
     }
 
 .iterate
-    ; iterate SCR_POS, CLR_POS, PIX_POS
     clc
     +destination_pointers 1
 
-;    tay
-
-;    asl
-;    asl
-;    asl                    ; a = 8 * tile_pos
-;    adc MTABLE_BYTES_LO, x ; a = a + LO of 6 * 8 * tile index
-;.pixels_lo
-;    sta .pixels
-;    lda MTABLE_BYTES_HI, x ; a = HI of 6 * 8 * tile index
-;    adc #>TILE_PIX
-;.pixels_hi
-;    sta .pixels
-
-;    ; color pointers
-;    tya
-;    adc MTABLE_TILES_LO, x ; a = a + LO of 6 * tile index
-;.screen_lo
-;    sta .screen
-;.colors_lo
-;    sta .colors
-
-;    lda MTABLE_TILES_HI, x ; a = HI of 6 * tile index
-;    adc #0
-;    tax
-;    adc #>TILE_SCR
-;.screen_hi
-;    sta .screen
-;    txa
-;    adc #>TILE_CLR
-;.colors_hi
-;    sta .colors
-
-    ; next iteration
 !if .cols = 1 {
     lda .tile_col
     adc #1
@@ -326,10 +162,6 @@ copy_tile_char5 !zone { +copy_tile_char 5 }
 
 !macro init_destination_pointers .cols {
 !if .cols = 1 {
-    !set .pixels = pixels_cols
-    !set .screen = screen_cols
-    !set .colors = colors_cols
-    !set .pixels_dst = C_PIXELS_DST
     !set .pix_pos_lo = C_PIX_POS_LO
     !set .pix_pos_hi = C_PIX_POS_HI
     !set .scr_pos_lo = C_SCR_POS_LO
@@ -340,10 +172,6 @@ copy_tile_char5 !zone { +copy_tile_char 5 }
     !set .scr_pos_hi1_t = C_SCR_POS_HI1_T
     !set .scr_pos_hi2_t = C_SCR_POS_HI2_T
 } else {
-    !set .pixels = pixels_rows
-    !set .screen = screen_rows
-    !set .colors = colors_rows
-    !set .pixels_dst = R_PIXELS_DST
     !set .pix_pos_lo = R_PIX_POS_LO
     !set .pix_pos_hi = R_PIX_POS_HI
     !set .scr_pos_lo = R_SCR_POS_LO
@@ -372,27 +200,16 @@ copy_tile_char5 !zone { +copy_tile_char 5 }
 
     lda .scr_pos_lo
     sta .scr_pos_lo_t
-
-    lda #(.pixels + 4) & $ff
-    sta .pixels_dst
 }
 
 !macro init_source_pointers .cols {
 !if .cols = 1 {
-    !set .pixels = pixels_cols
-    !set .screen = screen_cols
-    !set .colors = colors_cols
-    !set .pixels_src = C_PIXELS_SRC
     !set .map_pos_lo = C_MAP_POS_LO
     !set .map_pos_hi = C_MAP_POS_HI
     !set .map_pos1 = c_map_pos1
     !set .tile_col = C_TILE_COL
     !set .tile_row = C_TILE_ROW
 } else {
-    !set .pixels = pixels_rows
-    !set .screen = screen_rows
-    !set .colors = colors_rows
-    !set .pixels_src = R_PIXELS_SRC
     !set .map_pos_lo = R_MAP_POS_LO
     !set .map_pos_hi = R_MAP_POS_HI
     !set .map_pos1 = r_map_pos1
@@ -406,14 +223,9 @@ copy_tile_char5 !zone { +copy_tile_char 5 }
 
     lda .map_pos_lo
     sta .map_pos1 + (5 + 1)
-;    sta .map_pos1 + (26 + 5 + 1)
 
     lda .map_pos_hi
     sta .map_pos1 + (5 + 2)
-;    sta .map_pos1 + (26 + 5 + 2)
-
-    lda #(.pixels + 1) & $ff
-    sta .pixels_src
 }
 
 !macro iterate_source_pointers .cols, .count {
@@ -520,28 +332,6 @@ r_map_pos2
 ;    +iterate_destination_pointers SCR_COLS, 10
 }
 
-!macro copy_blocks .cols {
-!if .cols = 1 {
-    jsr copy_colors_cols_block
-    jsr copy_screen_cols_block
-    ldy C_COPY_PIX
-.copy_loop
-    jsr copy_pixels_cols_block
-    dey
-    bpl .copy_loop
-    sty C_COPY_PIX
-} else {
-    jsr copy_colors_rows_block
-    jsr copy_screen_rows_block
-    ldy R_COPY_PIX
-.copy_loop
-    jsr copy_pixels_rows_block
-    dey
-    bpl .copy_loop
-    sty R_COPY_PIX
-}
-}
-
 COPY_TILES !zone {
     ldy C_COPY_PIX
     bpl .check_pointers1
@@ -564,7 +354,6 @@ COPY_TILES !zone {
     rts
 .copy_pixels
     +set_col_pointers3
-    +copy_blocks 1
     rts
 }
 
@@ -583,6 +372,5 @@ COPY_ROW_TILES !zone {
     rts
 .copy_pixels
     +set_row_pointers2
-    +copy_blocks SCR_COLS
     rts
 }
