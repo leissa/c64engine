@@ -6,39 +6,35 @@ PLAY_SONG_REG2  = $04
 
 TILE_COL        = $05
 TILE_ROW        = $06
-
-; see as _T
 C_TILE_COL      = $07
 C_TILE_ROW      = $08
 R_TILE_COL      = $09
 R_TILE_ROW      = $0a
 
-; no _T => patch trick
+MAP_POS_LO_T    = $2e
+MAP_POS_HI_T    = $2f
 C_MAP_POS_LO    = $0b
 C_MAP_POS_HI    = $0c
 R_MAP_POS_LO    = $0d
 R_MAP_POS_HI    = $0e
-;C_MAP_POS_LO_T  = $0f
-;R_MAP_POS_LO_T  = $10
+C_MAP_POS_LO_T  = $30
+C_MAP_POS_HI_T  = $31
+R_MAP_POS_LO_T  = $32
+R_MAP_POS_HI_T  = $33
 
-SCR_POS_LO_T    = $c2
-SCR_POS_HI_T    = $c3
+SCR_POS_LO_T    = $0f
+SCR_POS_HI_T    = $10
 C_SCR_POS_LO    = $11
 C_SCR_POS_HI    = $12
 R_SCR_POS_LO    = $13
 R_SCR_POS_HI    = $14
 C_SCR_POS_LO_T  = $15
 C_SCR_POS_HI_T  = $16
-R_SCR_POS_LO_T  = $18
-R_SCR_POS_HI_T  = $19
+R_SCR_POS_LO_T  = $17
+R_SCR_POS_HI_T  = $18
 
-CLR_POS_LO_T    = $c4
-CLR_POS_HI_T    = $c5
-C_CLR_POS_HI_T  = $17
-R_CLR_POS_HI_T  = $1a
-
-PIX_POS_LO_T    = $c6
-PIX_POS_HI_T    = $c7
+PIX_POS_LO_T    = $19
+PIX_POS_HI_T    = $1a
 C_PIX_POS_LO    = $1b
 C_PIX_POS_HI    = $1c
 R_PIX_POS_LO    = $1d
@@ -48,15 +44,18 @@ C_PIX_POS_HI_T  = $20
 R_PIX_POS_LO_T  = $21
 R_PIX_POS_HI_T  = $22
 
-C_COPY_PIX      = $23
-R_COPY_PIX      = $24
-SCROLL_U_D      = $25
-SCROLL_L_R      = $26
-IGNORE_DIR      = $2d
-IGNORE_COUNT    = $2e
-SPR_COUNTER     = $2f
-PLAY            = $30
-;LOADED          = $31
+CLR_POS_LO_T    = $23
+CLR_POS_HI_T    = $24
+C_CLR_POS_HI_T  = $25
+R_CLR_POS_HI_T  = $26
+
+C_COPY          = $27
+R_COPY          = $28
+SCROLL_U_D      = $29
+SCROLL_L_R      = $2a
+SPR_COUNTER     = $2b
+PLAY            = $2c
+;LOADED          = $2d
 
 SPR_I           = $40; - $57
 SPR_Y           = $58; - $6f
@@ -70,9 +69,9 @@ TOTAL_LO        = $75
 TOTAL_HI        = $76
 AVG_LO          = $77
 AVG_HI          = $78
+RASTER_LINE1    = $79
+RASTER_LINE2    = $7a
 RESULTS         = $80; - $bf
-RASTER_LINE1    = $c0
-RASTER_LINE2    = $c1
 
 ; zero page: $0000 - $00ff
 ; cpu stack: $0100 - $01ff

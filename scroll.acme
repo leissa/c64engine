@@ -107,8 +107,8 @@ SCROLL_U !zone {
     beq .prepare_copy_tiles
     rts
 .prepare_copy_tiles
-    lda #9
-    sta C_COPY_PIX
+    lda #2
+    sta C_COPY
 
     lda TILE_ROW
     sec
@@ -152,8 +152,8 @@ SCROLL_D !zone {
     beq .prepare_copy_tiles
     rts
 .prepare_copy_tiles
-    lda #9
-    sta C_COPY_PIX
+    lda #2
+    sta C_COPY
 
     lda TILE_ROW
     clc
@@ -188,12 +188,6 @@ SCROLL_L !zone {
 ;        ;dec VIC_SPR_0_X + .i*2
 ;    }
 
-;lda C_COPY_PIX
-;cmp #$7
-;bmi +
-;    rts
-;+
-
     +wrap_inc SOFT_X, SCROLL_SPEED, 8, .check_copy_tiles
     inc HARD_X
     lda #SCR_COLS
@@ -212,8 +206,8 @@ SCROLL_L !zone {
     beq .prepare_copy_tiles
     rts
 .prepare_copy_tiles
-    lda #9
-    sta R_COPY_PIX
+    lda #2
+    sta R_COPY
 
     lda TILE_COL
     sec
@@ -263,8 +257,8 @@ SCROLL_R !zone {
     beq .prepare_copy_tiles
     rts
 .prepare_copy_tiles
-    lda #9
-    sta R_COPY_PIX
+    lda #2
+    sta R_COPY
 
     lda TILE_COL
     clc

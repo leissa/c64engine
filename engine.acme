@@ -156,14 +156,10 @@ SPR_F
 
     ;---can be done at compile time?---
     ldx #0
-    stx IGNORE_DIR
-    stx IGNORE_COUNT
+    stx C_COPY
+    stx R_COPY
     stx SCROLL_U_D
     stx SCROLL_L_R
-
-    ldx #$ff
-    stx C_COPY_PIX
-    stx R_COPY_PIX
 
     ldx #COLOR_BLACK
     stx VIC_BACKGROUND_0

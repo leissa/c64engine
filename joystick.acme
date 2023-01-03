@@ -1,26 +1,3 @@
-COUNT=2
-
-!macro ignore .l, .a {
-!if SCROLL_SPEED = 2 {
-    ldy IGNORE_DIR
-!if .a = 1 {
-    bne +
-    ldy #1
-} else {
-    beq +
-    ldy #0
-}
-    sty IGNORE_DIR
-    ldy #COUNT
-    sty IGNORE_COUNT
-+
-    ldy IGNORE_COUNT
-    beq .l
-    dec IGNORE_COUNT
-    rts
-}
-}
-
 JOYSTICK !zone {
     ldx CUR_SPR
     inc SPR_A, x
@@ -44,9 +21,6 @@ JOYSTICK !zone {
     asl
     bcs .left
 
-;+ignore .continue4, 0
-;.continue4
-
     pha
     jsr SCROLL_R
     pla
@@ -54,16 +28,9 @@ JOYSTICK !zone {
     ldx CUR_SPR
     inc SPR_X, x
 
-;!if SCROLL_SPEED = 2 {
-;    rts
-;}
-
 .left
     asl
     bcs .down
-
-;+ignore .continue3, 0
-;.continue3
 
     pha
     jsr SCROLL_L
@@ -72,16 +39,9 @@ JOYSTICK !zone {
     ldx CUR_SPR
     dec SPR_X, x
 
-;!if SCROLL_SPEED = 2 {
-;    rts
-;}
-
 .down
     asl
     bcs .up
-
-;+ignore .continue2, 1
-;.continue2
 
     pha
     jsr SCROLL_D
@@ -91,16 +51,9 @@ JOYSTICK !zone {
     inc SPR_Y, x
 +
 
-;!if SCROLL_SPEED = 2 {
-;    rts
-;}
-
 .up
     asl
     bcs .exit
-
-;+ignore .continue1, 1
-;.continue1
 
     jsr SCROLL_U
 
