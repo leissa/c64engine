@@ -31,6 +31,7 @@ SCR_ROWS            = 25
 MAP_WIDTH           = 256
 MAP_HEIGHT          = 96
 SPRITES             = 24 ; must be at least 8 and a multiple of 4
+TILES               = 185 ; TODO calculate this with pixels.bin size / 8 / TILE_COLS / TILE_ROWS
 
 *=SPR_DATA
 

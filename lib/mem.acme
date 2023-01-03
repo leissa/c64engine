@@ -61,9 +61,15 @@ TOTAL_LO        = $75
 TOTAL_HI        = $76
 AVG_LO          = $77
 AVG_HI          = $78
-RESULTS         = $80
-RASTER_LINE1    = $81
-RASTER_LINE2    = $82
+RESULTS         = $80; - $bf
+RASTER_LINE1    = $c0
+RASTER_LINE2    = $c1
+SCR_POS_LO_T    = $c2
+SCR_POS_HI_T    = $c3
+CLR_POS_LO_T    = $c4
+CLR_POS_HI_T    = $c5
+PIX_POS_LO_T    = $c6
+PIX_POS_HI_T    = $c7
 
 ; zero page: $0000 - $00ff
 ; cpu stack: $0100 - $01ff
