@@ -1,5 +1,5 @@
-COPY_COLS = SCROLL_COLS
-COPY_ROWS = SCROLL_ROWS
+;COPY_COLS = SCROLL_COLS
+;COPY_ROWS = SCROLL_ROWS
 
 ; TILES could be made equal to 256 so that we have nice page boundaries
 !macro copy_tile_char .char {
@@ -34,18 +34,18 @@ copy_tile_char4 !zone { +copy_tile_char 4 }
 copy_tile_char5 !zone { +copy_tile_char 5 }
 
 !macro destination_pointers .cols {
-!if .cols = 1 {
+;!if .cols = 1 {
     !set .pix_pos_lo_t = PIX_POS_LO_T
     !set .pix_pos_hi_t = PIX_POS_HI_T
     !set .scr_pos_lo_t = SCR_POS_LO_T
     !set .scr_pos_hi_t = SCR_POS_HI_T
     !set .clr_pos_lo_t = CLR_POS_LO_T
     !set .clr_pos_hi_t = CLR_POS_HI_T
-} else {
-    !set .pix_pos_lo_t = R_PIX_POS_LO_T
-    !set .pix_pos_hi_t = R_PIX_POS_HI_T
-    !set .scr_pos_lo_t = R_SCR_POS_LO_T
-}
+;} else {
+;    !set .pix_pos_lo_t = R_PIX_POS_LO_T
+;    !set .pix_pos_hi_t = R_PIX_POS_HI_T
+;    !set .scr_pos_lo_t = R_SCR_POS_LO_T
+;}
 
     ; pixel pointer
     lda .pix_pos_lo_t
@@ -169,8 +169,8 @@ copy_tile_char5 !zone { +copy_tile_char 5 }
     !set .pix_pos_lo_t = C_PIX_POS_LO_T
     !set .pix_pos_hi_t = C_PIX_POS_HI_T
     !set .scr_pos_lo_t = C_SCR_POS_LO_T
-    !set .scr_pos_hi1_t = C_SCR_POS_HI1_T
-    !set .scr_pos_hi2_t = C_SCR_POS_HI2_T
+    !set .scr_pos_hi_t = C_SCR_POS_HI_T
+    !set .clr_pos_hi_t = C_CLR_POS_HI_T
 } else {
     !set .pix_pos_lo = R_PIX_POS_LO
     !set .pix_pos_hi = R_PIX_POS_HI
@@ -179,8 +179,8 @@ copy_tile_char5 !zone { +copy_tile_char 5 }
     !set .pix_pos_lo_t = R_PIX_POS_LO_T
     !set .pix_pos_hi_t = R_PIX_POS_HI_T
     !set .scr_pos_lo_t = R_SCR_POS_LO_T
-    !set .scr_pos_hi1_t = R_SCR_POS_HI1_T
-    !set .scr_pos_hi2_t = R_SCR_POS_HI2_T
+    !set .scr_pos_hi_t = R_SCR_POS_HI_T
+    !set .clr_pos_hi_t = R_CLR_POS_HI_T
 }
     clc
     lda .pix_pos_hi
@@ -192,11 +192,11 @@ copy_tile_char5 !zone { +copy_tile_char 5 }
 
     lda .scr_pos_hi
     adc #>SCREEN
-    sta .scr_pos_hi1_t
+    sta .scr_pos_hi_t
 
     lda .scr_pos_hi
     adc #>COLOR_RAM
-    sta .scr_pos_hi2_t
+    sta .clr_pos_hi_t
 
     lda .scr_pos_lo
     sta .scr_pos_lo_t
@@ -222,75 +222,81 @@ copy_tile_char5 !zone { +copy_tile_char 5 }
     sta .tile_row
 
     lda .map_pos_lo
-    sta .map_pos1 + (5 + 1)
+    sta .map_pos1 + (22 + 5 + 1)
 
     lda .map_pos_hi
-    sta .map_pos1 + (5 + 2)
+    sta .map_pos1 + (22 + 5 + 2)
 }
 
 !macro iterate_source_pointers .cols, .count {
 !if .cols = 1 {
-;    !set .map_pos1 = c_map_pos1
-;    !set .map_pos2 = c_map_pos2
+    !set .map_pos1 = c_map_pos1
+    !set .map_pos2 = c_map_pos2
+    !set .pix_pos_lo_t = C_PIX_POS_LO_T
+    !set .pix_pos_hi_t = C_PIX_POS_HI_T
+    !set .scr_pos_lo_t = C_SCR_POS_LO_T
+    !set .scr_pos_hi_t = C_SCR_POS_HI_T
+    !set .clr_pos_hi_t = C_CLR_POS_HI_T
 } else {
     !set .map_pos1 = r_map_pos1
     !set .map_pos2 = r_map_pos2
+    !set .pix_pos_lo_t = R_PIX_POS_LO_T
+    !set .pix_pos_hi_t = R_PIX_POS_HI_T
+    !set .scr_pos_lo_t = R_SCR_POS_LO_T
+    !set .scr_pos_hi_t = R_SCR_POS_HI_T
+    !set .clr_pos_hi_t = R_CLR_POS_HI_T
 }
     lda #.count       ; 2 bytes
     sta ITERATIONS    ; 2 bytes
 
+; how about TILE_ROW/COL?
     clc               ; 1 byte
+
+; init here
+
+lda .scr_pos_lo_t
+sta SCR_POS_LO_T
+sta CLR_POS_LO_T
+
+lda .scr_pos_hi_t
+sta SCR_POS_HI_T
+
+lda .clr_pos_hi_t
+sta CLR_POS_HI_T
+
+lda .pix_pos_lo_t
+sta PIX_POS_LO_T
+lda .pix_pos_hi_t
+sta PIX_POS_HI_T
+
 .iterate
+;-
     +source_pointers .cols
     dec ITERATIONS
     beq .exit
     jmp .iterate
 ;    bne -
 .exit
-;    ldy .map_pos1 + (26 + 5 + 1)
-;    sty .map_pos2 + (26 + 5 + 1)
-;    ldy .map_pos1 + (26 + 5 + 2)
-;    sty .map_pos2 + (26 + 5 + 2)
-}
 
-!macro iterate_destination_pointers .cols, .count {
-!if .cols = 1 {
-    !set .scr_pos_hi1_t = C_SCR_POS_HI1_T
-    !set .scr_pos_hi2_t = C_SCR_POS_HI2_T
-} else {
-    !set .scr_pos_hi1_t = R_SCR_POS_HI1_T
-    !set .scr_pos_hi2_t = R_SCR_POS_HI2_T
-}
-    lda #.count
-    sta ITERATIONS
+; store here
 
-    clc
-    ldx .scr_pos_hi1_t
-    ldy .scr_pos_hi2_t
--
-    +destination_pointers .cols
-    dec ITERATIONS
-    bne -
+;    lda SCR_POS_HI_T
+;    sta .scr_pos_hi_t
+;    lda CLR_POS_HI_T
+;    sta .clr_pos_hi_t
 
-    stx .scr_pos_hi1_t
-    sty .scr_pos_hi2_t
+    ldy .map_pos1 + (22 + 5 + 1)
+    sty .map_pos2 + (22 + 5 + 1)
+    ldy .map_pos1 + (22 + 5 + 2)
+    sty .map_pos2 + (22 + 5 + 2)
 }
 
 set_col_pointers1 !zone {
+
+; combine these inits into 1
+
     +init_source_pointers 1
     +init_destination_pointers 1
-
-lda C_SCR_POS_LO_T
-sta SCR_POS_LO_T
-sta CLR_POS_LO_T
-lda C_SCR_POS_HI1_T
-sta SCR_POS_HI_T
-lda C_SCR_POS_HI2_T
-sta CLR_POS_HI_T
-lda C_PIX_POS_LO_T
-sta PIX_POS_LO_T
-lda C_PIX_POS_HI_T
-sta PIX_POS_HI_T
 
 c_map_pos1
 +iterate_source_pointers 1, 40
@@ -298,24 +304,13 @@ rts
 
 ;c_map_pos1
     +iterate_source_pointers 1, 10
-    +iterate_destination_pointers 1, 26
-;    +iterate_source_pointers 1, 15
-;    +iterate_destination_pointers 1, 10
     rts
 }
 
 set_col_pointers2 !zone {
-;c_map_pos2
+c_map_pos2
     +iterate_source_pointers 1, 30
-    +iterate_destination_pointers 1, 4
-;    +iterate_source_pointers 1, 14
-;    +iterate_destination_pointers 1, 10
     rts
-}
-
-!macro set_col_pointers3 {
-    +iterate_destination_pointers 1, 10
-;    +iterate_destination_pointers 1, 9
 }
 
 !macro set_row_pointers1 {
@@ -323,13 +318,11 @@ set_col_pointers2 !zone {
     +init_destination_pointers SCR_COLS
 r_map_pos1
     +iterate_source_pointers SCR_COLS, 13
-;    +iterate_destination_pointers SCR_COLS, 13
 }
 
 !macro set_row_pointers2 {
 r_map_pos2
     +iterate_source_pointers SCR_COLS, 10
-;    +iterate_destination_pointers SCR_COLS, 10
 }
 
 COPY_TILES !zone {
@@ -353,7 +346,6 @@ COPY_TILES !zone {
     sty C_COPY_PIX
     rts
 .copy_pixels
-    +set_col_pointers3
     rts
 }
 
