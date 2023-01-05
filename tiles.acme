@@ -1,12 +1,12 @@
 !macro copy_tile_char .char {
     ldy #0
-    lda TILE_CLR+(.char*TILES), x ; todo: consider page bounderies for TILES
-    sta (CLR_POS_LO_T), y ; equals SCR_POS_LO_T, but HI is different
-
-    +set ALL_RAM, RAM_ROM_SELECTION ; todo: can we improve this?
+    lda TILE_CLR+(.char*TILES), x
+    sta (CLR_POS_LO_T), y
 
     lda TILE_SCR+(.char*TILES), x
     sta (SCR_POS_LO_T), y
+
+    +set ALL_RAM, RAM_ROM_SELECTION
 
     !for .row, 0, 7 {
         lda TILE_PIX+(.char*8*TILES)+(.row*TILES), x
@@ -34,7 +34,7 @@ copy_tile_char5 !zone { +copy_tile_char 5 }
     !set .tile_char = R_TILE_ROW
 }
 
-!if .cols = 1 {
+!if .cols = 1 or TILE_ROWS != 2 {
     lda .tile_char
     adc #1
     !if .cols = 1 {
@@ -43,7 +43,7 @@ copy_tile_char5 !zone { +copy_tile_char 5 }
         cmp #TILE_ROWS
     }
     sta .tile_char
-    bne +
+    bcc +
     clc
     lda #0
     sta .tile_char
@@ -51,22 +51,15 @@ copy_tile_char5 !zone { +copy_tile_char 5 }
 
 !if .cols = 1 {
     inc MAP_POS_LO_T
-    bne +
-    inc MAP_POS_HI_T
 } else {
-    ; speed up (TILE_ROWS = 2)
-    lda .tile_char
-    adc #1
-    and #1
-    sta .tile_char
-    bne +
+    !if TILE_ROWS = 2 {
+        lda .tile_char
+        adc #1
+        and #1
+        sta .tile_char
+        bne +
+    }
 
-    ; example map is 256 tiles wide
-    ; lda MAP_POS_LO_T
-    ; adc #MAP_WIDTH
-    ; sta MAP_POS_LO_T
-    ; bcc +
-    ; clc
     inc MAP_POS_HI_T
 }
 +
@@ -77,29 +70,28 @@ copy_tile_char5 !zone { +copy_tile_char 5 }
     lda PIX_POS_LO_T
     adc #(8*.cols % 256) ; + 64
     sta PIX_POS_LO_T
-
+!if .cols = 1 {
+    bcc+
+}
     lda PIX_POS_HI_T
     adc #(8*.cols / 256) ; + 256
     and #%11011111 ; modulo 8192 (but keep upper bits)
     sta PIX_POS_HI_T ; next pixel position to start from
-
++
     ; color pointers
     lda SCR_POS_LO_T
     adc #.cols
     sta SCR_POS_LO_T ; next screen position to start from
     sta CLR_POS_LO_T
     bcc +
-    clc
-
-    lda SCR_POS_HI_T
-    adc #1
-    and #%11111011 ; modulo 1024 (but keep upper bits)
-    sta SCR_POS_HI_T
 
     lda CLR_POS_HI_T
-    adc #1
-    and #%11111011 ; module 1024 (but keep upper bits)
+    adc #0
+    and #%11111011 ; modulo 1024 (but keep upper bits)
     sta CLR_POS_HI_T
+
+    adc #%00001000
+    sta SCR_POS_HI_T
 +
 }
 
@@ -115,22 +107,25 @@ iterate_row_pointers !zone {
     rts
 }
 
-select_and_copy_tile_char !zone {
-    !for .char, 0, 5 {
-        !if .char != 5 {
-            cmp #.char
-            bne +
-        }
-        !if .char = 0 { jsr copy_tile_char0 }
-        !if .char = 1 { jsr copy_tile_char1 }
-        !if .char = 2 { jsr copy_tile_char2 }
-        !if .char = 3 { jsr copy_tile_char3 }
-        !if .char = 4 { jsr copy_tile_char4 }
-        !if .char = 5 { jsr copy_tile_char5 }
-        rts
-+
-    }
-}
+; depends on TILE_COLS and TILE_ROWS
+;select_and_copy_tile_char !zone {
+;    !for .char, 0, 5 {
+;        !if .char != 5 {
+;            !if .char != 0 {
+;                cmp #.char
+;            }
+;            bne +
+;        }
+;        !if .char = 0 { jsr copy_tile_char0 }
+;        !if .char = 1 { jsr copy_tile_char1 }
+;        !if .char = 2 { jsr copy_tile_char2 }
+;        !if .char = 3 { jsr copy_tile_char3 }
+;        !if .char = 4 { jsr copy_tile_char4 }
+;        !if .char = 5 { jsr copy_tile_char5 }
+;        rts
+;+
+;    }
+;}
 
 !macro init_pointers .cols {
 !if .cols = 1 {
@@ -166,7 +161,6 @@ select_and_copy_tile_char !zone {
     !set .scr_pos_hi_t = R_SCR_POS_HI_T
     !set .clr_pos_hi_t = R_CLR_POS_HI_T
 }
-
     lda TILE_COL
     sta .tile_col
 
@@ -223,9 +217,6 @@ select_and_copy_tile_char !zone {
     !set .scr_pos_hi_t = R_SCR_POS_HI_T
     !set .clr_pos_hi_t = R_CLR_POS_HI_T
 }
-    lda #.count
-    sta ITERATIONS
-
     lda .map_pos_lo_t
     sta MAP_POS_LO_T
 
@@ -248,6 +239,9 @@ select_and_copy_tile_char !zone {
     lda .pix_pos_hi_t
     sta PIX_POS_HI_T
 
+    lda #.count
+    sta ITERATIONS
+
     clc
 .next
     ldy #0
@@ -265,7 +259,9 @@ select_and_copy_tile_char !zone {
 
     !for .char, 0, 5 {
         !if .char != 5 {
-            cmp #.char
+            !if .char != 0 {
+                cmp #.char
+            }
             bne +
         }
         !if .char = 0 { jsr copy_tile_char0 }
@@ -280,17 +276,17 @@ select_and_copy_tile_char !zone {
 
 .iterate_pointers
     clc
-    +iterate_source_pointers .cols
-    +iterate_destination_pointers .cols
-;    !if .cols = 1 {
-;        jsr iterate_col_pointers
-;    } else {
-;        jsr iterate_row_pointers
-;    }
+;    +iterate_source_pointers .cols
+;    +iterate_destination_pointers .cols
+    !if .cols = 1 {
+        jsr iterate_col_pointers
+    } else {
+        jsr iterate_row_pointers
+    }
     dec ITERATIONS
-    beq .exit
-    jmp .next
-;    bne .next
+;    beq .exit
+;    jmp .next
+    bne .next
 
 .exit
     lda MAP_POS_LO_T
@@ -328,12 +324,12 @@ copy_col_tiles2 !zone {
 
 copy_row_tiles1 !zone {
     +init_pointers SCR_COLS
-    +copy_tile_chars SCR_COLS, 11
+    +copy_tile_chars SCR_COLS, 12
     rts
 }
 
 copy_row_tiles2 !zone {
-    +copy_tile_chars SCR_COLS, 12
+    +copy_tile_chars SCR_COLS, 11
     rts
 }
 

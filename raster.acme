@@ -311,7 +311,6 @@ rotate
 
 ;            txa
 ;            pha
-;;    jsr COPY_TILES
 ;;lda #6
 ;;sta VIC_BORDER
 ;;            jsr PLAY_SONG
@@ -434,25 +433,24 @@ last_irq
 ;.copy_tiles
     lda #11
     sta VIC_BORDER
-    lda VIC_RASTER
-    cmp RASTER_LINE1
-    bcc .skip1
-    sta RASTER_LINE1
-.skip1
+;    lda VIC_RASTER
+;    cmp RASTER_LINE1
+;    bcc .skip1
+;    sta RASTER_LINE1
+;.skip1
     jsr COPY_TILES
-    lda VIC_RASTER
-    cmp RASTER_LINE2
-    bmi .skip2
-    bcc .skip2
-    sta RASTER_LINE2
-.skip2
+;    lda VIC_RASTER
+;    cmp RASTER_LINE2
+;    bmi .skip2
+;    bcc .skip2
+;    sta RASTER_LINE2
+;.skip2
     lda #0
     sta VIC_BORDER
 
 .play_song
     ldy PLAY
     beq +
-;    jsr COPY_TILES
 ;    jsr PLAY_SONG
 +
 

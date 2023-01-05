@@ -100,6 +100,6 @@ SPR_FR          = $e400; - $ffbf,  7k 111 sprite frames
 ;---------------------------------16k
 
 SPR_FR_BASE     = (SPR_FR-VIC_BANK)/64
-SPR_PTR         = SCREEN+$0400-8
+SPR_PTR         = SCREEN+$0400-8; $e3f8 - $e400
 INIT_SONG       = SONG_DATA
 PLAY_SONG       = INIT_SONG+3

@@ -118,8 +118,9 @@ SCROLL_U !zone {
     clc
     adc #TILE_ROWS
     sta TILE_ROW
-    +wrap_sub C_MAP_POS_LO, C_MAP_POS_HI, MAP_WIDTH, 256
-    +wrap_sub R_MAP_POS_LO, R_MAP_POS_HI, MAP_WIDTH, 256
+
+    dec C_MAP_POS_HI
+    dec R_MAP_POS_HI
 +
     +wrap_sub C_SCR_POS_LO, C_SCR_POS_HI, SCROLL_COLS, 4
     +wrap_sub R_SCR_POS_LO, R_SCR_POS_HI, SCROLL_COLS, 4
@@ -128,9 +129,14 @@ SCROLL_U !zone {
 
     lda SCROLL_U_D
     beq +
-    +wrap_sub C_MAP_POS_LO, C_MAP_POS_HI, MAP_WIDTH*(SCROLL_ROWS-1)/2, 256
+
+    sec
+    lda C_MAP_POS_HI
+    sbc #(SCROLL_ROWS-1)/TILE_ROWS
+    sta C_MAP_POS_HI
     +wrap_sub C_SCR_POS_LO, C_SCR_POS_HI, (SCROLL_ROWS-1)*SCROLL_COLS, 4
     +wrap_sub C_PIX_POS_LO, C_PIX_POS_HI, 8*(SCROLL_ROWS-1)*SCROLL_COLS, 8*4
+
     lda #0
     sta SCROLL_U_D
 +
@@ -164,8 +170,9 @@ SCROLL_D !zone {
     sec
     sbc #TILE_ROWS
     sta TILE_ROW
-    +wrap_add C_MAP_POS_LO, C_MAP_POS_HI, MAP_WIDTH, 256
-    +wrap_add R_MAP_POS_LO, R_MAP_POS_HI, MAP_WIDTH, 256
+
+    inc C_MAP_POS_HI
+    inc R_MAP_POS_HI
 +
     +wrap_add C_SCR_POS_LO, C_SCR_POS_HI, SCROLL_COLS, 4
     +wrap_add R_SCR_POS_LO, R_SCR_POS_HI, SCROLL_COLS, 4
@@ -174,9 +181,14 @@ SCROLL_D !zone {
 
     lda SCROLL_U_D
     bne +
-    +wrap_add C_MAP_POS_LO, C_MAP_POS_HI, MAP_WIDTH*(SCROLL_ROWS-1)/2, 256
+
+    clc
+    lda C_MAP_POS_HI
+    adc #(SCROLL_ROWS-1)/TILE_ROWS
+    sta C_MAP_POS_HI
     +wrap_add C_SCR_POS_LO, C_SCR_POS_HI, (SCROLL_ROWS-1)*SCROLL_COLS, 4
     +wrap_add C_PIX_POS_LO, C_PIX_POS_HI, 8*(SCROLL_ROWS-1)*SCROLL_COLS, 8*4
+
     lda #1
     sta SCROLL_U_D
 +
@@ -217,8 +229,9 @@ SCROLL_L !zone {
     clc
     adc #TILE_COLS
     sta TILE_COL
-    +wrap_sub C_MAP_POS_LO, C_MAP_POS_HI, 1, 256
-    +wrap_sub R_MAP_POS_LO, R_MAP_POS_HI, 1, 256
+
+    dec C_MAP_POS_LO
+    dec R_MAP_POS_LO
 +
     +wrap_sub C_SCR_POS_LO, C_SCR_POS_HI, 1, 4
     +wrap_sub R_SCR_POS_LO, R_SCR_POS_HI, 1, 4
@@ -227,9 +240,14 @@ SCROLL_L !zone {
 
     lda SCROLL_L_R
     beq +
-    +wrap_sub R_MAP_POS_LO, R_MAP_POS_HI, (SCROLL_COLS-1) / TILE_COLS, 256
+
+    sec
+    lda R_MAP_POS_LO
+    sbc #(SCROLL_COLS-1)/TILE_COLS
+    sta R_MAP_POS_LO
     +wrap_sub R_SCR_POS_LO, R_SCR_POS_HI, SCROLL_COLS-1, 4
     +wrap_sub R_PIX_POS_LO, R_PIX_POS_HI, 8*(SCROLL_COLS-1), 8*4
+
     lda #0
     sta SCROLL_L_R
 +
@@ -269,8 +287,9 @@ SCROLL_R !zone {
     sec
     sbc #TILE_COLS
     sta TILE_COL
-    +wrap_add C_MAP_POS_LO, C_MAP_POS_HI, 1, 256
-    +wrap_add R_MAP_POS_LO, R_MAP_POS_HI, 1, 256
+
+    inc C_MAP_POS_LO
+    inc R_MAP_POS_LO
 +
     +wrap_add C_SCR_POS_LO, C_SCR_POS_HI, 1, 4
     +wrap_add R_SCR_POS_LO, R_SCR_POS_HI, 1, 4
@@ -279,9 +298,14 @@ SCROLL_R !zone {
 
     lda SCROLL_L_R
     bne +
-    +wrap_add R_MAP_POS_LO, R_MAP_POS_HI, (SCROLL_COLS-1)/TILE_COLS, 256
+
+    clc
+    lda R_MAP_POS_LO
+    adc #(SCROLL_COLS-1)/TILE_COLS
+    sta R_MAP_POS_LO
     +wrap_add R_SCR_POS_LO, R_SCR_POS_HI, SCROLL_COLS-1, 4
     +wrap_add R_PIX_POS_LO, R_PIX_POS_HI, 8*(SCROLL_COLS-1), 8*4
+
     lda #1
     sta SCROLL_L_R
 +
