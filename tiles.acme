@@ -291,7 +291,7 @@ iterate_row_pointers !zone {
 .exit
     lda MAP_POS_LO_T
     sta .map_pos_lo_t
-    
+
     lda MAP_POS_HI_T
     sta .map_pos_hi_t
 

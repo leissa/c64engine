@@ -270,15 +270,12 @@ SOFT_Y = *+1
 ;-------------------------------------------------------------------------------
 
     !ifdef DEBUG {
-        ldx #0
+        ldx #3
         stx VIC_BORDER
 ;        inc VIC_BORDER
     }
     ldx #4
     stx SPR_COUNTER
-
-    ldy #1
-    sty PLAY
 
 rotate
     !for .i, 0, 3 {
@@ -312,7 +309,7 @@ rotate
 ;            }
             ldx SPR_COUNTER
             !ifdef DEBUG {
-;                stx VIC_BORDER
+                stx VIC_BORDER
             }
 
 .display_sprite
@@ -362,8 +359,7 @@ rotate
             inx
             !if r = 0 {
                 cpx #SPRITES
-                bpl last_irq
-;                beq last_irq
+                beq last_irq
                 jmp rotate
             }
         }
@@ -373,69 +369,22 @@ rotate
 ; we are finishing the last irq this frame
 ;-------------------------------------------------------------------------------
 
-;;!ifndef DEVELOP {
-;!source "krill/loader/build/loadersymbols-c64.inc"
-;;}
-
-;;!convtab pet {
-;;tile_map
-;;    !tx "map"
-;;    !by 0
-;;}
-
 last_irq
+!ifdef DEBUG {
     lda #10
     sta VIC_BORDER
-
-    inc CURR_FRAME
+}
     jsr JOYSTICK
-
-;lda R_MAP_POS_HI
-;cmp #96
-;bne .clear_loaded
-
-;lda LOADED
-;bne .copy_tiles
-;;inc VIC_BORDER
-
-;lda #$71
-;sta VIC_CONTROL_Y
-
-;ldx #<tile_map
-;ldy #>tile_map
-;jsr loadcompd
-
-;lda #1
-;sta LOADED
-;jmp .play_song
-
-;.clear_loaded
-;lda #0
-;sta LOADED
-
-;.copy_tiles
+!ifdef DEBUG {
     lda #11
     sta VIC_BORDER
-;    lda VIC_RASTER
-;    cmp RASTER_LINE1
-;    bcc .skip1
-;    sta RASTER_LINE1
-;.skip1
+}
     jsr COPY_TILES
-;    lda VIC_RASTER
-;    cmp RASTER_LINE2
-;    bmi .skip2
-;    bcc .skip2
-;    sta RASTER_LINE2
-;.skip2
+!ifdef DEBUG {
     lda #0
     sta VIC_BORDER
-
-.play_song
-    ldy PLAY
-    beq +
+}
     jsr PLAY_SONG
-+
 
 ;-------------------------------------------------------------------------------
 ; sort sprites

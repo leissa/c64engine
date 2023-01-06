@@ -55,23 +55,9 @@ SCROLL_U_D      = $2f
 SCROLL_L_R      = $30
 SPR_COUNTER     = $31
 PLAY            = $32
-;LOADED          = $33
 
 SPR_I           = $40; - $57
 SPR_Y           = $58; - $6f
-
-RESULT          = $70
-PREV_FRAME      = $71
-CURR_FRAME      = $72
-LOOP_LO         = $73
-LOOP_HI         = $74
-TOTAL_LO        = $75
-TOTAL_HI        = $76
-AVG_LO          = $77
-AVG_HI          = $78
-RASTER_LINE1    = $79
-RASTER_LINE2    = $7a
-RESULTS         = $80; - $bf
 
 ; zero page: $0000 - $00ff
 ; cpu stack: $0100 - $01ff
@@ -100,6 +86,6 @@ SPR_FR          = $e400; - $ffbf,  7k 111 sprite frames
 ;---------------------------------16k
 
 SPR_FR_BASE     = (SPR_FR-VIC_BANK)/64
-SPR_PTR         = SCREEN+$0400-8; $e3f8 - $e400
+SPR_PTR         = SCREEN+$0400-8
 INIT_SONG       = SONG_DATA
 PLAY_SONG       = INIT_SONG+3
