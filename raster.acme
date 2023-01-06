@@ -303,23 +303,6 @@ rotate
 
             +set16 .next_irq, VECTOR_IRQ
 
-;            cpy #24 ; play routine needs about 21 lines, add 3 for safety
-;            +bult .exit
-;            ldy PLAY
-;            beq .exit
-;            dec PLAY
-
-;            txa
-;            pha
-;;lda #6
-;;sta VIC_BORDER
-;;            jsr PLAY_SONG
-;;lda #0
-;;sta VIC_BORDER
-;            pla
-;            tax
-
-;.exit
             jmp out_x
 
 .next_irq
@@ -451,49 +434,60 @@ last_irq
 .play_song
     ldy PLAY
     beq +
-;    jsr PLAY_SONG
+    jsr PLAY_SONG
 +
 
 ;-------------------------------------------------------------------------------
 ; sort sprites
 ;-------------------------------------------------------------------------------
 
-;    !ifdef DEBUG {
-;        ldx #2
-;        stx VIC_BORDER
-;;        inc VIC_BORDER
-;    }
-;    !for .i, 0, SPRITES-2 {
-;        ldy SPR_I + .i + 1
-;        !if .i % 2 = 0 {
-;            !set .back_0 = *
-;        } else {
-;            !set .back_1 = *
-;        }
-;        ldx SPR_I + .i
-;        lda SPR_Y, y            ; A: r-elem
-;        cmp SPR_Y, x            ; M: l-elem
-;        ; swap if A < M
-;        ; skip if A >= M
-;        +buge +
-;        stx SPR_I + .i + 1
-;        sty SPR_I + .i
-;        !if .i = 0 {
-;            ; do nothing
-;        } else {
-;            !if .i % 2 = 0 {
-;                +bult .back_1   ; always true
-;            } else {
-;                +bult .back_0   ; always true
-;            }
-;        }
-;+
-;    }
-;    !ifdef DEBUG {
-;        ldx #1
-;        stx VIC_BORDER
-;;        dec VIC_BORDER
-;    }
+    !ifdef DEBUG {
+        ldx #2
+        stx VIC_BORDER
+;        inc VIC_BORDER
+    }
+    !for .i, 0, SPRITES-2 {
+        ldy SPR_I + .i + 1
+        !if .i % 2 = 0 {
+            !set .back_0 = *
+        } else {
+            !set .back_1 = *
+        }
+        ldx SPR_I + .i
+        lda SPR_Y, y            ; A: r-elem
+        cmp SPR_Y, x            ; M: l-elem
+        ; swap if A < M
+        ; skip if A >= M
+        +buge +
+        stx SPR_I + .i + 1
+        sty SPR_I + .i
+        !if .i = 0 {
+            ; do nothing
+        } else {
+            !if .i % 2 = 0 {
+                +bult .back_1   ; always true
+            } else {
+                +bult .back_0   ; always true
+            }
+        }
++
+    }
+    !ifdef DEBUG {
+        ldx #1
+        stx VIC_BORDER
+;        dec VIC_BORDER
+    }
+
+!ifdef DEVELOP {
+    lda $d011
+    and #$80
+    bne +
+    lda VIC_RASTER
+    cmp #LINE_0-1
+    bmi +
+;    jam ; if there is too little time, stop execution
++
+}
 
     +set_raster_line_8 LINE_0
     +set16 IRQ, VECTOR_IRQ

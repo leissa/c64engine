@@ -48,6 +48,11 @@ JOYSTICK !zone {
     pla
 
     ldx CUR_SPR
+!ifdef DEVELOP {
+    ldy SPR_Y, x
+    cpy #$fa
+    beq +
+}
     inc SPR_Y, x
 +
 
@@ -58,7 +63,12 @@ JOYSTICK !zone {
     jsr SCROLL_U
 
     ldx CUR_SPR
+!ifdef DEVELOP {
+    ldy SPR_Y, x
+    beq +
+}
     dec SPR_Y, x
++
 
 .exit
     rts

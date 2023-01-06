@@ -31,13 +31,13 @@ SCR_ROWS            = 25
 MAP_WIDTH           = 256 ; assumed by the code, no other widths supported atm.
 MAP_HEIGHT          = 96
 SPRITES             = 24 ; must be at least 8 and a multiple of 4
-TILES               = 185 ; TODO calculate this with pixels.bin size / 8 / TILE_COLS / TILE_ROWS
+TILES               = 185 ; TODO: calculate this with pixels.bin size / 8 / TILE_COLS / TILE_ROWS
 
 *=SPR_DATA
 
 _spr_y
 ;    !by $fa, $f8, $f6, $f4, $da, $d8, $d6, $d4, $ba, $b8, $b6, $b4, $9a, $98, $96, $94, $7a, $78, $76, $74, $5a, $58, $56, $54
-    !by $54, $56, $58, $5a, $74, $76, $78, $7a, $94, $96, $98, $9a, $b4, $b6, $b8, $ba, $d4, $d6, $d8, $da, $f4, $f6, $f8, $fa
+    !by $54, $56, $58, $5a, $74, $76, $78, $7a, $94, $96, $98, $9a, $b4, $b6, $b8, $ba, $d0, $d2, $d4, $d6, $f0, $f0, $f0, $f0
 SPR_X
     !by $10, $20, $30, $40, $50, $60, $70, $80, $10, $20, $30, $40, $50, $60, $70, $80, $10, $20, $30, $40, $50, $60, $70, $80
 SPR_A
