@@ -10,9 +10,15 @@ IRQ !zone {
 
     ; irq event                             ;  7
     ; last instruction                      ;  1 (min)
-    +save_regs out                          ; 12
-    +assert LINE_0, VIC_RASTER              ;  9
-                                            ;--> 29
+    sta restore_regs + 1                    ;  4
+    stx restore_regs + 3                    ;  4
+    sty restore_regs + 5                    ;  4
+
+    lda VIC_RASTER                          ;  4
+    cmp #LINE_0                             ;  2
+    beq +                                   ;  3
+    jam
++                                           ;--> 29
     ; ack interrupt
     inc VIC_IRQ_STATUS                      ;  6
 
@@ -119,12 +125,12 @@ SOFT_Y = *+1
 ;-------------------------------------------------------------------------------
 
 !macro inc_vic_control_y {
-        lda VIC_CONTROL_Y                   ;  4
-        clc                                 ;  2
-        adc #1                              ;  2
-        and #%00000111                      ;  2
-        adc #CONTROL_Y_INVALID              ;  2
-        sta VIC_CONTROL_Y                   ;  4
+    lda VIC_CONTROL_Y                       ;  4
+    clc                                     ;  2
+    adc #1                                  ;  2
+    and #%00000111                          ;  2
+    adc #CONTROL_Y_INVALID                  ;  2
+    sta VIC_CONTROL_Y                       ;  4
 }                                           ;--> 16
 
 
@@ -203,47 +209,50 @@ SOFT_Y = *+1
         stx VIC_BORDER
 ;        inc VIC_BORDER
     }
-    !for .i, 0, 3 {
-        !set .r = 3-.i
-        ; index
-        ldy SPR_I + .i
 
-        ; y-coord
-        lda SPR_Y, y
-        sta VIC_SPR_0_Y + 4*.r
-        sta VIC_SPR_0_Y + 4*.r + 2
+    !if SPRITES > 0 {
+        !for .i, 0, 3 {
+            !set .r = 3-.i
+            ; index
+            ldy SPR_I + .i
 
-        ; x-coord
-        lda SPR_X, y
-        asl
-        sta VIC_SPR_0_X + 4*.r
-        sta VIC_SPR_0_X + 4*.r + 2
+            ; y-coord
+            lda SPR_Y, y
+            sta VIC_SPR_0_Y + 4*.r
+            sta VIC_SPR_0_Y + 4*.r + 2
 
-        ; x-coord MSB
-        !if .i != 0 {
-            txa
+            ; x-coord
+            lda SPR_X, y
+            asl
+            sta VIC_SPR_0_X + 4*.r
+            sta VIC_SPR_0_X + 4*.r + 2
+
+            ; x-coord MSB
+            !if .i != 0 {
+                txa
+            }
+            php
+            rol
+            plp
+            rol
+            tax
+
+            ; colors
+            lda SPR_A, y
+            sta VIC_SPR_0_COLOR + .r*2 + 1
+            lda SPR_B, y
+            sta VIC_SPR_0_COLOR + .r*2
+
+            ; set sprite pointers
+            lda SPR_F, y
+            tay
+            sty SPR_PTR + .r*2 + 1
+            iny
+            sty SPR_PTR + .r*2
         }
-        php
-        rol
-        plp
-        rol
-        tax
-
-        ; colors
-        lda SPR_A, y
-        sta VIC_SPR_0_COLOR + .r*2 + 1
-        lda SPR_B, y
-        sta VIC_SPR_0_COLOR + .r*2
-
-        ; set sprite pointers
-        lda SPR_F, y
-        tay
-        sty SPR_PTR + .r*2 + 1
-        iny
-        sty SPR_PTR + .r*2
+        stx VIC_SPR_X_MSB
     }
 
-    stx VIC_SPR_X_MSB
     !ifdef DEBUG {
         ldx #2
         stx VIC_BORDER
@@ -256,10 +265,10 @@ SOFT_Y = *+1
 
     pla
     ; wait till end of AGSP region
-    ldy #FIRST_BADLINE+SCR_ROWS+8
+    ldy #FIRST_BADLINE+SCR_ROWS+8-1
 -
     cpy VIC_RASTER
-    bne -
+    bcs -
 
     ;stx CIA2_DATA_PORT_A
     ;stx $ff00
@@ -274,36 +283,62 @@ SOFT_Y = *+1
         stx VIC_BORDER
 ;        inc VIC_BORDER
     }
-    ldx #4
-    stx SPR_COUNTER
+
+    !if SPRITES < 4 {
+        ldx #SPRITES
+    } else {
+        ldx #4
+    }
+
+;   sprite with y = 28:
+;   27--------------------|... dma disabled
+;   28--------------------|... dma enabled
+;   29------line 1--------|... dma enabled
+;   ..
+;   49------line 21-------|... dma disabled
+;   50---ready for next---|<-- triggerline = 28+22
 
 rotate
     !for .i, 0, 3 {
         !set r = 3-.i
         !zone {
-            lda VIC_SPR_0_Y + r*4
-            clc
-            adc #21 + 2     ; carry clear - so add one extra for borrow
-            sbc VIC_RASTER
-            +bult .display_sprite
-
-            ; don't issue next interrupt too early - let's have 3 raster lines safety
-            cmp #3
-            +buge +
-            lda #3
+.check_done
+            cpx #SPRITES
+            bne +
+            jmp last_irq
 +
-            tay
-
+            lda VIC_SPR_0_Y + r*4 ; get y position of physical sprite
             clc
-            adc VIC_RASTER
-            sta VIC_RASTER
+            adc #22             ; calculate when sprite will be done, see above diagram
+            bcc +               ; if we overflow we can be sure triggerline is too high
+            jmp last_irq
++
+;            cmp #$f8            ; $f9 is the last visible line: ensure triggerline < $f8
+            cmp #$f2            ; $f2 ensures enough raster time to prevent jam
+            bcc +
+            jmp last_irq        ; nothing left to do
++
+            tay                 ; y = triggerline for next sprite
+            sbc VIC_RASTER      ; a = triggerline - rasterline - 1 (omit sec)
+            bcc .display_sprite ; rasterline >= triggerline: display next sprite
+            cmp #2              ; rasterline < triggerline, a = #lines left - 1
+            bcs .set_interrupt  ; at least 3 lines left to set an interrupt
+            dey                 ; fewer than 3 lines left, prepare to poll
+-
+            cpy VIC_RASTER
+            bcs -               ; we might be on a badline: use dey, bcs instead of bne
+            bcc .display_sprite ; branch always
 
+.set_interrupt
+            stx SPR_COUNTER
+            sty VIC_RASTER
             +set16 .next_irq, VECTOR_IRQ
-
-            jmp out_x
+            jmp out
 
 .next_irq
-            +save_regs out
+            sta restore_regs + 1
+            stx restore_regs + 3
+            sty restore_regs + 5
 ;            !ifdef DEBUG {
 ;                inc VIC_BORDER
 ;            }
@@ -314,14 +349,17 @@ rotate
 
 .display_sprite
             ldy SPR_I, x
+            inx
 
             ; y-coord
             lda SPR_Y, y
 
             ; are we too late?
             cmp VIC_RASTER
-            +bule .skip
+            bcs .do_display_sprite
+            bcc .check_done
 
+.do_display_sprite
             sta VIC_SPR_0_Y + r*4
             sta VIC_SPR_0_Y + r*4 + 2
 
@@ -352,14 +390,11 @@ rotate
             ; sprite frames
             lda SPR_F, y
             sta SPR_PTR + r*2 + 1
-            tay
-            iny
-            sty SPR_PTR + r*2
-.skip
-            inx
+            clc
+            adc #1
+            sta SPR_PTR + r*2
+
             !if r = 0 {
-                cpx #SPRITES
-                beq last_irq
                 jmp rotate
             }
         }
@@ -395,32 +430,34 @@ last_irq
         stx VIC_BORDER
 ;        inc VIC_BORDER
     }
-    !for .i, 0, SPRITES-2 {
-        ldy SPR_I + .i + 1
-        !if .i % 2 = 0 {
-            !set .back_0 = *
-        } else {
-            !set .back_1 = *
-        }
-        ldx SPR_I + .i
-        lda SPR_Y, y            ; A: r-elem
-        cmp SPR_Y, x            ; M: l-elem
-        ; swap if A < M
-        ; skip if A >= M
-        +buge +
-        stx SPR_I + .i + 1
-        sty SPR_I + .i
-        !if .i = 0 {
-            ; do nothing
-        } else {
+
+    !if SPRITES > 1 {
+        !for .i, 0, SPRITES-2 {
+            ldy SPR_I + .i + 1
             !if .i % 2 = 0 {
-                +bult .back_1   ; always true
+                !set .back_0 = *
             } else {
-                +bult .back_0   ; always true
+                !set .back_1 = *
             }
-        }
+            ldx SPR_I + .i
+            lda SPR_Y, y            ; A: r-elem
+            cmp SPR_Y, x            ; M: l-elem
+            ; swap if A < M
+            ; skip if A >= M
+            bcs +
+            stx SPR_I + .i + 1
+            sty SPR_I + .i
+            !if .i != 0 {
+                !if .i % 2 = 0 {
+                    bcc .back_1   ; always true
+                } else {
+                    bcc .back_0   ; always true
+                }
+            }
 +
+        }
     }
+
     !ifdef DEBUG {
         ldx #1
         stx VIC_BORDER
@@ -432,23 +469,30 @@ last_irq
     and #$80
     bne +
     lda VIC_RASTER
-    cmp #LINE_0-1
     bmi +
-;    jam ; if there is too little time, stop execution
+    cmp #LINE_0-1 ; ok if VIC_RASTER < LINE_0-1
+    bcc +
+    jam ; if there is too little time, stop execution
 +
 }
 
     +set_raster_line_8 LINE_0
     +set16 IRQ, VECTOR_IRQ
 
-out_x
-    stx SPR_COUNTER
+out
     !ifdef DEBUG {
         ldx #0
         stx VIC_BORDER
 ;        dec VIC_BORDER
     }
-out
-    +ack_restore_rti
+
+    inc VIC_IRQ_STATUS
+
+restore_regs
+    lda #0
+    ldx #0
+    ldy #0
+    rti
+
 EMPTY_INTERRUPT = *-1
 }

@@ -95,17 +95,17 @@ copy_tile_char5 !zone { +copy_tile_char 5 }
 +
 }
 
-iterate_col_pointers !zone {
-    +iterate_source_pointers 1
-    +iterate_destination_pointers 1
-    rts
-}
+;iterate_col_pointers !zone {
+;    +iterate_source_pointers 1
+;    +iterate_destination_pointers 1
+;    rts
+;}
 
-iterate_row_pointers !zone {
-    +iterate_source_pointers SCR_COLS
-    +iterate_destination_pointers SCR_COLS
-    rts
-}
+;iterate_row_pointers !zone {
+;    +iterate_source_pointers SCR_COLS
+;    +iterate_destination_pointers SCR_COLS
+;    rts
+;}
 
 ; depends on TILE_COLS and TILE_ROWS
 ;select_and_copy_tile_char !zone {
@@ -276,17 +276,17 @@ iterate_row_pointers !zone {
 
 .iterate_pointers
     clc
-;    +iterate_source_pointers .cols
-;    +iterate_destination_pointers .cols
-    !if .cols = 1 {
-        jsr iterate_col_pointers
-    } else {
-        jsr iterate_row_pointers
-    }
+    +iterate_source_pointers .cols
+    +iterate_destination_pointers .cols
+;    !if .cols = 1 {
+;        jsr iterate_col_pointers
+;    } else {
+;        jsr iterate_row_pointers
+;    }
     dec ITERATIONS
-;    beq .exit
-;    jmp .next
-    bne .next
+    beq .exit
+    jmp .next
+;    bne .next
 
 .exit
     lda MAP_POS_LO_T

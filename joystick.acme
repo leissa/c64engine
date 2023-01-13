@@ -64,6 +64,7 @@ JOYSTICK !zone {
     ldx CUR_SPR
 !ifdef DEVELOP {
     ldy SPR_Y, x
+    cpy #FIRST_BADLINE+SCR_ROWS
     beq .exit
 }
     dec SPR_Y, x
