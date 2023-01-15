@@ -314,7 +314,7 @@ rotate
             jmp last_irq
 +
 ;            cmp #$f8            ; $f9 is the last visible line: ensure triggerline < $f8
-            cmp #$f2            ; $f2 ensures enough raster time to prevent jam
+            cmp #$f0            ; $f0 ensures enough raster time to prevent jam
             bcc +
             jmp last_irq        ; nothing left to do
 +

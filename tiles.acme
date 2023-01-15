@@ -6,7 +6,8 @@
     lda TILE_SCR+(.char*TILES), x
     sta (SCR_POS_LO_T), y
 
-    +set ALL_RAM, RAM_ROM_SELECTION
+    lda #ALL_RAM
+    sta RAM_ROM_SELECTION
 
     !for .row, 0, 7 {
         lda TILE_PIX+(.char*8*TILES)+(.row*TILES), x
@@ -16,7 +17,9 @@
         }
     }
 
-    +set ALL_RAM_WITH_IO, RAM_ROM_SELECTION
+    lda #ALL_RAM_WITH_IO
+    sta RAM_ROM_SELECTION
+
     rts
 }
 
@@ -27,7 +30,7 @@ copy_tile_char3 !zone { +copy_tile_char 3 }
 copy_tile_char4 !zone { +copy_tile_char 4 }
 copy_tile_char5 !zone { +copy_tile_char 5 }
 
-!macro iterate_source_pointers .cols {
+!macro iterate_source_pointers .cols, .map_pos {
 !if .cols = 1 {
     !set .tile_char = C_TILE_COL
 } else {
@@ -50,7 +53,7 @@ copy_tile_char5 !zone { +copy_tile_char 5 }
 }
 
 !if .cols = 1 {
-    inc MAP_POS_LO_T
+    inc .map_pos + 1
 } else {
     !if TILE_ROWS = 2 {
         lda .tile_char
@@ -60,7 +63,7 @@ copy_tile_char5 !zone { +copy_tile_char 5 }
         bne +
     }
 
-    inc MAP_POS_HI_T
+    inc .map_pos + 2
 }
 +
 }
@@ -94,18 +97,6 @@ copy_tile_char5 !zone { +copy_tile_char 5 }
     sta SCR_POS_HI_T
 +
 }
-
-;iterate_col_pointers !zone {
-;    +iterate_source_pointers 1
-;    +iterate_destination_pointers 1
-;    rts
-;}
-
-;iterate_row_pointers !zone {
-;    +iterate_source_pointers SCR_COLS
-;    +iterate_destination_pointers SCR_COLS
-;    rts
-;}
 
 ; depends on TILE_COLS and TILE_ROWS
 ;select_and_copy_tile_char !zone {
@@ -174,6 +165,7 @@ copy_tile_char5 !zone { +copy_tile_char 5 }
 
     lda .map_pos_hi
     adc #>TILE_MAP
+    clc
     sta .map_pos_hi_t
 
     lda .pix_pos_hi
@@ -218,10 +210,10 @@ copy_tile_char5 !zone { +copy_tile_char 5 }
     !set .clr_pos_hi_t = R_CLR_POS_HI_T
 }
     lda .map_pos_lo_t
-    sta MAP_POS_LO_T
+    sta .next_tile_char + 1
 
     lda .map_pos_hi_t
-    sta MAP_POS_HI_T
+    sta .next_tile_char + 2
 
     lda .scr_pos_lo_t
     sta SCR_POS_LO_T
@@ -243,10 +235,8 @@ copy_tile_char5 !zone { +copy_tile_char 5 }
     sta ITERATIONS
 
     clc
-.next
-    ldy #0
-    lda (MAP_POS_LO_T), y
-    tax
+.next_tile_char
+    ldx TILE_MAP
 
     ; pixel pointer
     lda .tile_row_t
@@ -270,29 +260,22 @@ copy_tile_char5 !zone { +copy_tile_char 5 }
         !if .char = 3 { jsr copy_tile_char3 }
         !if .char = 4 { jsr copy_tile_char4 }
         !if .char = 5 { jsr copy_tile_char5 }
-        !if .char != 5 { jmp .iterate_pointers }
+        !if .char != 5 { bne .iterate_pointers }
 +
     }
 
 .iterate_pointers
     clc
-    +iterate_source_pointers .cols
+    +iterate_source_pointers .cols, .next_tile_char
     +iterate_destination_pointers .cols
-;    !if .cols = 1 {
-;        jsr iterate_col_pointers
-;    } else {
-;        jsr iterate_row_pointers
-;    }
     dec ITERATIONS
-    beq .exit
-    jmp .next
-;    bne .next
+    bne .next_tile_char
 
 .exit
-    lda MAP_POS_LO_T
+    lda .next_tile_char + 1
     sta .map_pos_lo_t
 
-    lda MAP_POS_HI_T
+    lda .next_tile_char + 2
     sta .map_pos_hi_t
 
     lda SCR_POS_LO_T

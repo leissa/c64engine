@@ -17,7 +17,7 @@ INC_HARD_Y !zone {
     clc
     adc #SCR_COLS
     cmp #SCR_COLS
-    +buge .return    ; jmp if A < 40
+    bcs .return    ; jmp if A < 40
     sta HARD_X
     inc HARD_Y
 
@@ -61,7 +61,7 @@ DEC_HARD_Y !zone {
     sbc #.dec
     and #.and-1 ; assumes 2^x = .and
     sta .mem
-    +bbc .l
+    bcs .l
 }
 
 !macro wrap_add .lo, .hi, .add, .and {
@@ -70,10 +70,14 @@ DEC_HARD_Y !zone {
     lda .lo
     adc #(.add % 256)
     sta .lo
+!if .add < 256 {
+    bcc +
+}
     lda .hi
     adc #(.add / 256)
     and #.and-1 ; assumes 2^x = .and
     sta .hi
++
 }
 
 !macro wrap_sub .lo, .hi, .sub, .and {
@@ -82,10 +86,14 @@ DEC_HARD_Y !zone {
     lda .lo
     sbc #(.sub % 256)
     sta .lo
+!if .sub < 256 {
+    bcs +
+}
     lda .hi
     sbc #(.sub / 256)
     and #.and-1 ; assumes 2^x = .and
     sta .hi
++
 }
 
 SCROLL_U !zone {
@@ -113,15 +121,12 @@ SCROLL_U !zone {
     lda TILE_ROW
     sec
     sbc #1
-    sta TILE_ROW
-    bpl +
-    clc
+    bcs +
     adc #TILE_ROWS
-    sta TILE_ROW
-
     dec C_MAP_POS_HI
     dec R_MAP_POS_HI
 +
+    sta TILE_ROW
     +wrap_sub C_SCR_POS_LO, C_SCR_POS_HI, SCROLL_COLS, 4
     +wrap_sub R_SCR_POS_LO, R_SCR_POS_HI, SCROLL_COLS, 4
     +wrap_sub C_PIX_POS_LO, C_PIX_POS_HI, 8*SCROLL_COLS, 8*4
@@ -165,15 +170,12 @@ SCROLL_D !zone {
     clc
     adc #1
     cmp #TILE_ROWS
-    sta TILE_ROW
-    bmi +
-    sec
+    bcc +
     sbc #TILE_ROWS
-    sta TILE_ROW
-
     inc C_MAP_POS_HI
     inc R_MAP_POS_HI
 +
+    sta TILE_ROW
     +wrap_add C_SCR_POS_LO, C_SCR_POS_HI, SCROLL_COLS, 4
     +wrap_add R_SCR_POS_LO, R_SCR_POS_HI, SCROLL_COLS, 4
     +wrap_add C_PIX_POS_LO, C_PIX_POS_HI, 8*SCROLL_COLS, 8*4
@@ -224,15 +226,12 @@ SCROLL_L !zone {
     lda TILE_COL
     sec
     sbc #1
-    sta TILE_COL
-    bpl +
-    clc
+    bcs +
     adc #TILE_COLS
-    sta TILE_COL
-
     dec C_MAP_POS_LO
     dec R_MAP_POS_LO
 +
+    sta TILE_COL
     +wrap_sub C_SCR_POS_LO, C_SCR_POS_HI, 1, 4
     +wrap_sub R_SCR_POS_LO, R_SCR_POS_HI, 1, 4
     +wrap_sub C_PIX_POS_LO, C_PIX_POS_HI, 8, 8*4
@@ -282,15 +281,12 @@ SCROLL_R !zone {
     clc
     adc #1
     cmp #TILE_COLS
-    sta TILE_COL
-    bmi +
-    sec
+    bcc +
     sbc #TILE_COLS
-    sta TILE_COL
-
     inc C_MAP_POS_LO
     inc R_MAP_POS_LO
 +
+    sta TILE_COL
     +wrap_add C_SCR_POS_LO, C_SCR_POS_HI, 1, 4
     +wrap_add R_SCR_POS_LO, R_SCR_POS_HI, 1, 4
     +wrap_add C_PIX_POS_LO, C_PIX_POS_HI, 8, 8*4
