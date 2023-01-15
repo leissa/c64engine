@@ -115,7 +115,11 @@ SCROLL_U !zone {
     beq .prepare_copy_tiles
     rts
 .prepare_copy_tiles
+!if SCROLL_SPEED = 2 {
     lda #2
+} else {
+    lda #4
+}
     sta C_COPY
 
     lda TILE_ROW
@@ -163,7 +167,11 @@ SCROLL_D !zone {
     beq .prepare_copy_tiles
     rts
 .prepare_copy_tiles
+!if SCROLL_SPEED = 2 {
     lda #2
+} else {
+    lda #4
+}
     sta C_COPY
 
     lda TILE_ROW
@@ -220,7 +228,11 @@ SCROLL_L !zone {
     beq .prepare_copy_tiles
     rts
 .prepare_copy_tiles
+!if SCROLL_SPEED = 2 {
     lda #2
+} else {
+    lda #4
+}
     sta R_COPY
 
     lda TILE_COL
@@ -274,7 +286,11 @@ SCROLL_R !zone {
     beq .prepare_copy_tiles
     rts
 .prepare_copy_tiles
+!if SCROLL_SPEED = 2 {
     lda #2
+} else {
+    lda #4
+}
     sta R_COPY
 
     lda TILE_COL
