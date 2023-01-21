@@ -55,6 +55,7 @@ SCROLL_U_D      = $2f
 SCROLL_L_R      = $30
 SPR_COUNTER     = $31
 PLAY            = $32
+CTRL_Y_INVALID  = $33
 
 SPR_I           = $40; - $57
 SPR_Y           = $58; - $6f

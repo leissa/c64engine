@@ -22,22 +22,22 @@
 
 CONTROL_Y_MASK      = %10111111 ; bitmap mode
 LINE_0              = FIRST_BADLINE-3
-;SCROLL_SPEED        = 2
-SCROLL_SPEED        = 1
+SCROLL_SPEED        = 2
+;SCROLL_SPEED        = 1
 TILE_COLS           = 3
 TILE_ROWS           = 2
 SCR_COLS            = 40
 SCR_ROWS            = 25
 MAP_WIDTH           = 256 ; assumed by the code, no other widths supported atm.
 MAP_HEIGHT          = 96
-SPRITES             = 24
+SPRITES             = 4
 TILES               = 185 ; TODO: calculate this with pixels.bin size / 8 / TILE_COLS / TILE_ROWS
 
 *=SPR_DATA
 
 _spr_y
 ;    !by $fa, $f8, $f6, $f4, $da, $d8, $d6, $d4, $ba, $b8, $b6, $b4, $9a, $98, $96, $94, $7a, $78, $76, $74, $5a, $58, $56, $54
-    !by $54, $56, $58, $5a, $74, $76, $78, $7a, $94, $96, $98, $9a, $b4, $b6, $b8, $ba, $d0, $d2, $d4, $d6, $f0, $f0, $f0, $f0
+    !by $33, $33, $33, $33, $74, $76, $78, $7a, $94, $96, $98, $9a, $b4, $b6, $b8, $ba, $d0, $d2, $d4, $d6, $f0, $f0, $f0, $f0
 ;    !by $54, $56, $58, $5a, $74, $76, $78, $7a, $94, $96, $98, $9a, $b4, $b6, $b8, $ba, $d4, $d6, $d8, $da, $f4, $f6, $f8, $fa
 SPR_X
     !by $10, $20, $30, $40, $50, $60, $70, $80, $10, $20, $30, $40, $50, $60, $70, $80, $10, $20, $30, $40, $50, $60, $70, $80
@@ -165,6 +165,9 @@ SPR_F
     stx VIC_SPR_ENABLE
 
     ;---can be done at compile time?---
+ldx #CONTROL_Y_INVALID
+stx CTRL_Y_INVALID
+
     ldx #0
     stx C_COPY
     stx R_COPY
@@ -274,7 +277,6 @@ tile_pix
     +set 1, VIC_IRQ_CONTROL
     ; enable IRQs
     cli
-
 -
     ; some 7 cycle garbage instructions
     lda ($f0), y

@@ -53,7 +53,7 @@ JOYSTICK !zone {
     cpy #$fa
     beq .up
 }
-    inc SPR_Y, x
+;    inc SPR_Y, x
 
 .up
     asl
@@ -67,7 +67,7 @@ JOYSTICK !zone {
     cpy #FIRST_BADLINE+SCR_ROWS
     beq .exit
 }
-    dec SPR_Y, x
+;    dec SPR_Y, x
 
 .exit
     rts

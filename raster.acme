@@ -2,6 +2,17 @@
     !warn "bytes wasted: ", IRQ-*
 }
 
+inc_vic_control_y_zone !zone {
+    lda VIC_CONTROL_Y                       ;  4
+    clc                                     ;  2
+    adc #1                                  ;  2
+    and #%00000111                          ;  2
+    adc #CONTROL_Y_INVALID                  ;  2
+    sta VIC_CONTROL_Y                       ;  4
+
+    rts                                     ;  6
+}                                           ;--> 22
+
 !align 255, 0
 IRQ !zone {
 ;-------------------------------------------------------------------------------
@@ -94,9 +105,10 @@ SOFT_X = *+1
     ; wobble check from above               ;-->  3
 
     ; make FIRST_BADLINE a bad line
-    lda #CONTROL_Y_INVALID                  ;  2
+;    lda #CONTROL_Y_INVALID                  ;  2
+    lda CTRL_Y_INVALID                      ;  3
     sta VIC_CONTROL_Y                       ;  4
-                                            ;-->  6
+                                            ;-->  7; 6
 
     lda #SCR_ROWS                           ;  2
     sec                                     ;  2
@@ -115,33 +127,23 @@ SOFT_Y = *+1
     ora #CONTROL_Y_INVALID                  ;  2
     ; spill pre-computed value
     pha                                     ;  3
-                                            ;--> 13
-
-    ;wait till just before LINE_O + 3 == FIRST_BADLINE
-    +wait_loop 63 - 3 - 6 - 8 - 13 - 20 - 4
+                                            ;--> 14; 13
 
 ;-------------------------------------------------------------------------------
 ;   FLD & line crunch
 ;-------------------------------------------------------------------------------
 
-!macro inc_vic_control_y {
-    lda VIC_CONTROL_Y                       ;  4
-    clc                                     ;  2
-    adc #1                                  ;  2
-    and #%00000111                          ;  2
-    adc #CONTROL_Y_INVALID                  ;  2
-    sta VIC_CONTROL_Y                       ;  4
-}                                           ;--> 16
-
-
 .fld_loop
     cpx #0                                  ;  2
     beq +                                   ;  2 (in this loop)
-    +inc_vic_control_y                      ; 16
-                                            ;--> 20
-    +wait_loop 63 - 20 - 2 - 3
-;+wait_loop 63 - 20 - 2 - 3 - 6
-;inc VIC_BORDER
+    jsr inc_vic_control_y_zone              ; 22 + 6 (jsr)
+                                            ;--> 32
+
+    lda VIC_RASTER                          ;  4
+    cmp #$33                                ;  2
+    bcs .sprite_rows_fld_wait               ;  2/3
+
+    +wait_loop 63 - 32 - 2 - 3 - 4 - 2 - 2
 
     dex                                     ;  2
     jmp .fld_loop                           ;  3
@@ -152,21 +154,51 @@ SOFT_Y = *+1
 .crunch_loop
     cpx #0                                  ;  2
     beq +                                   ;  2 (in this loop)
-    +inc_vic_control_y                      ; 16
-                                            ;--> 20
-    +wait_loop 63 - 20 - 2 - 3
-;+wait_loop 63 - 20 - 2 - 3 - 6
-;dec VIC_BORDER
+    jsr inc_vic_control_y_zone              ; 22 + 6 (jsr)
+                                            ;--> 32
+
+    lda VIC_RASTER                          ;  4
+    cmp #$33                                ;  2
+    bcs .sprite_rows_crunch_wait            ;  2/3
+
+    +wait_loop 63 - 32 - 2 - 3 - 4 - 2 - 2
 
     dex                                     ;  2
     jmp .crunch_loop                        ;  3
 +
 
+.sprite_rows_fld_loop
+    cpx #0                                  ;  2
+    beq +                                   ;  2 (in this loop)
+    jsr inc_vic_control_y_zone              ; 22 + 6 (jsr)
+                                            ;--> 32
+.sprite_rows_fld_wait
+    +wait_loop 44 - 32 - 2 - 3
+
+    dex                                     ;  2
+    jmp .sprite_rows_fld_loop               ;  3
++
+
+    ldx HARD_Y
+
+.sprite_rows_crunch_loop
+    cpx #0                                  ;  2
+    beq +                                   ;  2 (in this loop)
+    jsr inc_vic_control_y_zone              ; 22 + 6 (jsr)
+                                            ;--> 32
+.sprite_rows_crunch_wait
+    +wait_loop 44 - 32 - 2 - 3
+
+    dex                                     ;  2
+    jmp .sprite_rows_crunch_loop            ;  3
++
     ; ^^^ these are always 25 raster lines ^^^
 
 ;-------------------------------------------------------------------------------
 ;   VSP
 ;-------------------------------------------------------------------------------
+
+    +wait 18
     ; make VSP line not a bad line
     inc VIC_CONTROL_Y                       ;6
     +wait 5                                 ;5
@@ -421,6 +453,49 @@ last_irq
 }
     jsr PLAY_SONG
 
+    !if SPRITES > 0 {
+        !for .i, 0, 3 {
+            !set .r = 3-.i
+            ; index
+            ldy SPR_I + .i
+
+            ; y-coord
+            lda SPR_Y, y
+            sta VIC_SPR_0_Y + 4*.r
+            sta VIC_SPR_0_Y + 4*.r + 2
+
+            ; x-coord
+            lda SPR_X, y
+            asl
+            sta VIC_SPR_0_X + 4*.r
+            sta VIC_SPR_0_X + 4*.r + 2
+
+            ; x-coord MSB
+            !if .i != 0 {
+                txa
+            }
+            php
+            rol
+            plp
+            rol
+            tax
+
+            ; colors
+            lda SPR_A, y
+            sta VIC_SPR_0_COLOR + .r*2 + 1
+            lda SPR_B, y
+            sta VIC_SPR_0_COLOR + .r*2
+
+            ; set sprite pointers
+            lda SPR_F, y
+            tay
+            sty SPR_PTR + .r*2 + 1
+            iny
+            sty SPR_PTR + .r*2
+        }
+        stx VIC_SPR_X_MSB
+    }
+
 ;-------------------------------------------------------------------------------
 ; sort sprites
 ;-------------------------------------------------------------------------------
@@ -472,7 +547,7 @@ last_irq
     bmi +
     cmp #LINE_0-1 ; ok if VIC_RASTER < LINE_0-1
     bcc +
-    jam ; if there is too little time, stop execution
+;    jam ; if there is too little time, stop execution
 +
 }
 
