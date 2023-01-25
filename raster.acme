@@ -2,7 +2,8 @@
     !warn "bytes wasted: ", IRQ-*
 }
 
-inc_vic_control_y_zone !zone {
+;inc_vic_control_y_zone !zone {
+!macro inc_vic_control_y_zone {
     lda VIC_CONTROL_Y                       ;  4
     clc                                     ;  2
     adc #1                                  ;  2
@@ -10,7 +11,7 @@ inc_vic_control_y_zone !zone {
     adc #CONTROL_Y_INVALID                  ;  2
     sta VIC_CONTROL_Y                       ;  4
 
-    rts                                     ;  6
+;    rts                                     ;  6
 }                                           ;--> 22
 
 !align 255, 0
@@ -105,8 +106,8 @@ SOFT_X = *+1
     ; wobble check from above               ;-->  3
 
     ; make FIRST_BADLINE a bad line
-;    lda #CONTROL_Y_INVALID                  ;  2
-    lda CTRL_Y_INVALID                      ;  3
+    lda #CONTROL_Y_INVALID                  ;  2
+;    lda CTRL_Y_INVALID                      ;  3
     sta VIC_CONTROL_Y                       ;  4
                                             ;-->  7; 6
 
@@ -129,6 +130,10 @@ SOFT_Y = *+1
     pha                                     ;  3
                                             ;--> 14; 13
 
+
++wait_loop 63 - 3 - 6 - 8 - 13 - 20 - 4
+
+
 ;-------------------------------------------------------------------------------
 ;   FLD & line crunch
 ;-------------------------------------------------------------------------------
@@ -136,14 +141,16 @@ SOFT_Y = *+1
 .fld_loop
     cpx #0                                  ;  2
     beq +                                   ;  2 (in this loop)
-    jsr inc_vic_control_y_zone              ; 22 + 6 (jsr)
+;    jsr inc_vic_control_y_zone              ; 22 + 6 (jsr)
+    +inc_vic_control_y_zone              ; 22 + 6 (jsr)
                                             ;--> 32
 
-    lda VIC_RASTER                          ;  4
-    cmp #$33                                ;  2
-    bcs .sprite_rows_fld_wait               ;  2/3
+;    lda VIC_RASTER                          ;  4
+;    cmp #SPRITES_TOP                        ;  2
+;    bcs .sprite_rows_fld_wait               ;  2/3
 
-    +wait_loop 63 - 32 - 2 - 3 - 4 - 2 - 2
+;    +wait_loop 63 - 32 - 2 - 3 - 4 - 2 - 2
+    +wait_loop 63 - 20 - 2 - 3
 
     dex                                     ;  2
     jmp .fld_loop                           ;  3
@@ -154,54 +161,55 @@ SOFT_Y = *+1
 .crunch_loop
     cpx #0                                  ;  2
     beq +                                   ;  2 (in this loop)
-    jsr inc_vic_control_y_zone              ; 22 + 6 (jsr)
+;    jsr inc_vic_control_y_zone              ; 22 + 6 (jsr)
+    +inc_vic_control_y_zone              ; 22 + 6 (jsr)
                                             ;--> 32
 
-    lda VIC_RASTER                          ;  4
-    cmp #$33                                ;  2
-    bcs .sprite_rows_crunch_wait            ;  2/3
+;    lda VIC_RASTER                          ;  4
+;    cmp #SPRITES_TOP                        ;  2
+;    bcs .sprite_rows_crunch_wait            ;  2/3
 
-    +wait_loop 63 - 32 - 2 - 3 - 4 - 2 - 2
+;    +wait_loop 63 - 32 - 2 - 3 - 4 - 2 - 2
+    +wait_loop 63 - 20 - 2 - 3
 
     dex                                     ;  2
     jmp .crunch_loop                        ;  3
 +
 
-.sprite_rows_fld_loop
-    cpx #0                                  ;  2
-    beq +                                   ;  2 (in this loop)
-    jsr inc_vic_control_y_zone              ; 22 + 6 (jsr)
+;.sprite_rows_fld_loop
+;    cpx #0                                  ;  2
+;    beq +                                   ;  2 (in this loop)
+;    jsr inc_vic_control_y_zone              ; 22 + 6 (jsr)
                                             ;--> 32
-.sprite_rows_fld_wait
-    +wait_loop 44 - 32 - 2 - 3
+;.sprite_rows_fld_wait
+;    +wait_loop 44 - 32 - 2 - 3
 
-    dex                                     ;  2
-    jmp .sprite_rows_fld_loop               ;  3
-+
+;    dex                                     ;  2
+;    jmp .sprite_rows_fld_loop               ;  3
+;+
 
-    ldx HARD_Y
+;    ldx HARD_Y
 
-.sprite_rows_crunch_loop
-    cpx #0                                  ;  2
-    beq +                                   ;  2 (in this loop)
-    jsr inc_vic_control_y_zone              ; 22 + 6 (jsr)
+;.sprite_rows_crunch_loop
+;    cpx #0                                  ;  2
+;    beq +                                   ;  2 (in this loop)
+;    jsr inc_vic_control_y_zone              ; 22 + 6 (jsr)
                                             ;--> 32
-.sprite_rows_crunch_wait
-    +wait_loop 44 - 32 - 2 - 3
+;.sprite_rows_crunch_wait
+;    +wait_loop 44 - 32 - 2 - 3
 
-    dex                                     ;  2
-    jmp .sprite_rows_crunch_loop            ;  3
-+
+;    dex                                     ;  2
+;    jmp .sprite_rows_crunch_loop            ;  3
+;+
     ; ^^^ these are always 25 raster lines ^^^
 
 ;-------------------------------------------------------------------------------
 ;   VSP
 ;-------------------------------------------------------------------------------
-
-    +wait 18
+;+wait 18
     ; make VSP line not a bad line
     inc VIC_CONTROL_Y                       ;6
-    +wait 5                                 ;5
+    +wait 5                                 ;4
     sec                                     ;2
     ; introduce an extra cycle if 39 - HARD_X is odd
 .self_modifying_branch__lsb
@@ -209,7 +217,7 @@ SOFT_Y = *+1
 
 .self_modifying_branch__nops
     ; always true and jump into nop field
-    +bcs                                    ;  3
+    +bcs                                    ;3
     +wait 38                                ;0-38
 
 !if (>IRQ) != (>*) {
@@ -223,84 +231,34 @@ SOFT_Y = *+1
 ;-------------------------------------------------------------------------------
 ; prepare soft scroll
 ;-------------------------------------------------------------------------------
-
     ; reload pre-computed VIC_CONTROL_Y value
     pla
-    sta VIC_CONTROL_Y
+sta VIC_CONTROL_Y
     and #CONTROL_Y_MASK
     pha
 
 ;stx VIC_BORDER    ;4
 
 ;-------------------------------------------------------------------------------
-; use wait time to setup first sprite strip
+; use wait time to setup sprites
 ;-------------------------------------------------------------------------------
-
-    !ifdef DEBUG {
-        ldx #1
-        stx VIC_BORDER
-;        inc VIC_BORDER
-    }
-
-    !if SPRITES > 0 {
-        !for .i, 0, 3 {
-            !set .r = 3-.i
-            ; index
-            ldy SPR_I + .i
-
-            ; y-coord
-            lda SPR_Y, y
-            sta VIC_SPR_0_Y + 4*.r
-            sta VIC_SPR_0_Y + 4*.r + 2
-
-            ; x-coord
-            lda SPR_X, y
-            asl
-            sta VIC_SPR_0_X + 4*.r
-            sta VIC_SPR_0_X + 4*.r + 2
-
-            ; x-coord MSB
-            !if .i != 0 {
-                txa
-            }
-            php
-            rol
-            plp
-            rol
-            tax
-
-            ; colors
-            lda SPR_A, y
-            sta VIC_SPR_0_COLOR + .r*2 + 1
-            lda SPR_B, y
-            sta VIC_SPR_0_COLOR + .r*2
-
-            ; set sprite pointers
-            lda SPR_F, y
-            tay
-            sty SPR_PTR + .r*2 + 1
-            iny
-            sty SPR_PTR + .r*2
-        }
-        stx VIC_SPR_X_MSB
-    }
-
-    !ifdef DEBUG {
-        ldx #2
-        stx VIC_BORDER
-;        dec VIC_BORDER
-    }
 
 ;-------------------------------------------------------------------------------
 ; issue soft scroll
 ;-------------------------------------------------------------------------------
 
+;    lda HARD_X
+;    lsr
+;    bcs +
+;+
+
     pla
     ; wait till end of AGSP region
-    ldy #FIRST_BADLINE+SCR_ROWS+8-1
+;    ldy #FIRST_BADLINE+SCR_ROWS+8
+    ldy #FIRST_BADLINE+SCR_ROWS+8+1
 -
     cpy VIC_RASTER
-    bcs -
+    bne -
 
     ;stx CIA2_DATA_PORT_A
     ;stx $ff00
@@ -336,20 +294,25 @@ rotate
         !zone {
 .check_done
             cpx #SPRITES
-            bne +
-            jmp last_irq
+            bne .next_sprite
+.last_irq
+            ldy VIC_RASTER
+            cpy #$fc
+            bcc +
+            jam
 +
+            ldy #$fc+2
+            sty VIC_RASTER
+            +set16 last_irq, VECTOR_IRQ
+            jmp out
+.next_sprite
             lda VIC_SPR_0_Y + r*4 ; get y position of physical sprite
             clc
             adc #22             ; calculate when sprite will be done, see above diagram
-            bcc +               ; if we overflow we can be sure triggerline is too high
-            jmp last_irq
-+
-;            cmp #$f8            ; $f9 is the last visible line: ensure triggerline < $f8
-            cmp #$f0            ; $f0 ensures enough raster time to prevent jam
-            bcc +
-            jmp last_irq        ; nothing left to do
-+
+            bcs .last_irq       ; if we overflow we can be sure triggerline is too high
+            cmp #$f8            ; $f9 is the last visible line: ensure triggerline < $f8
+            bcs .last_irq       ; nothing left to do
+
             tay                 ; y = triggerline for next sprite
             sbc VIC_RASTER      ; a = triggerline - rasterline - 1 (omit sec)
             bcc .display_sprite ; rasterline >= triggerline: display next sprite
@@ -389,7 +352,10 @@ rotate
             ; are we too late?
             cmp VIC_RASTER
             bcs .do_display_sprite
-            bcc .check_done
+            lda #$f8
+            cmp VIC_RASTER
+            bcc .last_irq
+            jmp .check_done
 
 .do_display_sprite
             sta VIC_SPR_0_Y + r*4
@@ -437,6 +403,9 @@ rotate
 ;-------------------------------------------------------------------------------
 
 last_irq
+    sta restore_regs + 1
+    stx restore_regs + 3
+    sty restore_regs + 5
 !ifdef DEBUG {
     lda #10
     sta VIC_BORDER
