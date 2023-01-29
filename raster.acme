@@ -2,7 +2,7 @@
     !warn "bytes wasted: ", IRQ-*
 }
 
-;inc_vic_control_y_zone !zone {
+!if SPRITES = 0 {
 !macro inc_vic_control_y_zone {
     lda VIC_CONTROL_Y                       ;  4
     clc                                     ;  2
@@ -10,9 +10,19 @@
     and #%00000111                          ;  2
     adc #CONTROL_Y_INVALID                  ;  2
     sta VIC_CONTROL_Y                       ;  4
+}
+} else {
+inc_vic_control_y_zone !zone {
+    lda VIC_CONTROL_Y                       ;  4
+    clc                                     ;  2
+    adc #1                                  ;  2
+    and #%00000111                          ;  2
+    adc #CONTROL_Y_INVALID                  ;  2
+    sta VIC_CONTROL_Y                       ;  4
 
-;    rts                                     ;  6
+    rts                                     ;  6
 }                                           ;--> 22
+}
 
 !align 255, 0
 IRQ !zone {
@@ -106,8 +116,11 @@ SOFT_X = *+1
     ; wobble check from above               ;-->  3
 
     ; make FIRST_BADLINE a bad line
+!if SPRITES = 0 {
     lda #CONTROL_Y_INVALID                  ;  2
-;    lda CTRL_Y_INVALID                      ;  3
+} else {
+    lda CTRL_Y_INVALID                      ;  3
+}
     sta VIC_CONTROL_Y                       ;  4
                                             ;-->  7; 6
 
@@ -130,9 +143,9 @@ SOFT_Y = *+1
     pha                                     ;  3
                                             ;--> 14; 13
 
-
+!if SPRITES = 0 {
 +wait_loop 63 - 3 - 6 - 8 - 13 - 20 - 4
-
+}
 
 ;-------------------------------------------------------------------------------
 ;   FLD & line crunch
@@ -141,16 +154,16 @@ SOFT_Y = *+1
 .fld_loop
     cpx #0                                  ;  2
     beq +                                   ;  2 (in this loop)
-;    jsr inc_vic_control_y_zone              ; 22 + 6 (jsr)
-    +inc_vic_control_y_zone              ; 22 + 6 (jsr)
-                                            ;--> 32
-
-;    lda VIC_RASTER                          ;  4
-;    cmp #SPRITES_TOP                        ;  2
-;    bcs .sprite_rows_fld_wait               ;  2/3
-
-;    +wait_loop 63 - 32 - 2 - 3 - 4 - 2 - 2
+!if SPRITES = 0 {
+    +inc_vic_control_y_zone                 ; 16
     +wait_loop 63 - 20 - 2 - 3
+} else {
+    jsr inc_vic_control_y_zone              ; 22 + 6 (jsr)
+    lda VIC_RASTER                          ;  4
+    cmp #SPRITES_TOP                        ;  2
+    bcs .sprite_rows_fld_wait               ;  2/3
+    +wait_loop 63 - 32 - 2 - 3 - 4 - 2 - 2
+}                                           ;--> 32
 
     dex                                     ;  2
     jmp .fld_loop                           ;  3
@@ -161,55 +174,60 @@ SOFT_Y = *+1
 .crunch_loop
     cpx #0                                  ;  2
     beq +                                   ;  2 (in this loop)
-;    jsr inc_vic_control_y_zone              ; 22 + 6 (jsr)
-    +inc_vic_control_y_zone              ; 22 + 6 (jsr)
-                                            ;--> 32
-
-;    lda VIC_RASTER                          ;  4
-;    cmp #SPRITES_TOP                        ;  2
-;    bcs .sprite_rows_crunch_wait            ;  2/3
-
-;    +wait_loop 63 - 32 - 2 - 3 - 4 - 2 - 2
+!if SPRITES = 0 {
+    +inc_vic_control_y_zone                 ; 16
     +wait_loop 63 - 20 - 2 - 3
+} else {
+    jsr inc_vic_control_y_zone              ; 22 + 6 (jsr)
+    lda VIC_RASTER                          ;  4
+    cmp #SPRITES_TOP                        ;  2
+    bcs .sprite_rows_crunch_wait            ;  2/3
+    +wait_loop 63 - 32 - 2 - 3 - 4 - 2 - 2
+}                                           ;--> 32
 
     dex                                     ;  2
     jmp .crunch_loop                        ;  3
 +
 
-;.sprite_rows_fld_loop
-;    cpx #0                                  ;  2
-;    beq +                                   ;  2 (in this loop)
-;    jsr inc_vic_control_y_zone              ; 22 + 6 (jsr)
+!if SPRITES != 0 {
+.sprite_rows_fld_loop
+    cpx #0                                  ;  2
+    beq +                                   ;  2 (in this loop)
+    jsr inc_vic_control_y_zone              ; 22 + 6 (jsr)
                                             ;--> 32
-;.sprite_rows_fld_wait
-;    +wait_loop 44 - 32 - 2 - 3
+.sprite_rows_fld_wait
+    +wait_loop 44 - 32 - 2 - 3
 
-;    dex                                     ;  2
-;    jmp .sprite_rows_fld_loop               ;  3
-;+
+    dex                                     ;  2
+    jmp .sprite_rows_fld_loop               ;  3
++
 
-;    ldx HARD_Y
+    ldx HARD_Y
 
-;.sprite_rows_crunch_loop
-;    cpx #0                                  ;  2
-;    beq +                                   ;  2 (in this loop)
-;    jsr inc_vic_control_y_zone              ; 22 + 6 (jsr)
+.sprite_rows_crunch_loop
+    cpx #0                                  ;  2
+    beq +                                   ;  2 (in this loop)
+    jsr inc_vic_control_y_zone              ; 22 + 6 (jsr)
                                             ;--> 32
-;.sprite_rows_crunch_wait
-;    +wait_loop 44 - 32 - 2 - 3
+.sprite_rows_crunch_wait
+    +wait_loop 44 - 32 - 2 - 3
 
-;    dex                                     ;  2
-;    jmp .sprite_rows_crunch_loop            ;  3
-;+
+    dex                                     ;  2
+    jmp .sprite_rows_crunch_loop            ;  3
++
+}
     ; ^^^ these are always 25 raster lines ^^^
 
 ;-------------------------------------------------------------------------------
 ;   VSP
 ;-------------------------------------------------------------------------------
-;+wait 18
     ; make VSP line not a bad line
     inc VIC_CONTROL_Y                       ;6
-    +wait 5                                 ;4
+!if SPRITES = 0 {
+    +wait 5                                 ;5
+} else {
+    +wait 4                                 ;4
+}
     sec                                     ;2
     ; introduce an extra cycle if 39 - HARD_X is odd
 .self_modifying_branch__lsb
