@@ -50,7 +50,7 @@ JOYSTICK !zone {
     ldx CUR_SPR
 ;!ifdef DEVELOP {
     ldy SPR_Y, x
-    cpy #$fa
+    cpy #$e5
     beq .up
 ;}
     cpy #SPRITES_TOP

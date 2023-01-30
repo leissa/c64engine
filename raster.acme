@@ -315,11 +315,11 @@ rotate
             bne .next_sprite
 .last_irq
             ldy VIC_RASTER
-            cpy #$fc
+            cpy #$f0
             bcc +
             jam
 +
-            ldy #$fc+2
+            ldy #$f0+2
             sty VIC_RASTER
             +set16 last_irq, VECTOR_IRQ
             jmp out
@@ -328,7 +328,7 @@ rotate
             clc
             adc #22             ; calculate when sprite will be done, see above diagram
             bcs .last_irq       ; if we overflow we can be sure triggerline is too high
-            cmp #$f8            ; $f9 is the last visible line: ensure triggerline < $f8
+            cmp #$e5            ; $f9 is the last visible line: ensure triggerline < $f8
             bcs .last_irq       ; nothing left to do
 
             tay                 ; y = triggerline for next sprite
@@ -370,7 +370,7 @@ rotate
             ; are we too late?
             cmp VIC_RASTER
             bcs .do_display_sprite
-            lda #$f8
+            lda #$e5
             cmp VIC_RASTER
             bcc .last_irq
             jmp .check_done
@@ -534,7 +534,7 @@ last_irq
     bmi +
     cmp #LINE_0-1 ; ok if VIC_RASTER < LINE_0-1
     bcc +
-;    jam ; if there is too little time, stop execution
+    jam ; if there is too little time, stop execution
 +
 }
 
