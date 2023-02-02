@@ -336,7 +336,6 @@ COPY_TILES !zone {
 COPY_ROW_TILES !zone {
     ldy R_COPY
     bne .check_copy_row_tiles1
-;jsr COPY_TILES
     rts
 .check_copy_row_tiles1
     dey

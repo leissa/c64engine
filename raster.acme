@@ -96,10 +96,6 @@ SOFT_X = *+1
     sta VIC_CONTROL_X                       ;  4
                                             ;--> 10
 
-    ; switch to VIC bank 0
-    ;inc CIA2_DATA_PORT_A                    ;  6
-    ;inc $ff00
-
     +wait 63-11-12-11-10-6
 
     ; wobble check
@@ -144,7 +140,7 @@ SOFT_Y = *+1
                                             ;--> 14; 13
 
 !if SPRITES = 0 {
-+wait_loop 63 - 3 - 6 - 8 - 13 - 20 - 4
+    +wait_loop 63 - 3 - 6 - 8 - 13 - 20 - 4
 }
 
 ;-------------------------------------------------------------------------------
@@ -160,7 +156,7 @@ SOFT_Y = *+1
 } else {
     jsr inc_vic_control_y_zone              ; 22 + 6 (jsr)
     lda VIC_RASTER                          ;  4
-    cmp #SPRITES_TOP                        ;  2
+    cmp #SPRITES_TOP_Y                      ;  2
     bcs .sprite_rows_fld_wait               ;  2/3
     +wait_loop 63 - 32 - 2 - 3 - 4 - 2 - 2
 }                                           ;--> 32
@@ -180,7 +176,7 @@ SOFT_Y = *+1
 } else {
     jsr inc_vic_control_y_zone              ; 22 + 6 (jsr)
     lda VIC_RASTER                          ;  4
-    cmp #SPRITES_TOP                        ;  2
+    cmp #SPRITES_TOP_Y                      ;  2
     bcs .sprite_rows_crunch_wait            ;  2/3
     +wait_loop 63 - 32 - 2 - 3 - 4 - 2 - 2
 }                                           ;--> 32
@@ -251,7 +247,7 @@ SOFT_Y = *+1
 ;-------------------------------------------------------------------------------
     ; reload pre-computed VIC_CONTROL_Y value
     pla
-sta VIC_CONTROL_Y
+    sta VIC_CONTROL_Y
     and #CONTROL_Y_MASK
     pha
 
@@ -261,25 +257,19 @@ sta VIC_CONTROL_Y
 ; use wait time to setup sprites
 ;-------------------------------------------------------------------------------
 
+    ; todo
+
 ;-------------------------------------------------------------------------------
 ; issue soft scroll
 ;-------------------------------------------------------------------------------
 
-;    lda HARD_X
-;    lsr
-;    bcs +
-;+
-
     pla
     ; wait till end of AGSP region
-;    ldy #FIRST_BADLINE+SCR_ROWS+8
     ldy #FIRST_BADLINE+SCR_ROWS+8+1
 -
     cpy VIC_RASTER
     bne -
 
-    ;stx CIA2_DATA_PORT_A
-    ;stx $ff00
     sta VIC_CONTROL_Y
 
 ;-------------------------------------------------------------------------------
@@ -314,11 +304,13 @@ rotate
             cpx #SPRITES
             bne .next_sprite
 .last_irq
+!ifdef DEVELOP {
             ldy VIC_RASTER
             cpy #$f0
             bcc +
             jam
 +
+}
             ldy #$f0+2
             sty VIC_RASTER
             +set16 last_irq, VECTOR_IRQ
@@ -328,7 +320,7 @@ rotate
             clc
             adc #22             ; calculate when sprite will be done, see above diagram
             bcs .last_irq       ; if we overflow we can be sure triggerline is too high
-            cmp #$e5            ; $f9 is the last visible line: ensure triggerline < $f8
+            cmp #SPRITES_MAX_Y  ; $f9 is the last visible line: ensure triggerline < $f8
             bcs .last_irq       ; nothing left to do
 
             tay                 ; y = triggerline for next sprite
@@ -370,7 +362,7 @@ rotate
             ; are we too late?
             cmp VIC_RASTER
             bcs .do_display_sprite
-            lda #$e5
+            lda #SPRITES_MAX_Y
             cmp VIC_RASTER
             bcc .last_irq
             jmp .check_done
@@ -440,7 +432,7 @@ last_irq
 }
     jsr PLAY_SONG
 
-    !if SPRITES > 0 {
+    !if SPRITES != 0 {
         !for .i, 0, 3 {
             !set .r = 3-.i
             ; index

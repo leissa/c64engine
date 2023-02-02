@@ -48,12 +48,10 @@ JOYSTICK !zone {
     pla
 
     ldx CUR_SPR
-;!ifdef DEVELOP {
     ldy SPR_Y, x
-    cpy #$e5
+    cpy #SPRITES_MAX_Y
     beq .up
-;}
-    cpy #SPRITES_TOP
+    cpy #SPRITES_TOP_Y
     beq .up
     inc SPR_Y, x
 
@@ -64,12 +62,10 @@ JOYSTICK !zone {
     jsr SCROLL_U
 
     ldx CUR_SPR
-;!ifdef DEVELOP {
     ldy SPR_Y, x
     cpy #FIRST_BADLINE+SCR_ROWS
     beq .exit
-;}
-    cpy #SPRITES_TOP
+    cpy #SPRITES_TOP_Y
     beq .exit
     dec SPR_Y, x
 
