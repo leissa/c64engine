@@ -32,8 +32,12 @@ MAP_HEIGHT          = 96
 SPRITES             = 24 ; at least 4
 SPRITES_TOP         = 60 ; somewhere between 55 and 60
 TILES               = 185 ; TODO: calculate this with pixels.bin size / 8 / TILE_COLS / TILE_ROWS
-COPY_COL_FRAMES     = 4; 3; 2; must be 2 for SCROLL_SPEED 2
-COPY_ROW_FRAMES     = 2; 3; must be 2 for SCROLL_SPEED 2
+COPY_ROW_FRAMES     = 2
+!if SCROLL_SPEED = 2 {
+COPY_COL_FRAMES     = 2
+} else {
+COPY_COL_FRAMES     = 4
+}
 
 *=SPR_DATA
 
