@@ -111,15 +111,11 @@ SCROLL_U !zone {
 
 .check_copy_tiles
 ;   lda SOFT_Y
-    !if SCROLL_SPEED = 2 { cmp #2 } else { cmp #3 }
+    !if SCROLL_SPEED = 2 { cmp #2 } else { cmp #2 } ;#3 } ;#0 }
     beq .prepare_copy_tiles
     rts
 .prepare_copy_tiles
-!if SCROLL_SPEED = 2 {
-    lda #2
-} else {
-    lda #4
-}
+    lda #COPY_COL_FRAMES
     sta C_COPY
 
     lda TILE_ROW
@@ -163,15 +159,11 @@ SCROLL_D !zone {
 
 .check_copy_tiles
 ;   lda SOFT_Y
-    cmp #4
+    cmp #3;4;1
     beq .prepare_copy_tiles
     rts
 .prepare_copy_tiles
-!if SCROLL_SPEED = 2 {
-    lda #2
-} else {
-    lda #4
-}
+    lda #COPY_COL_FRAMES
     sta C_COPY
 
     lda TILE_ROW
@@ -224,15 +216,11 @@ SCROLL_L !zone {
 
 .check_copy_tiles
 ;   lda SOFT_X
-    cmp #4
+    cmp #3;4;2
     beq .prepare_copy_tiles
     rts
 .prepare_copy_tiles
-!if SCROLL_SPEED = 2 {
-    lda #2
-} else {
-    lda #4
-}
+    lda #COPY_ROW_FRAMES
     sta R_COPY
 
     lda TILE_COL
@@ -282,15 +270,11 @@ SCROLL_R !zone {
 
 .check_copy_tiles
 ;   lda SOFT_X
-    !if SCROLL_SPEED = 2 { cmp #2 } else { cmp #3 }
+    !if SCROLL_SPEED = 2 { cmp #2 } else { cmp #2 } ; 3 } ;#1 }
     beq .prepare_copy_tiles
     rts
 .prepare_copy_tiles
-!if SCROLL_SPEED = 2 {
-    lda #2
-} else {
-    lda #4
-}
+    lda #COPY_ROW_FRAMES
     sta R_COPY
 
     lda TILE_COL

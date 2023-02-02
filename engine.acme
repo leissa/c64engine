@@ -22,7 +22,7 @@
 
 CONTROL_Y_MASK      = %10111111 ; bitmap mode
 LINE_0              = FIRST_BADLINE-3
-SCROLL_SPEED        = 2 ; supported are 1 or 2
+SCROLL_SPEED        = 1 ; supported are 1 or 2
 TILE_COLS           = 3
 TILE_ROWS           = 2
 SCR_COLS            = 40
@@ -30,8 +30,10 @@ SCR_ROWS            = 25
 MAP_WIDTH           = 256 ; assumed by the code, no other widths supported atm.
 MAP_HEIGHT          = 96
 SPRITES             = 24 ; at least 4
-SPRITES_TOP         = $3c; 60; somewhere between 55 and 60
+SPRITES_TOP         = 60 ; somewhere between 55 and 60
 TILES               = 185 ; TODO: calculate this with pixels.bin size / 8 / TILE_COLS / TILE_ROWS
+COPY_COL_FRAMES     = 4; 3; 2; must be 2 for SCROLL_SPEED 2
+COPY_ROW_FRAMES     = 2; 3; must be 2 for SCROLL_SPEED 2
 
 *=SPR_DATA
 

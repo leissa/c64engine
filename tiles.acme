@@ -296,39 +296,23 @@ copy_tile_char5 !zone { +copy_tile_char 5 }
 
 copy_col_tiles1 !zone {
     +init_pointers 1
-!if SCROLL_SPEED = 2 {
-    +copy_tile_chars 1, 20
-} else {
-    +copy_tile_chars 1, 10
-}
+    +copy_tile_chars 1, SCROLL_COLS / COPY_COL_FRAMES
     rts
 }
 
 copy_col_tiles2 !zone {
-!if SCROLL_SPEED = 2 {
-    +copy_tile_chars 1, 20
-} else {
-    +copy_tile_chars 1, 10
-}
+    +copy_tile_chars 1, SCROLL_COLS / COPY_COL_FRAMES + ((SCROLL_COLS % COPY_COL_FRAMES) != 0)
     rts
 }
 
 copy_row_tiles1 !zone {
     +init_pointers SCR_COLS
-!if SCROLL_SPEED = 2 {
-    +copy_tile_chars SCR_COLS, 11
-} else {
-    +copy_tile_chars SCR_COLS, 5
-}
+    +copy_tile_chars SCR_COLS, SCROLL_ROWS / COPY_ROW_FRAMES
     rts
 }
 
 copy_row_tiles2 !zone {
-!if SCROLL_SPEED = 2 {
-    +copy_tile_chars SCR_COLS, 12
-} else {
-    +copy_tile_chars SCR_COLS, 6
-}
+    +copy_tile_chars SCR_COLS, SCROLL_ROWS / COPY_ROW_FRAMES + ((SCROLL_ROWS % COPY_ROW_FRAMES) != 0)
     rts
 }
 
@@ -340,11 +324,7 @@ COPY_TILES !zone {
 .check_copy_col_tiles1
     dey
     sty C_COPY
-!if SCROLL_SPEED = 2 {
-    cpy #1
-} else {
-    cpy #3
-}
+    cpy #COPY_COL_FRAMES-1
     bne .check_copy_col_tiles2
     jsr copy_col_tiles1
     rts
@@ -356,15 +336,12 @@ COPY_TILES !zone {
 COPY_ROW_TILES !zone {
     ldy R_COPY
     bne .check_copy_row_tiles1
+;jsr COPY_TILES
     rts
 .check_copy_row_tiles1
     dey
     sty R_COPY
-!if SCROLL_SPEED = 2 {
-    cpy #1
-} else {
-    cpy #3
-}
+    cpy #COPY_ROW_FRAMES-1
     bne .check_copy_row_tiles2
     jsr copy_row_tiles1
     rts
