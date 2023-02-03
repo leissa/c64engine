@@ -184,19 +184,19 @@ SPR_F
     stx VIC_BACKGROUND_0
     stx VIC_BORDER
 
-    ldx #0
+    ldx #2
     stx TILE_COL
     ldx #1
     stx TILE_ROW
 
 ;    ldx #<TILE_MAP
 ;    ldx #$80
-    ldx #$f3
+    ldx #$7b
     stx C_MAP_POS_LO
     stx R_MAP_POS_LO
 ;    ldx #>TILE_MAP
 ;    ldx #$40
-    ldx #$42
+    ldx #$22
     stx C_MAP_POS_HI
     stx R_MAP_POS_HI
 
@@ -211,8 +211,6 @@ SPR_F
     stx R_PIX_POS_HI
     ;----------------------------------
 
-    +clear_screen 0, SCREEN
-
 ;-------------------------------------------------------------------------------
 ;   setup sound
 ;-------------------------------------------------------------------------------
@@ -221,7 +219,7 @@ SPR_F
     jsr INIT_SONG
 
 ;-------------------------------------------------------------------------------
-;   load map data
+;   load map data and initialize screen
 ;-------------------------------------------------------------------------------
 
 !ifndef DEVELOP {
@@ -271,6 +269,8 @@ tile_pix
     bcs .load_error
 }
 
+    jsr init_screen
+
 ;-------------------------------------------------------------------------------
 ;   setup raster irq
 ;-------------------------------------------------------------------------------
@@ -299,6 +299,24 @@ tile_pix
 !source "joystick.acme"
 !source "raster.acme"
 !source "tiles.acme"
+
+init_screen !zone {
+    lda #(8*SCR_COLS/SCROLL_SPEED % 256)
+    sta INIT_SCREEN_LO
+    lda #1+(8*SCR_COLS/SCROLL_SPEED / 256)
+    sta INIT_SCREEN_HI
+-
+    jsr SCROLL_L
+    jsr COPY_TILES
+    dec INIT_SCREEN_LO
+    bne -
+    lda #$ff
+    sta INIT_SCREEN_LO
+    dec INIT_SCREEN_HI
+    bne -
+
+    rts
+}
 
 !ifdef DEBUG {
     !warn "code ends on: ", *-1
