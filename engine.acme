@@ -1,4 +1,6 @@
-;!to "engine.prg", cbm   ; output program
+!ifdef DEVELOP {
+!to "engine.prg", cbm   ; output program
+}
 !sl "labels.l"          ; create label file for vice
 !convtab scr            ; for conversion to c64 screen codes
 
@@ -6,7 +8,9 @@
 !source "lib/vic.acme"
 !source "lib/cia.acme"
 !source "lib/std.acme"
+!ifndef DEVELOP {
 !source "krill/loader/build/loadersymbols-c64.inc"
+}
 
 !ifdef DEBUG {
     CONTROL_X           = %00011000 ; 40 cols
@@ -18,22 +22,31 @@
 
 CONTROL_Y_MASK      = %10111111 ; bitmap mode
 LINE_0              = FIRST_BADLINE-3
-;SCROLL_SPEED        = 2
-SCROLL_SPEED        = 1
-TILE_COLS           = 3
-TILE_ROWS           = 2
-SCR_COLS            = 40
-SCR_ROWS            = 25
-MAP_WIDTH           = 256
-MAP_HEIGHT          = 96
-SPRITES             = 24
+SCROLL_SPEED        = 1 ; supported are 1 or 2
+TILE_COLS           = 3 ; 40 - 1 / 3 = whole number = 13
+TILE_ROWS           = 2 ; 23 - 1 / 2 = whole number = 11
+SCR_COLS            = 40 ; horizontal screen chars in memory. the screen is in 38x24 mode
+SCR_ROWS            = 25 ; vertical screen chars in memory. the screen is in 38x24 mode
+MAP_WIDTH           = 256 ; assumed by the code, no other widths supported atm
+MAP_HEIGHT          = 96 ; not really used in the code, but good to know nonetheless
+SPRITES             = 24 ; 0 or at least 4 as this number includes the sprites in the crunch area
+SPRITES_TOP_Y       = 60 ; sprite position in fld/crunch area, can be somewhere between 55 and 60
+SPRITES_MAX_Y       = 229 ; the lower, the more off-screen raster time we have to do other things
+TILES               = 185 ; TODO: calculate this with pixels.bin size / 8 / TILE_COLS / TILE_ROWS
+COPY_ROW_FRAMES     = 2 ; use 2 frames to copy all rows, vertically
+!if SCROLL_SPEED = 2 {
+COPY_COL_FRAMES     = 2 ; use 2 frames to copy all cols, horizontally
+} else {
+COPY_COL_FRAMES     = 4 ; use 4 frames to copy all cols, horizontally
+}
 
 *=SPR_DATA
 
 _spr_y
-    !by $fa, $f8, $f6, $f4, $da, $d8, $d6, $d4, $ba, $b8, $b6, $b4, $9a, $98, $96, $94, $7a, $78, $76, $74, $5a, $58, $56, $54
+    !by SPRITES_TOP_Y, SPRITES_TOP_Y, SPRITES_TOP_Y, SPRITES_TOP_Y
+    !by $64, $66, $68, $6a, $84, $86, $88, $8a, $a4, $a6, $a8, $aa, $c0, $c2, $c4, $c6, $e5, $e5, $e5, $e5
 SPR_X
-    !by $10, $20, $30, $40, $50, $60, $70, $80, $10, $20, $30, $40, $50, $60, $70, $80, $10, $20, $30, $40, $50, $60, $70, $80
+    !by $20, $40, $60, $80, $50, $60, $70, $80, $10, $20, $30, $40, $50, $60, $70, $80, $10, $20, $30, $40, $50, $60, $70, $80
 SPR_A
     !by $0a, $0a, $02, $03, $04, $05, $06, $07, $08, $09, $0a, $0a, $0a, $0d, $0e, $0f, $00, $01, $02, $03, $04, $05, $06, $07
 SPR_B
@@ -54,6 +67,7 @@ SPR_F
 ;   install 1541 code (credits for the disk loader go to Krill)
 ;-------------------------------------------------------------------------------
 
+!ifndef DEVELOP {
     jsr install
     bcc +
     ldx #0
@@ -62,6 +76,7 @@ SPR_F
     stx $d020
     jmp -
 +
+}
 
 ;-------------------------------------------------------------------------------
 ;   disable all basic, kernal and irq crap
@@ -103,6 +118,7 @@ SPR_F
 ;   copy loader code to work area $0200 ~ $0400
 ;-------------------------------------------------------------------------------
 
+!ifndef DEVELOP {
     ; copy 2 pages
     ldy #2
     ldx #0
@@ -115,6 +131,7 @@ SPR_F
     inc .copy_loop + 5
     dey
     bne .copy_loop
+}
 
 ;-------------------------------------------------------------------------------
 ;   setup VIC
@@ -137,23 +154,31 @@ SPR_F
 ;   setup test stuff
 ;-------------------------------------------------------------------------------
 
-    !for .i, 0, SPRITES-1 {
-        lda _spr_y + .i
-        sta SPR_Y + .i
-        lda #.i
-        sta SPR_I + .i
+    !if SPRITES > 0 {
+        !for .i, 0, SPRITES-1 {
+            lda _spr_y + .i
+            sta SPR_Y + .i
+            lda #.i
+            sta SPR_I + .i
+        }
     }
 
+    !if SPRITES < 4 {
+        ldx #$ff-(2^(8-(2*SPRITES))-1)
+    } else {
+        ldx #$ff
+    }
+    stx VIC_SPR_ENABLE
+
     ;---can be done at compile time?---
+    ldx #CONTROL_Y_INVALID
+    stx CTRL_Y_INVALID
+
     ldx #0
-    stx IGNORE_DIR
-    stx IGNORE_COUNT
+    stx C_COPY
+    stx R_COPY
     stx SCROLL_U_D
     stx SCROLL_L_R
-
-    ldx #$ff
-    stx C_COPY_PIX
-    stx R_COPY_PIX
 
     ldx #COLOR_BLACK
     stx VIC_BACKGROUND_0
@@ -196,45 +221,10 @@ SPR_F
     jsr INIT_SONG
 
 ;-------------------------------------------------------------------------------
-;   setup multiplication tables
-;-------------------------------------------------------------------------------
-
-!macro multiplication_table .multiplier, .address_lo, .address_hi {
-    ldx #0
-
-.multiply_next_entry
-    stx TEMP_HI
-    ldy #.multiplier
-    sty TEMP_LO
-
-    lda #0
-    ldy #8
-    lsr TEMP_LO
-.add
-    bcc .rotate
-    clc
-    adc TEMP_HI
-.rotate
-    ror
-    ror TEMP_LO
-    dey
-    bne .add
-
-    sta .address_hi, x
-    lda TEMP_LO
-    sta .address_lo, x
-
-    inx
-    bne .multiply_next_entry
-}
-
-    +multiplication_table TILE_COLS*TILE_ROWS, MTABLE_TILES_LO, MTABLE_TILES_HI
-    +multiplication_table TILE_COLS*TILE_ROWS*8, MTABLE_BYTES_LO, MTABLE_BYTES_HI
-
-;-------------------------------------------------------------------------------
 ;   load map data
 ;-------------------------------------------------------------------------------
 
+!ifndef DEVELOP {
     jmp .load
 
 .load_error
@@ -279,6 +269,7 @@ tile_pix
     ldy #>tile_pix
     jsr loadcompd
     bcs .load_error
+}
 
 ;-------------------------------------------------------------------------------
 ;   setup raster irq
@@ -292,7 +283,6 @@ tile_pix
     +set 1, VIC_IRQ_CONTROL
     ; enable IRQs
     cli
-
 -
     ; some 7 cycle garbage instructions
     lda ($f0), y
@@ -317,23 +307,27 @@ tile_pix
 *=SONG_DATA
 !bin "snd/transylvanian.bin"
 
-*=DISK_LOADER_SRC;
+!ifndef DEVELOP {
+*=DISK_LOADER_SRC
 !bin "krill/loader/build/loader-c64.prg",,2
 
 *=DISK_INSTALLER
 !bin "krill/loader/build/install-c64.prg",,2
+}
 
-;*=TILE_MAP
-;!bin "map.bin"
+!ifdef DEVELOP {
+*=TILE_MAP
+!bin "map.bin"
 
-;*=TILE_CLR
-;!bin "colors.bin"
+*=TILE_CLR
+!bin "colors.bin"
 
-;*=TILE_SCR
-;!bin "screen.bin"
+*=TILE_SCR
+!bin "screen.bin"
 
-;*=TILE_PIX
-;!bin "pixels.bin"
+*=TILE_PIX
+!bin "pixels.bin"
+}
 
 *=SPR_FR
 !bin "spr/hero.raw", 64*4

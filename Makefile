@@ -4,7 +4,7 @@ CONFIG ?= config.default
 OUT       ?= engine
 D64       ?= $(OUT).d64
 KRILL     ?= ./krill
-KRILL_URL ?= "https://krill.e2m.io/loader-v184.zip"
+KRILL_URL ?= "http://csdb.dk/getinternalfile.php/196649/loader-v184.zip"
 INC       ?= $(KRILL)/loader/build/loadersymbols-c64.inc
 CC1541    ?= $(KRILL)/loader/tools/cc1541/cc1541
 EXO       ?= $(KRILL)/loader/tools/exomizer-3/src/exomizer
@@ -30,7 +30,7 @@ all: $(D64)
 
 $(INC):
 	@echo '===> INSTALL KRILL LOADER'
-	$(Q)$(WGET)  $(KRILL_URL) -O krill.zip
+	$(Q)$(WGET) $(KRILL_URL) -O krill.zip
 	$(Q)$(MKDIR) $(KRILL)
 	$(Q)$(UNZIP) krill.zip -d $(KRILL)
 	$(Q)$(MAKE)  -C $(KRILL)/loader
@@ -73,4 +73,14 @@ distclean: clean
 
 run: $(D64)
 	@echo '===> RUN $<'
-	$(Q)$(X64) -device8 0 +iecdevice8 -truedrive -8 $(D64)
+	$(Q)$(X64) -device8 0 +iecdevice8 -drive8truedrive -8 $(D64)
+
+dev:
+	@echo '===> DEV'
+	rm -f engine.prg
+	$(Q)$(ACME) -DSYSTEM=64 -DDEVELOP=1 -DDEBUG=1 engine.acme
+
+prg:
+	@echo '===> PRG'
+	rm -f engine.prg
+	$(Q)$(ACME) -DSYSTEM=64 -DDEVELOP=1 engine.acme
