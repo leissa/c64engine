@@ -57,7 +57,7 @@ $(EXO): $(INC)
 
 %.tc: %.prg $(INC)
 	@echo '===> TC $<'
-	$(Q)$(TC) -i $< $@
+	$(Q)$(PYTHON) $(TC) -i $< $@
 
 $(D64): $(CC1541) $(ENGINE_TC) $(ENGINE_EXO)
 	@echo '===> CC1541 $@'
@@ -73,7 +73,7 @@ distclean: clean
 
 run: $(D64)
 	@echo '===> RUN $<'
-	$(Q)$(X64) -device8 0 +iecdevice8 -drive8truedrive -8 $(D64)
+	$(Q)$(X64) $(D64)
 
 dev:
 	@echo '===> DEV'

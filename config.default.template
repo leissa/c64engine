@@ -1,6 +1,7 @@
 ACME   := /usr/bin/acme
 MAKE   := /usr/bin/make
 MKDIR  := /usr/bin/mkdir
+PYTHON := python3
 UNZIP  := /usr/bin/unzip
 WGET   := /usr/bin/wget
-X64    := /usr/bin/x64sc
+X64    := /usr/bin/x64
