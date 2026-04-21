@@ -30,7 +30,7 @@ Use joystick in port 2 to run the demo.
 
 ## Features
 
-* Bitmap scrolling using [AGSP](http://codebase64.org/doku.php?id=base:agsp_any_given_screen_position)
+* Bitmap scrolling using [AGSP](https://codebase64.net/doku.php?id=base:agsp_any_given_screen_position)
 
     This technique only requires 36 raster lines CPU time and 33 raster lines of screen space. All other screen space - including screen memory (used for colors ```%01``` and ```%10```) and color ram (color ```%11```) is moved around as well.
 
