@@ -106,9 +106,24 @@ reset !zone {
     lda #$15
     sta VIC_ADDR_SELECT
 
-    ; screen off until the engine takes over, so the copy stays invisible
-    lda #0
+    ; Screen off until the engine takes over, so the copy stays invisible -- but
+    ; RSEL must be left *set*, the same way the KERNAL leaves $1b here.
+    ;
+    ; The engine rewrites VIC_CONTROL_Y several times per frame and always with
+    ; RSEL clear, so this looks like it cannot matter, and under x64sc it does
+    ; not.  Under x64 booting with RSEL clear gets you a 25 row display window --
+    ; four extra raster lines at the top and bottom, which show as the FLD band
+    ; above and one row too much map below, wobbling as the AGSP shifts.  Leaving
+    ; RSEL set here reproduces the state the engine was written against and the
+    ; window is 24 rows again.  DEN makes no difference either way, so it stays
+    ; clear and the copy stays hidden.
+    ;
+    ; Same failure mode as VIC_CONTROL_X above, and the same reason it was never
+    ; seen from disk: this is a register the engine never writes with RSEL set,
+    ; so whatever the boot leaves is what the very first frames run with.
+    lda #%00001011          ; RSEL, no DEN -- the KERNAL's $1b without the display
     sta VIC_CONTROL_Y
+    lda #0
     sta VIC_BORDER
     sta VIC_BACKGROUND_0
 

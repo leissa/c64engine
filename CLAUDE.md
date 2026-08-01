@@ -128,6 +128,13 @@ sprite starting before `SPRITES_TOP_Y` and the 44-cycle crunch path mistimes.  T
 enforces.  `SPR_X` is half resolution (`last_irq` does an `asl`), so it only steps on every second pixel of camera
 travel.
 
+**Recycling a sprite must reposition it in `SPR_I` by hand.**  Shifting every sprite by the same amount leaves the
+sorted order intact, but a sprite that wraps travels from one end of the Y range to the other and has to travel the
+whole length of `SPR_I` with it.  Left to the insertion sort in `last_irq` that is its O(n²) case, and it cost **~26 of
+the 47 raster lines** of off-screen budget for a single wrap — measured, not estimated.  So the wrap moves the entry in
+`SPR_I` directly and the sort then finds nothing to do.  `SPR_WRAP_MARGIN` exists because the order read there is the
+one sorted at the end of the *previous* frame, so a wrap can be noticed a frame or two late.
+
 The tunable constraints that used to be comments are now `!error` assertions at the top of the file:
 `(SCROLL_ROWS-1) % TILE_ROWS` and `(SCROLL_COLS-1) % TILE_COLS` must be zero, because the direction-reversal cursor
 jump is expressed in tiles and ACME's division truncates.
@@ -188,6 +195,12 @@ Two that already bit:
 - **CIA2 `DDRA` must be `$3f`.**
   Otherwise the engine's `sta CIA2_DATA_PORT_A` hits an all-inputs port, the VIC keeps
   reading bank 0, and you get a screen of structured garbage that looks like a corrupt copy but isn't.
+- **`VIC_CONTROL_Y` must be left with RSEL set**, the way the KERNAL leaves `$1b`.
+  The engine rewrites `$d011` several times per frame and always with RSEL clear, so this looks like it cannot
+  matter — and under `x64sc` it does not.  Under `x64` booting with RSEL clear produces a **25-row display window**:
+  four extra raster lines top and bottom, showing the FLD band above and one row too much map below, which reads as
+  the bottom border wobbling as the AGSP shifts.  DEN makes no difference, so it stays clear and the copy stays
+  hidden.  Booting from disk this never showed, because the KERNAL had already put `$1b` here.
 - **The whole VIC register file must be initialised, `VIC_CONTROL_X` above all.**
   The engine writes `$d016` exactly once
   per frame from the raster IRQ (`raster.acme:96` is the only write in the tree) and never touches the registers it does
@@ -246,9 +259,48 @@ clean at both `SCROLL_SPEED` values, and the copies overrunning their nominal fr
 serialise — `COPY_TILES` finishes `C_COPY` before touching `R_COPY`) is absorbed by the spare rows/columns
 `SCROLL_ROWS = SCR_ROWS-2` leaves.
 
-To measure the raster budget rather than just pass/fail it, temporarily parameterise the `-DDEVELOP` overrun check's
-`cmp #LINE_0-1` and bisect the threshold: the lowest value that does *not* jam is the line the frame ends on.
-As of the sprite-scrolling and tile-copy work that is line 18, against a limit of 47.
+### Measuring the off-screen budget
+
+`make regress` only tells you whether the budget was blown.  To measure how much is left, temporarily parameterise the
+`-DDEVELOP` overrun check's `cmp #LINE_0-1`, force a constant stick direction (`sed` the `lda CIA1_PORT_2` in
+`joystick.acme` to `lda #$f5` for down+right), and bisect the threshold over a long run: the lowest value that does
+*not* jam is the raster line `last_irq` finishes on.  `LINE_0-1 = 47` is the limit.
+
+Do this over **thousands** of frames with a constant direction, not over the autopilot — the worst case is rare.
+Measuring the diagonal phase of one `AP_TABLE` pass reported line 18 for a build whose true worst case was 36.
+Reference points, all diagonal:
+
+| build | frame ends on |
+|---|---|
+| before world-fixed sprites | < line 6 |
+| sprites, wrap left to the sort | line 36 |
+| sprites, wrap fixing `SPR_I` itself | line 20 |
+
+The same technique works for any other invariant that should hold every frame — stash the value in a spare zero-page
+byte inside the cycle-exact code (there is documented slack before the soft-scroll wait), then compare and `jam` in
+`last_irq` where timing is free.  That is how the AGSP end line, the soft-scroll wait target, RSEL and `SPR_I`'s
+permutation invariant were all checked.
+
+### What headless screenshots cannot tell you
+
+`-exitscreenshot` stops the emulator at a cycle count, not at a frame boundary, and the capture is **not reproducible
+at frame granularity** — the same binary at the same `-limitcycles` has been observed to produce a 24-row and a 25-row
+window on different runs.  Roughly one capture in 30 shows a display area 4 lines taller at each end.  This happens on
+old commits too, at the same rate.  It is a capture artifact; do not go hunting for it in the engine.
+
+That is why the autopilot freezes the screen before the screenshot is taken, and why anything frame-by-frame has to be
+measured from inside the program with a `jam`, not from images.
+
+**Test the cartridge under `x64`, not just the `.prg` under `x64sc`.**  The cartridge payload is byte-identical to the
+`.prg`, so anything that reproduces on one and not the other is boot state, not engine code — that is exactly how the
+`VIC_CONTROL_Y` RSEL bug above was found, after a long detour chasing it in the scroll code.  The four combinations
+are cheap to run and disagreeing pairs localise the fault immediately:
+
+```bash
+acme -DSYSTEM=64 -DAUTOPILOT=1 -DAP_FRAMES=n -f cbm -o ap.obj engine.acme   # same payload both ways
+x64   -warp -sounddev dummy +easyflashcrtwrite -limitcycles 22000000 -exitscreenshot a.png -cartcrt ap.crt
+x64sc -warp -sounddev dummy -autostartprgmode 1 -limitcycles 22000000 -exitscreenshot b.png -autostart ap.prg
+```
 
 ## Debugging
 

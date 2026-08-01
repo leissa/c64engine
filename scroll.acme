@@ -36,15 +36,33 @@ SCROLL_ROWS = SCR_ROWS-2
 ;   SPRITES_TOP_Y on the assumption that those four (= all eight hardware
 ;   sprites) are the ones with DMA active there, so a scrolled sprite must never
 ;   drift below them.  That is what SPR_WRAP_TOP enforces.
+;
+;   **Recycling a sprite has to fix SPR_I itself.**  Shifting every sprite by the
+;   same amount leaves the SPR_I order intact, but a sprite that wraps travels
+;   from one end of the range to the other and so has to travel the whole length
+;   of the order with it.  Left to the insertion sort in last_irq that is its
+;   O(n^2) case -- measured at ~26 raster lines of the off-screen budget for a
+;   single wrap, against a total budget of 47 lines.  So the wrap moves the
+;   sprite in SPR_I directly, which keeps the order sorted and leaves the sort
+;   with nothing to do.  Do not "simplify" this back into a plain bounds check.
+;
+;   The order is the one last_irq sorted at the end of the previous frame, so the
+;   sprite examined here can be off by a position or two (the joystick nudges one
+;   sprite independently).  A missed wrap is picked up on the next frame, which
+;   is what SPR_WRAP_MARGIN covers.
 ;-------------------------------------------------------------------------------
 
-CRUNCH_SPRITES = 4              ; the sprites _spr_y parks at SPRITES_TOP_Y
-SPR_WRAP_TOP    = SPRITES_TOP_Y+1
+CRUNCH_SPRITES  = 4             ; the sprites _spr_y parks at SPRITES_TOP_Y
+SPR_WRAP_MARGIN = 4             ; slack for a wrap noticed a frame or two late
+SPR_WRAP_TOP    = SPRITES_TOP_Y + SPR_WRAP_MARGIN
 SPR_WRAP_BOTTOM = SPRITES_MAX_Y
 
 !if SPRITES != 0 {
   !if SPRITES < CRUNCH_SPRITES {
     !error "SPRITES (", SPRITES, ") must be 0 or at least CRUNCH_SPRITES (", CRUNCH_SPRITES, ")"
+  }
+  !if SPR_WRAP_MARGIN < 2 * SCROLL_SPEED {
+    !error "SPR_WRAP_MARGIN (", SPR_WRAP_MARGIN, ") leaves no room at SCROLL_SPEED ", SCROLL_SPEED
   }
 
 ; camera moved towards larger map coordinates, so the world slides up
@@ -54,14 +72,30 @@ SCROLL_SPRITES_UP !zone {
     sec
     lda SPR_Y, x
     sbc #SCROLL_SPEED
-    cmp #SPR_WRAP_TOP
-    bcs +
-    lda #SPR_WRAP_BOTTOM
-+
     sta SPR_Y, x
     dex
     cpx #CRUNCH_SPRITES-1
     bne -
+
+    ; anything that ran off the top is at the front of the order
+.recycle
+    ldy SPR_I + CRUNCH_SPRITES
+    lda SPR_Y, y
+    cmp #SPR_WRAP_TOP
+    bcs .done
+    lda #SPR_WRAP_BOTTOM
+    sta SPR_Y, y
+    ; it is the largest now, so it belongs at the back
+    ldx #CRUNCH_SPRITES
+-
+    lda SPR_I + 1, x
+    sta SPR_I, x
+    inx
+    cpx #SPRITES-1
+    bne -
+    sty SPR_I + SPRITES-1
+    jmp .recycle
+.done
     rts
 }
 
@@ -71,14 +105,30 @@ SCROLL_SPRITES_DOWN !zone {
     clc
     lda SPR_Y, x
     adc #SCROLL_SPEED
-    cmp #SPR_WRAP_BOTTOM+1
-    bcc +
-    lda #SPR_WRAP_TOP
-+
     sta SPR_Y, x
     dex
     cpx #CRUNCH_SPRITES-1
     bne -
+
+    ; mirror image: anything that ran off the bottom is at the back of the order
+.recycle
+    ldy SPR_I + SPRITES-1
+    lda SPR_Y, y
+    cmp #SPR_WRAP_BOTTOM+1
+    bcc .done
+    lda #SPR_WRAP_TOP
+    sta SPR_Y, y
+    ; it is the smallest non-crunch sprite now, so it belongs at the front
+    ldx #SPRITES-1
+-
+    lda SPR_I - 1, x
+    sta SPR_I, x
+    dex
+    cpx #CRUNCH_SPRITES
+    bne -
+    sty SPR_I + CRUNCH_SPRITES
+    jmp .recycle
+.done
     rts
 }
 
