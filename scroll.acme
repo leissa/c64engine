@@ -49,7 +49,15 @@ SCROLL_ROWS = SCR_ROWS-2
 ;   is what SPR_WRAP_MARGIN covers.
 ;-------------------------------------------------------------------------------
 
-; the soft scroll is issued at this line; the multiplexer runs after it
+; The soft scroll is issued at SPR_MUX_START and the multiplexer runs after it,
+; so SPR_WRAP_TOP is as high as a sprite can be and still be placed in time.  A
+; sprite cannot slide out from *behind* the panel row -- the hardware is busy
+; with it until SPRITES_TOP_Y+SPRITE_HEIGHT -- so this edge always pops.
+;
+; SPR_WRAP_MARGIN cannot go much below 6: the four slots are filled in sequence
+; over the first few lines, so the last of them needs more room than the first,
+; and 3 was measured to drop sprites.  See the KNOWN LIMITATION at
+; SPRITES_MAX_Y in engine.acme for the matching problem at the bottom edge.
 SPR_MUX_START   = FIRST_BADLINE+SCR_ROWS+8+1
 SPR_WRAP_MARGIN = 6             ; slack for a wrap noticed a frame or two late
 SPR_WRAP_TOP    = SPR_MUX_START + SPR_WRAP_MARGIN
@@ -61,6 +69,9 @@ SPR_WRAP_BOTTOM = SPRITES_MAX_Y
   }
   !if SPR_WRAP_TOP < SPRITES_TOP_Y + SPRITE_HEIGHT {
     !error "SPR_WRAP_TOP (", SPR_WRAP_TOP, ") would overlap the panel row"
+  }
+  !if SPR_WRAP_BOTTOM > SPRITES_MAX_Y {
+    !error "SPR_WRAP_BOTTOM (", SPR_WRAP_BOTTOM, ") is past SPRITES_MAX_Y (", SPRITES_MAX_Y, "), so a recycled sprite could never be placed"
   }
 
 ; camera moved towards larger map coordinates, so the world slides up

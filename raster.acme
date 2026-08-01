@@ -313,22 +313,26 @@ rotate
 .last_irq
 !ifdef DEVELOP {
             ldy VIC_RASTER
-            cpy #$f0
+            cpy #LAST_IRQ_LINE-2
             bcc +
             jam
 +
 }
-            ldy #$f0+2
+            ldy #LAST_IRQ_LINE
             sty VIC_RASTER
             +set16 last_irq, VECTOR_IRQ
             jmp out
 .next_sprite
             lda VIC_SPR_0_Y + r*4 ; get y position of physical sprite
-            clc
-            adc #22             ; calculate when sprite will be done, see above diagram
-            bcs .last_irq       ; if we overflow we can be sure triggerline is too high
-            cmp #SPRITES_MAX_Y  ; $f9 is the last visible line: ensure triggerline < $f8
+            ; The slot frees SPRITE_HEIGHT+1 lines on; if that is past the last
+            ; line we work on there is nothing left to do.  Test *before* the
+            ; add: adding to a sprite low on the screen wraps the byte, and the
+            ; old code read that overflow as "too high" and abandoned the whole
+            ; frame -- which is what stopped sprites reaching the bottom border.
+            cmp #SPRITES_MAX_Y-(SPRITE_HEIGHT+1)
             bcs .last_irq       ; nothing left to do
+            clc
+            adc #SPRITE_HEIGHT+1 ; calculate when sprite will be done, see above diagram
 
             tay                 ; y = triggerline for next sprite
             sbc VIC_RASTER      ; a = triggerline - rasterline - 1 (omit sec)
@@ -550,11 +554,19 @@ last_irq
     lda SPR_YQ + SPRITE_SLOTS, x
     sec
     sbc SPR_YQ, x
-    cmp #SPRITE_HEIGHT
+    cmp #SPRITE_HEIGHT+1   ; the multiplexer frees a slot SPRITE_HEIGHT+1 lines on
     bcc .try_two_zones
     inx
     cpx #SPRITES - SPRITE_SLOTS
     bne -
+    ; The multiplexer also gives up the moment a slot it still needs holds a
+    ; sprite too low to be reused (see .next_sprite), so the last sprite that
+    ; still has a successor in its slot has to stay above that line.  Without
+    ; this the pair q[i]=SPRITES_MAX_Y-22, q[i+4]=SPRITES_MAX_Y passes the test
+    ; above and then gets abandoned mid-frame.
+    lda SPR_YQ + SPRITES - SPRITE_SLOTS - 1
+    cmp #SPRITES_MAX_Y-(SPRITE_HEIGHT+1)
+    bcs .try_two_zones
 
     ldx #0                          ; stride 1, phase 0
     ldy #SPRITES
@@ -570,13 +582,20 @@ last_irq
     lda SPR_YQ + 2*SPRITE_SLOTS, x
     sec
     sbc SPR_YQ, x
-    cmp #SPRITE_HEIGHT
+    cmp #SPRITE_HEIGHT+1   ; the multiplexer frees a slot SPRITE_HEIGHT+1 lines on
     bcc .one_zone
     inx
     inx
     iny
     cpy #SPRITE_SLOTS
     bne -
+    ; same bound as above, for the 8 entry list
+    lda SPR_FRAME
+    and #1
+    tax
+    lda SPR_YQ + 2*(SPRITES/2 - SPRITE_SLOTS - 1), x
+    cmp #SPRITES_MAX_Y-(SPRITE_HEIGHT+1)
+    bcs .one_zone
 
     lda SPR_FRAME
     and #1
