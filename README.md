@@ -10,7 +10,7 @@ Dependencies:
 
 The following dependencies are automatically dealt with by the `Makefile`:
 * [Krill's loader](https://csdb.dk/release/?id=189130)
-* [exomizer](https://github.com/exomiser/Exomiser) (using Krill's intree sources)
+* [exomizer](https://bitbucket.org/magli143/exomizer/wiki/Home) (using Krill's intree sources)
 * [tinycrunch](https://csdb.dk/release/?id=168629) (using Krill's intree sources)
 
 ```bash
