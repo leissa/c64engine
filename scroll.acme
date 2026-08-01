@@ -28,14 +28,11 @@ SCROLL_ROWS = SCR_ROWS-2
 ;   them straight into the VIC registers -- so pinning a sprite to the map means
 ;   stepping every sprite the opposite way whenever the camera moves.
 ;
-;   Sprite ids 0..CRUNCH_SPRITES-1 are excluded: they are the ones parked in the
-;   FLD/crunch area by _spr_y in engine.acme.  Nothing sorts them there, they
-;   just always hold the smallest SPR_Y, which is what puts them in the first
-;   four SPR_I slots and hence into the hardware registers that last_irq writes.
-;   The crunch loop in raster.acme switches to its shorter 44 cycle path at
-;   SPRITES_TOP_Y on the assumption that those four (= all eight hardware
-;   sprites) are the ones with DMA active there, so a scrolled sprite must never
-;   drift below them.  That is what SPR_WRAP_TOP enforces.
+;   The panel row is a separate set written straight into the hardware by
+;   last_irq, so nothing here has to keep clear of it -- all SPRITES world
+;   sprites scroll.  What they must not do is come up past the line the
+;   multiplexer can first reach: it only starts once the soft scroll has been
+;   issued, so a sprite above SPR_WRAP_TOP could never be placed in time.
 ;
 ;   **Recycling a sprite has to fix SPR_I itself.**  Shifting every sprite by the
 ;   same amount leaves the SPR_I order intact, but a sprite that wraps travels
@@ -52,17 +49,18 @@ SCROLL_ROWS = SCR_ROWS-2
 ;   is what SPR_WRAP_MARGIN covers.
 ;-------------------------------------------------------------------------------
 
-CRUNCH_SPRITES  = 4             ; the sprites _spr_y parks at SPRITES_TOP_Y
-SPR_WRAP_MARGIN = 4             ; slack for a wrap noticed a frame or two late
-SPR_WRAP_TOP    = SPRITES_TOP_Y + SPR_WRAP_MARGIN
+; the soft scroll is issued at this line; the multiplexer runs after it
+SPR_MUX_START   = FIRST_BADLINE+SCR_ROWS+8+1
+SPR_WRAP_MARGIN = 6             ; slack for a wrap noticed a frame or two late
+SPR_WRAP_TOP    = SPR_MUX_START + SPR_WRAP_MARGIN
 SPR_WRAP_BOTTOM = SPRITES_MAX_Y
 
 !if SPRITES != 0 {
-  !if SPRITES < CRUNCH_SPRITES {
-    !error "SPRITES (", SPRITES, ") must be 0 or at least CRUNCH_SPRITES (", CRUNCH_SPRITES, ")"
-  }
   !if SPR_WRAP_MARGIN < 2 * SCROLL_SPEED {
     !error "SPR_WRAP_MARGIN (", SPR_WRAP_MARGIN, ") leaves no room at SCROLL_SPEED ", SCROLL_SPEED
+  }
+  !if SPR_WRAP_TOP < SPRITES_TOP_Y + SPRITE_HEIGHT {
+    !error "SPR_WRAP_TOP (", SPR_WRAP_TOP, ") would overlap the panel row"
   }
 
 ; camera moved towards larger map coordinates, so the world slides up
@@ -74,19 +72,18 @@ SCROLL_SPRITES_UP !zone {
     sbc #SCROLL_SPEED
     sta SPR_Y, x
     dex
-    cpx #CRUNCH_SPRITES-1
-    bne -
+    bpl -
 
     ; anything that ran off the top is at the front of the order
 .recycle
-    ldy SPR_I + CRUNCH_SPRITES
+    ldy SPR_I
     lda SPR_Y, y
     cmp #SPR_WRAP_TOP
     bcs .done
     lda #SPR_WRAP_BOTTOM
     sta SPR_Y, y
     ; it is the largest now, so it belongs at the back
-    ldx #CRUNCH_SPRITES
+    ldx #0
 -
     lda SPR_I + 1, x
     sta SPR_I, x
@@ -107,8 +104,7 @@ SCROLL_SPRITES_DOWN !zone {
     adc #SCROLL_SPEED
     sta SPR_Y, x
     dex
-    cpx #CRUNCH_SPRITES-1
-    bne -
+    bpl -
 
     ; mirror image: anything that ran off the bottom is at the back of the order
 .recycle
@@ -118,30 +114,28 @@ SCROLL_SPRITES_DOWN !zone {
     bcc .done
     lda #SPR_WRAP_TOP
     sta SPR_Y, y
-    ; it is the smallest non-crunch sprite now, so it belongs at the front
+    ; it is the smallest now, so it belongs at the front
     ldx #SPRITES-1
 -
     lda SPR_I - 1, x
     sta SPR_I, x
     dex
-    cpx #CRUNCH_SPRITES
     bne -
-    sty SPR_I + CRUNCH_SPRITES
+    sty SPR_I
     jmp .recycle
 .done
     rts
 }
 
-; SPR_X is half resolution (last_irq does an asl before storing it), so one unit
-; is two pixels.  No wrap check: the byte wraps on its own and the multiplexer
-; already deals with sprites parked off either side.
+; SPR_X is half resolution (the multiplexer does an asl before storing it), so
+; one unit is two pixels.  No wrap check: the byte wraps on its own and the
+; multiplexer already deals with sprites parked off either side.
 SCROLL_SPRITES_LEFT !zone {
     ldx #SPRITES-1
 -
     dec SPR_X, x
     dex
-    cpx #CRUNCH_SPRITES-1
-    bne -
+    bpl -
     rts
 }
 
@@ -150,8 +144,7 @@ SCROLL_SPRITES_RIGHT !zone {
 -
     inc SPR_X, x
     dex
-    cpx #CRUNCH_SPRITES-1
-    bne -
+    bpl -
     rts
 }
 }

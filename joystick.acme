@@ -10,6 +10,10 @@ AP_IDX = *+1
     ldx #0
     cpx #AP_FRAMES
     bcc .autopilot_go
+    ; freeze the sprite flicker phase as well, or a clustered layout keeps
+    ; changing which sprites are shown and the screenshot stops being repeatable
+    lda #1
+    sta AP_FROZEN
     rts
 .autopilot_go
     inc AP_IDX
@@ -68,9 +72,7 @@ AP_IDX = *+1
 
     ldx CUR_SPR
     ldy SPR_Y, x
-    cpy #SPRITES_MAX_Y
-    beq .up
-    cpy #SPRITES_TOP_Y
+    cpy #SPR_WRAP_BOTTOM
     beq .up
     inc SPR_Y, x
 
@@ -82,9 +84,7 @@ AP_IDX = *+1
 
     ldx CUR_SPR
     ldy SPR_Y, x
-    cpy #FIRST_BADLINE+SCR_ROWS
-    beq .exit
-    cpy #SPRITES_TOP_Y
+    cpy #SPR_WRAP_TOP
     beq .exit
     dec SPR_Y, x
 

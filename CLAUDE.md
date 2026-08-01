@@ -98,10 +98,9 @@ Stages, in order:
 4. **VSP** — the self-modified nop field lands the badline on the right cycle.
    Guarded by `!if (>IRQ) != (>*) { !error }`:
    the critical code must not cross a page, which is why `IRQ` is `!align 255, 0`.
-5. **Soft scroll**, then **sprite multiplexing** (`SPRITES` virtual sprites over 8 hardware ones, two hardware sprites
-   per virtual one for extra colors).
-6. **`last_irq`** — the "off-screen" budget: `JOYSTICK`, `COPY_TILES`, `PLAY_SONG`, sprite register updates, and an
-   unrolled bubble-sort pass over `SPR_I` by `SPR_Y`.
+5. **Soft scroll**, then **sprite multiplexing** — see *Sprites* below.
+6. **`last_irq`** — the "off-screen" budget: `JOYSTICK`, `COPY_TILES`, `PLAY_SONG`, the panel row, an insertion-sort
+   pass over `SPR_I` by `SPR_Y`, and the sprite scheduling for the next frame.
 
 `HARD_X`/`HARD_Y`/`SOFT_X`/`SOFT_Y` are not variables but `*+1` labels pointing at immediate operands inside the IRQ —
 self-modifying code is the norm here, not an exception.
@@ -138,6 +137,45 @@ one sorted at the end of the *previous* frame, so a wrap can be noticed a frame 
 The tunable constraints that used to be comments are now `!error` assertions at the top of the file:
 `(SCROLL_ROWS-1) % TILE_ROWS` and `(SCROLL_COLS-1) % TILE_COLS` must be zero, because the direction-reversal cursor
 jump is expressed in tiles and ACME's division truncates.
+
+### Sprites
+
+Two disjoint sets share the eight hardware sprites, and the split is what keeps the crunch band's timing honest.
+
+`PANEL_SPRITES` (8) sit on one raster row inside the black FLD/crunch band, one hardware sprite each, single colour —
+meant for hitpoints, weapons, text.  `last_irq` writes them straight out from `PANEL_X`/`PANEL_C`/`PANEL_F` (X is full
+9-bit, with `PANEL_X_MSB`); they take no part in the sort or the multiplexer.
+**They must share one Y**: the 44-cycle crunch path is `63-19`, i.e. all eight sprites DMA-active across the whole
+band, so staggering them would need the FLD/crunch loop to carry a per-line cycle count.
+
+`SPRITES` (16) are the world sprites below that, two hardware sprites each — a hires overlay over a multicolour one —
+multiplexed over `SPRITE_SLOTS` (4) pairs.  `VIC_SPR_MULTI` is flipped between the two: `last_irq` clears it for the
+panel row, the multiplexer sets `%10101010` when it takes over (safe, because the panel row ends at
+`SPRITES_TOP_Y + SPRITE_HEIGHT`, just above the soft-scroll release line).
+
+**Scheduling is decided in `last_irq`, before the frame is drawn.**  A slot is busy for `SPRITE_HEIGHT` lines, so
+sprite *n* of the display list can only use slot `n % SPRITE_SLOTS` if it is that far below sprite `n-SPRITE_SLOTS`.
+The old code discovered this the hard way and dropped whatever it could not place — sprites blinking out at random
+whenever they clustered in Y.  Now the list is thinned until it fits:
+
+| zones | shown per frame | each sprite appears |
+|---|---|---|
+| 4 | all 16 | every frame |
+| 2 | every 2nd in Y order | every 2nd frame |
+| 1 | every 4th in Y order | every 4th frame |
+
+Thinning **in Y order, not by sprite id**, is the point: it halves the density of a cluster instead of leaving its
+members to collide.  One zone is always feasible — `SPRITE_SLOTS` sprites over `SPRITE_SLOTS` slots — so the chain
+terminates and nothing ever vanishes; it just degrades to a steady, controlled flicker.  `SPR_SHOWN` is how many
+entries of `SPR_Q` the multiplexer walks, `SPR_FRAME` picks the phase.
+
+The invariant worth re-checking after any change here is that the multiplexer places *every* scheduled sprite, i.e.
+the `.last_irq` "too late" path is now unreachable.  Verified by stashing X at that exit and comparing it against
+`SPR_SHOWN` in `last_irq`, over Y spacings from 8 down to 0.
+
+Because the phase advances in `last_irq`, a clustered layout would keep the screen changing after the autopilot has
+frozen `JOYSTICK`, which would break the reproducibility `make regress` depends on — hence `AP_FROZEN`, which stops
+the phase too.
 
 ### Tile copying — `tiles.acme`
 
@@ -275,6 +313,10 @@ Reference points, all diagonal:
 | before world-fixed sprites | < line 6 |
 | sprites, wrap left to the sort | line 36 |
 | sprites, wrap fixing `SPR_I` itself | line 20 |
+| 16 world + 8 panel, scheduled | line 12 |
+
+Beware a **spurious jam**: one sweep of this reported line 40 for a build whose real worst case is 12, and a rerun of
+the identical tree gave 10.  Confirm any surprising reading with a repeat before acting on it.
 
 The same technique works for any other invariant that should hold every frame — stash the value in a spare zero-page
 byte inside the cycle-exact code (there is documented slack before the soft-scroll wait), then compare and `jam` in

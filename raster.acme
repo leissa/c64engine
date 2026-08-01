@@ -284,11 +284,16 @@ SOFT_Y = *+1
 ;        inc VIC_BORDER
     }
 
-    !if SPRITES < 4 {
-        ldx #SPRITES
-    } else {
-        ldx #4
-    }
+    ; The panel row is finished by now (PANEL_Y + SPRITE_HEIGHT is above the soft
+    ; scroll release line), so hand the hardware over to the world sprites:
+    ; odd hardware sprites go multicolour again so each pair renders as a
+    ; multicolour under a hires overlay.
+!if SPRITES != 0 {
+    lda #%10101010
+    sta VIC_SPR_MULTI
+}
+    ; walk the display list last_irq scheduled, entry 0 up to SPR_SHOWN
+    ldx #0
 
 ;   sprite with y = 28:
 ;   27--------------------|... dma disabled
@@ -303,7 +308,7 @@ rotate
         !set r = 3-.i
         !zone {
 .check_done
-            cpx #SPRITES
+            cpx SPR_SHOWN
             bne .next_sprite
 .last_irq
 !ifdef DEVELOP {
@@ -355,7 +360,7 @@ rotate
             }
 
 .display_sprite
-            ldy SPR_I, x
+            ldy SPR_Q, x
             inx
 
             ; y-coord
@@ -434,47 +439,32 @@ last_irq
 }
     jsr PLAY_SONG
 
+;-------------------------------------------------------------------------------
+; panel row
+;
+; Hand the hardware back to the eight single-colour panel sprites for the top of
+; the next frame.  They all sit on PANEL_Y, which is what keeps the crunch band's
+; 44 cycle path honest -- see the note at SPRITES in engine.acme.  VIC_SPR_MULTI
+; goes to hires here and the multiplexer flips it back when it takes over.
+;-------------------------------------------------------------------------------
+
 !if SPRITES != 0 {
-    !for .i, 0, 3 {
-        !set .r = 3-.i
-        ; index
-        ldy SPR_I + .i
-
-        ; y-coord
-        lda SPR_Y, y
-        sta VIC_SPR_0_Y + 4*.r
-        sta VIC_SPR_0_Y + 4*.r + 2
-
-        ; x-coord
-        lda SPR_X, y
-        asl
-        sta VIC_SPR_0_X + 4*.r
-        sta VIC_SPR_0_X + 4*.r + 2
-
-        ; x-coord MSB
-        !if .i != 0 {
-            txa
-        }
-        php
-        rol
-        plp
-        rol
-        tax
-
-        ; colors
-        lda SPR_A, y
-        sta VIC_SPR_0_COLOR + .r*2 + 1
-        lda SPR_B, y
-        sta VIC_SPR_0_COLOR + .r*2
-
-        ; set sprite pointers
-        lda SPR_F, y
-        tay
-        sty SPR_PTR + .r*2 + 1
-        iny
-        sty SPR_PTR + .r*2
+    lda PANEL_Y
+    !for .i, 0, PANEL_SPRITES-1 {
+        sta VIC_SPR_0_Y + 2*.i
     }
-    stx VIC_SPR_X_MSB
+    !for .i, 0, PANEL_SPRITES-1 {
+        lda PANEL_X + .i
+        sta VIC_SPR_0_X + 2*.i
+        lda PANEL_C + .i
+        sta VIC_SPR_0_COLOR + .i
+        lda PANEL_F + .i
+        sta SPR_PTR + .i
+    }
+    lda PANEL_X_MSB
+    sta VIC_SPR_X_MSB
+    lda #0
+    sta VIC_SPR_MULTI
 }
 
 ;-------------------------------------------------------------------------------
@@ -513,6 +503,135 @@ last_irq
 +
         }
     }
+
+;-------------------------------------------------------------------------------
+; sprite scheduling
+;
+; A hardware slot is busy for SPRITE_HEIGHT lines, so a slot can only be reused
+; once its previous sprite has finished.  The multiplexer hands sprite n of the
+; display list to slot n % SPRITE_SLOTS, which works as long as every sprite is
+; at least SPRITE_HEIGHT lines below the one SPRITE_SLOTS places earlier in y
+; order.  When sprites cluster that fails, and the old code just dropped
+; whichever ones it could not place -- sprites blinking out at random.
+;
+; Instead, pick the display list here, before the frame is drawn, and thin it
+; until it does fit:
+;
+;   4 zones  every sprite, every frame
+;   2 zones  every 2nd sprite in y order, the other half on the next frame
+;   1 zone   every 4th sprite in y order, cycling over four frames
+;
+; Thinning in *y order* rather than by sprite id is what makes this work: it
+; halves the density of a cluster instead of leaving its members to collide.
+; One zone is always feasible -- SPRITE_SLOTS sprites over SPRITE_SLOTS slots --
+; so the chain always terminates and every sprite stays visible, just at a lower
+; and, crucially, steady rate.
+;-------------------------------------------------------------------------------
+
+!if SPRITES != 0 {
+!ifdef AUTOPILOT {
+    lda AP_FROZEN
+    bne +
+}
+    inc SPR_FRAME
++
+
+    ; SPR_YQ = the sorted y values, contiguous, so the checks below are plain
+    ; strided compares instead of another trip through SPR_I
+    !for .i, 0, SPRITES-1 {
+        ldy SPR_I + .i
+        lda SPR_Y, y
+        sta SPR_YQ + .i
+    }
+
+    ; 4 zones: slot n and slot n+SPRITE_SLOTS must not overlap, over the whole list
+    ldx #0
+-
+    lda SPR_YQ + SPRITE_SLOTS, x
+    sec
+    sbc SPR_YQ, x
+    cmp #SPRITE_HEIGHT
+    bcc .try_two_zones
+    inx
+    cpx #SPRITES - SPRITE_SLOTS
+    bne -
+
+    ldx #0                          ; stride 1, phase 0
+    ldy #SPRITES
+    jmp .schedule
+
+.try_two_zones
+    ; every 2nd sprite, so the pair that shares a slot is 2*SPRITE_SLOTS apart
+    lda SPR_FRAME
+    and #1
+    tax                             ; phase
+    ldy #0
+-
+    lda SPR_YQ + 2*SPRITE_SLOTS, x
+    sec
+    sbc SPR_YQ, x
+    cmp #SPRITE_HEIGHT
+    bcc .one_zone
+    inx
+    inx
+    iny
+    cpy #SPRITE_SLOTS
+    bne -
+
+    lda SPR_FRAME
+    and #1
+    tax                             ; stride 2, phase
+    ldy #SPRITES / 2
+    jmp .schedule
+
+.one_zone
+    ; SPRITE_SLOTS sprites over SPRITE_SLOTS slots always fits
+    lda SPR_FRAME
+    and #3
+    tax                             ; stride 4, phase
+    ldy #SPRITE_SLOTS
+
+.schedule
+    ; y = how many to show, x = phase; the stride follows from the count
+    sty SPR_SHOWN
+    cpy #SPRITES
+    beq .stride_one
+    cpy #SPRITES / 2
+    beq .stride_two
+
+    ; stride 4
+    ldy #0
+-
+    lda SPR_I, x
+    sta SPR_Q, y
+    inx
+    inx
+    inx
+    inx
+    iny
+    cpy #SPRITE_SLOTS
+    bne -
+    jmp .scheduled
+
+.stride_two
+    ldy #0
+-
+    lda SPR_I, x
+    sta SPR_Q, y
+    inx
+    inx
+    iny
+    cpy #SPRITES / 2
+    bne -
+    jmp .scheduled
+
+.stride_one
+    !for .i, 0, SPRITES-1 {
+        lda SPR_I + .i
+        sta SPR_Q + .i
+    }
+.scheduled
+}
 
     !ifdef DEBUG {
         ldx #1

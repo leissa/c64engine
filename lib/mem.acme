@@ -58,9 +58,16 @@ PLAY            = $32
 CTRL_Y_INVALID  = $33
 INIT_SCREEN_LO  = $34
 INIT_SCREEN_HI  = $35
+AP_FROZEN       = $38   ; -DAUTOPILOT only: set once the scripted run has finished
+SPR_SHOWN       = $36   ; how many entries of SPR_Q the multiplexer walks this frame
+SPR_FRAME       = $37   ; frame counter, picks the flicker phase
 
-SPR_I           = $40; - $57
-SPR_Y           = $58; - $6f
+; World sprite bookkeeping, all indexed by world sprite id 0..SPRITES-1 except
+; SPR_Q/SPR_YQ, which are indexed by position in the sorted order.
+SPR_I           = $40; - $4f, sprite ids sorted by SPR_Y, maintained across frames
+SPR_Y           = $50; - $5f, screen y per sprite id
+SPR_Q           = $60; - $6f, the subset the multiplexer shows this frame, in y order
+SPR_YQ          = $70; - $7f, SPR_Y read out in sorted order, for the zone check
 
 ; zero page: $0000 - $00ff
 ; cpu stack: $0100 - $01ff

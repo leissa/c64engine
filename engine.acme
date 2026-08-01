@@ -26,12 +26,42 @@ SCR_COLS            = 40 ; horizontal screen chars in memory. the screen is in 3
 SCR_ROWS            = 25 ; vertical screen chars in memory. the screen is in 38x24 mode
 MAP_WIDTH           = 256 ; assumed by the code, no other widths supported atm
 MAP_HEIGHT          = 96 ; not really used in the code, but good to know nonetheless
-SPRITES             = 24 ; 0 or at least 4 as this number includes the sprites in the crunch area
-SPRITES_TOP_Y       = 60 ; sprite position in fld/crunch area, can be somewhere between 55 and 60
+; Two disjoint sets share the eight hardware sprites.
+;
+; PANEL_SPRITES sit on one raster row in the black FLD/crunch band, one hardware
+; sprite each, single colour -- meant for hitpoints, weapons, text.  They must
+; share a y: the 44 cycle crunch path in raster.acme is 63-19, i.e. all eight
+; DMA-active across the whole band.
+;
+; SPRITES are the world sprites below that, two hardware sprites each (a hires
+; over a multicolour one) multiplexed over SPRITE_SLOTS pairs.  SPRITES = 0
+; compiles out both sets.
+SPRITES             = 16 ; world sprites; must be SPRITE_SLOTS * 4, see SPR_ZONES_MAX
+PANEL_SPRITES       = 8  ; one per hardware sprite, so all of them
+SPRITE_SLOTS        = 4  ; hardware sprite pairs available to the multiplexer
+SPRITE_HEIGHT       = 21 ; raster lines a sprite covers; a slot is busy this long
+SPRITES_TOP_Y       = 60 ; the panel row, in the fld/crunch area, between 55 and 60
 SPRITES_MAX_Y       = 229 ; the lower, the more off-screen raster time we have to do other things
 TILES               = 185 ; TODO: calculate this with pixels.bin size / 8 / TILE_COLS / TILE_ROWS
 ; must split SCROLL_ROWS/SCROLL_COLS exactly and fit in the 4/SCROLL_SPEED frames
 ; a soft scroll leaves before the hard step; both asserted in tiles.acme
+; The multiplexer degrades in powers of two: SPR_ZONES_MAX sprites per slot when
+; nothing clusters, then half of them on alternate frames, then a quarter on
+; every fourth frame.  See "sprite scheduling" in raster.acme.
+SPR_ZONES_MAX       = SPRITES / SPRITE_SLOTS
+
+!if SPRITES != 0 {
+  !if SPRITES % SPRITE_SLOTS != 0 {
+    !error "SPRITES (", SPRITES, ") must be a multiple of SPRITE_SLOTS (", SPRITE_SLOTS, ")"
+  }
+  !if SPR_ZONES_MAX != 4 {
+    !error "SPR_ZONES_MAX is ", SPR_ZONES_MAX, "; the 4/2/1 fallback chain assumes 4"
+  }
+  !if PANEL_SPRITES != 2 * SPRITE_SLOTS {
+    !error "PANEL_SPRITES (", PANEL_SPRITES, ") must cover all ", 2*SPRITE_SLOTS, " hardware sprites"
+  }
+}
+
 COPY_ROW_FRAMES     = 2 ; use 2 frames to copy all rows, vertically
 !if SCROLL_SPEED = 2 {
 COPY_COL_FRAMES     = 2 ; use 2 frames to copy all cols, horizontally
@@ -41,22 +71,40 @@ COPY_COL_FRAMES     = 4 ; use 4 frames to copy all cols, horizontally
 
 *=SPR_DATA
 
+; ---- world sprites, SPRITES entries each -------------------------------------
+; _spr_y seeds SPR_Y in zero page; the rest are read in place.
+; SPR_X is half resolution -- the multiplexer does an asl and takes the msb from
+; the carry -- so one unit is two pixels.
 _spr_y
-    !by SPRITES_TOP_Y, SPRITES_TOP_Y, SPRITES_TOP_Y, SPRITES_TOP_Y
-    !by $64, $66, $68, $6a, $84, $86, $88, $8a, $a4, $a6, $a8, $aa, $c0, $c2, $c4, $c6, $e5, $e5, $e5, $e5
+    !by $64, $6c, $74, $7c, $88, $90, $98, $a0, $a8, $b0, $b8, $c0, $c8, $d0, $d8, $e0
 SPR_X
-    !by $20, $40, $60, $80, $50, $60, $70, $80, $10, $20, $30, $40, $50, $60, $70, $80, $10, $20, $30, $40, $50, $60, $70, $80
+    !by $50, $60, $70, $80, $10, $20, $30, $40, $50, $60, $70, $80, $10, $20, $30, $40
 SPR_A
-    !by $0a, $0a, $02, $03, $04, $05, $06, $07, $08, $09, $0a, $0a, $0a, $0d, $0e, $0f, $00, $01, $02, $03, $04, $05, $06, $07
+    !by $04, $05, $06, $07, $08, $09, $0a, $0a, $0a, $0d, $0e, $0f, $00, $01, $02, $03
 SPR_B
-    !by $00, $00, $0d, $0c, $0b, $0a, $09, $08, $07, $06, $05, $00, $00, $02, $01, $00, $0f, $0e, $0d, $0c, $0b, $0a, $09, $08
+    !by $0b, $0a, $09, $08, $07, $06, $05, $00, $00, $02, $01, $00, $0f, $0e, $0d, $0c
 SPR_F
-    !by SPR_FR_BASE+$00, SPR_FR_BASE+$02, SPR_FR_BASE+$04, SPR_FR_BASE+$06
     !by SPR_FR_BASE+$08, SPR_FR_BASE+$0a, SPR_FR_BASE+$0c, SPR_FR_BASE+$0e
     !by SPR_FR_BASE+$10, SPR_FR_BASE+$12, SPR_FR_BASE+$14, SPR_FR_BASE+$00
     !by SPR_FR_BASE+$02, SPR_FR_BASE+$1a, SPR_FR_BASE+$1c, SPR_FR_BASE+$1e
     !by SPR_FR_BASE+$04, SPR_FR_BASE+$04, SPR_FR_BASE+$04, SPR_FR_BASE+$06
-    !by SPR_FR_BASE+$08, SPR_FR_BASE+$0a, SPR_FR_BASE+$0c, SPR_FR_BASE+$0e
+
+; ---- panel row, PANEL_SPRITES entries each -----------------------------------
+; One hardware sprite each, all on PANEL_Y, so they are written straight out by
+; last_irq and never take part in the sort or the multiplexer.  X is full 9 bit
+; here (PANEL_X plus one bit per sprite in PANEL_X_MSB) because these are placed by
+; hand, not scrolled.
+PANEL_Y
+    !by SPRITES_TOP_Y
+PANEL_X
+    !by 24, 48, 72, 96, 180, 204, 228, 252
+PANEL_X_MSB
+    !by %00000000
+PANEL_C
+    !by $02, $02, $02, $07, $01, $01, $0d, $0d
+PANEL_F
+    !by SPR_FR_BASE+$00, SPR_FR_BASE+$00, SPR_FR_BASE+$00, SPR_FR_BASE+$02
+    !by SPR_FR_BASE+$04, SPR_FR_BASE+$04, SPR_FR_BASE+$06, SPR_FR_BASE+$06
 
 +create_basic_starter CODE_START
 *=CODE_START
@@ -123,18 +171,23 @@ SPR_F
 ;-------------------------------------------------------------------------------
 
     !if SPRITES > 0 {
+        ; _spr_y is already in ascending order, so SPR_I starts out sorted
         !for .i, 0, SPRITES-1 {
             lda _spr_y + .i
             sta SPR_Y + .i
             lda #.i
             sta SPR_I + .i
         }
-    }
-
-    !if SPRITES < 4 {
-        ldx #$ff-(2^(8-(2*SPRITES))-1)
-    } else {
+        lda #0
+        sta SPR_FRAME
+!ifdef AUTOPILOT {
+        sta AP_FROZEN
+}
+        ; until the first last_irq has scheduled a frame, show nothing
+        sta SPR_SHOWN
         ldx #$ff
+    } else {
+        ldx #0
     }
     stx VIC_SPR_ENABLE
 
