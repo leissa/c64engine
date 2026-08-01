@@ -6,3 +6,5 @@ config.default
 eapi
 efboot.bin
 **/__pycache__
+regress
+regress-*

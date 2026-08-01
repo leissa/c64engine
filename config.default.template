@@ -3,3 +3,4 @@ MKDIR  := /usr/bin/mkdir
 PYTHON := python3
 WGET   := /usr/bin/wget
 X64    := /usr/bin/x64
+X64SC  := /usr/bin/x64sc   # used by 'make regress'

@@ -1,8 +1,27 @@
 JOYSTICK !zone {
+!ifdef AUTOPILOT {
+    ; -DAUTOPILOT=1 -DAP_FRAMES=n replaces the stick with the scripted pattern in
+    ; AP_TABLE for n frames and then freezes this routine completely: no scroll,
+    ; no colour cycling.  The screen goes static, which is what makes a headless
+    ; VICE run reproducible -- an exit screenshot taken while the engine is still
+    ; animating depends on the exact cycle the emulator is stopped on and is not
+    ; comparable between runs.  See tools/regress.sh.
+AP_IDX = *+1
+    ldx #0
+    cpx #AP_FRAMES
+    bcc .autopilot_go
+    rts
+.autopilot_go
+    inc AP_IDX
+    lda AP_TABLE, x         ; a = stick state; the ldx/inc below leave it alone
+    ldx CUR_SPR
+    inc SPR_A, x
+} else {
     ldx CUR_SPR
     inc SPR_A, x
 
     lda CIA1_PORT_2
+}
     asl
     asl
     asl
@@ -75,3 +94,41 @@ JOYSTICK !zone {
 
 CUR_SPR
     !by SPRITES-1
+
+!ifdef AUTOPILOT {
+;-------------------------------------------------------------------------------
+;   scripted stick pattern, one byte per frame
+;
+;   Exercises each direction on its own, both diagonals, and -- the case worth
+;   watching -- direction reversals partway through a tile copy, where the copy
+;   counter is re-seeded and the cursor jumps to the opposite edge while a copy
+;   is still in flight.
+;
+;   Page aligned so lda AP_TABLE,x never crosses a page and cannot perturb the
+;   raster budget depending on where it lands.
+;-------------------------------------------------------------------------------
+
+; joystick bits, active low: 0=up 1=down 2=left 3=right 4=fire
+AP_NONE = %11111111
+AP_U    = %11111110
+AP_D    = %11111101
+AP_L    = %11111011
+AP_R    = %11110111
+AP_DR   = %11110101
+AP_UL   = %11111010
+
+!align 255, 0
+AP_TABLE
+    !for .i, 0, 31 { !by AP_R }                       ; 000-031 pure right
+    !for .i, 0, 31 { !by AP_D }                       ; 032-063 pure down
+    !for .i, 0, 31 { !by AP_DR }                      ; 064-095 diagonal, both copies at once
+    !for .i, 0, 15 { !by AP_D, AP_U }                 ; 096-127 reverse every frame
+    !for .i, 0,  7 { !by AP_D, AP_D, AP_U, AP_U }     ; 128-159 reverse every 2 frames
+    !for .i, 0,  7 { !by AP_R, AP_R, AP_L, AP_L }     ; 160-191 same on the other axis
+    !for .i, 0,  7 { !by AP_DR, AP_DR, AP_UL, AP_UL } ; 192-223 diagonal reversal
+    !for .i, 0, 31 { !by AP_NONE }                    ; 224-255 idle
+
+!if AP_FRAMES > 256 {
+    !error "AP_FRAMES (", AP_FRAMES, ") exceeds the ", 256, " entry AP_TABLE"
+}
+}

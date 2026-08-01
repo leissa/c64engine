@@ -1,6 +1,111 @@
 SCROLL_COLS = SCR_COLS
 SCROLL_ROWS = SCR_ROWS-2
 
+;-------------------------------------------------------------------------------
+;   tunable sanity checks
+;
+;   When the scroll direction reverses, +scroll_axis has to jump the copy cursor
+;   from one edge of the screen to the other and expresses that jump in tiles:
+;   (SCROLL_ROWS-1)/TILE_ROWS and (SCROLL_COLS-1)/TILE_COLS.  ACME's division
+;   truncates, so a non-integral ratio would silently land the cursor short of
+;   the opposite edge -- the map would drift by a tile per reversal instead of
+;   failing loudly.  These used to be comments next to TILE_COLS/TILE_ROWS in
+;   engine.acme; they are assertions now.
+;-------------------------------------------------------------------------------
+
+!if (SCROLL_ROWS-1) % TILE_ROWS != 0 {
+    !error "SCROLL_ROWS-1 (", SCROLL_ROWS-1, ") must be a multiple of TILE_ROWS (", TILE_ROWS, ")"
+}
+
+!if (SCROLL_COLS-1) % TILE_COLS != 0 {
+    !error "SCROLL_COLS-1 (", SCROLL_COLS-1, ") must be a multiple of TILE_COLS (", TILE_COLS, ")"
+}
+
+;-------------------------------------------------------------------------------
+;   world-fixed sprites
+;
+;   SPR_X/SPR_Y hold *screen* coordinates -- last_irq and the multiplexer copy
+;   them straight into the VIC registers -- so pinning a sprite to the map means
+;   stepping every sprite the opposite way whenever the camera moves.
+;
+;   Sprite ids 0..CRUNCH_SPRITES-1 are excluded: they are the ones parked in the
+;   FLD/crunch area by _spr_y in engine.acme.  Nothing sorts them there, they
+;   just always hold the smallest SPR_Y, which is what puts them in the first
+;   four SPR_I slots and hence into the hardware registers that last_irq writes.
+;   The crunch loop in raster.acme switches to its shorter 44 cycle path at
+;   SPRITES_TOP_Y on the assumption that those four (= all eight hardware
+;   sprites) are the ones with DMA active there, so a scrolled sprite must never
+;   drift below them.  That is what SPR_WRAP_TOP enforces.
+;-------------------------------------------------------------------------------
+
+CRUNCH_SPRITES = 4              ; the sprites _spr_y parks at SPRITES_TOP_Y
+SPR_WRAP_TOP    = SPRITES_TOP_Y+1
+SPR_WRAP_BOTTOM = SPRITES_MAX_Y
+
+!if SPRITES != 0 {
+  !if SPRITES < CRUNCH_SPRITES {
+    !error "SPRITES (", SPRITES, ") must be 0 or at least CRUNCH_SPRITES (", CRUNCH_SPRITES, ")"
+  }
+
+; camera moved towards larger map coordinates, so the world slides up
+SCROLL_SPRITES_UP !zone {
+    ldx #SPRITES-1
+-
+    sec
+    lda SPR_Y, x
+    sbc #SCROLL_SPEED
+    cmp #SPR_WRAP_TOP
+    bcs +
+    lda #SPR_WRAP_BOTTOM
++
+    sta SPR_Y, x
+    dex
+    cpx #CRUNCH_SPRITES-1
+    bne -
+    rts
+}
+
+SCROLL_SPRITES_DOWN !zone {
+    ldx #SPRITES-1
+-
+    clc
+    lda SPR_Y, x
+    adc #SCROLL_SPEED
+    cmp #SPR_WRAP_BOTTOM+1
+    bcc +
+    lda #SPR_WRAP_TOP
++
+    sta SPR_Y, x
+    dex
+    cpx #CRUNCH_SPRITES-1
+    bne -
+    rts
+}
+
+; SPR_X is half resolution (last_irq does an asl before storing it), so one unit
+; is two pixels.  No wrap check: the byte wraps on its own and the multiplexer
+; already deals with sprites parked off either side.
+SCROLL_SPRITES_LEFT !zone {
+    ldx #SPRITES-1
+-
+    dec SPR_X, x
+    dex
+    cpx #CRUNCH_SPRITES-1
+    bne -
+    rts
+}
+
+SCROLL_SPRITES_RIGHT !zone {
+    ldx #SPRITES-1
+-
+    inc SPR_X, x
+    dex
+    cpx #CRUNCH_SPRITES-1
+    bne -
+    rts
+}
+}
+
 INC_HARD_Y !zone {
     inc HARD_Y
     lda #SCR_ROWS+1
@@ -10,14 +115,19 @@ INC_HARD_Y !zone {
     lda #0
     sta HARD_Y
 
+    ; a Y wrap shifts the AGSP origin by 16 chars
     lda HARD_X
     sec
     sbc #16
     sta HARD_X
+    ; re-add a full row: if that overflows back past SCR_COLS the subtraction
+    ; above stayed inside the row and we are done ...
     clc
     adc #SCR_COLS
     cmp #SCR_COLS
-    bcs .return    ; jmp if A < 40
+    bcs .return
+    ; ... otherwise it borrowed from the row above, so keep the wrapped X and
+    ; give the row back
     sta HARD_X
     inc HARD_Y
 
@@ -32,6 +142,8 @@ DEC_HARD_Y !zone {
     lda #SCR_ROWS
     sta HARD_Y
 
+    ; mirror of INC_HARD_Y: shift the AGSP origin the other way and hand a row
+    ; back if X ran past the end of the row
     lda HARD_X
     clc
     adc #16
@@ -96,214 +208,218 @@ DEC_HARD_Y !zone {
 +
 }
 
-SCROLL_U !zone {
-;    lda VIC_SPR_0_Y
-;    cmp #73
-;    beq+
-;    !for .i, 0, 7 {
-;        ;dec VIC_SPR_0_Y + .i*2
-;    }
-;+
+;-------------------------------------------------------------------------------
+;   SCROLL_U / SCROLL_D / SCROLL_L / SCROLL_R
+;
+;   All four are the same routine.  They differ only in which axis they walk and
+;   in the sign of every step, so +scroll_axis generates each of them:
+;
+;     .vertical  1 -> SOFT_Y / HARD_Y / TILE_ROW  (SCROLL_U, SCROLL_D)
+;                0 -> SOFT_X / HARD_X / TILE_COL  (SCROLL_L, SCROLL_R)
+;     .dir      +1 -> the direction that advances the map cursor
+;                     (SCROLL_D, SCROLL_R)
+;               -1 -> the direction that retreats it (SCROLL_U, SCROLL_L)
+;
+;   Beware the one place where the signs do *not* line up: on the horizontal
+;   axis SOFT_X and HARD_X run opposite to the map cursor, so SCROLL_L
+;   (.dir = -1) *increments* both.  The VSP delay in raster.acme is 39-HARD_X,
+;   which is where that inversion comes from.  .soft_dir below is .dir for the
+;   vertical axis and -.dir for the horizontal one; anything that reads or steps
+;   SOFT_*/HARD_X keys off .soft_dir, everything else off .dir.
+;
+;   Each call does up to three things:
+;
+;   1. Step SOFT_* by SCROLL_SPEED.  On wrap, step the hard scroll and return --
+;      no tile work happens on a wrap frame.
+;   2. At the halfway point of the soft scroll, seed the copy counter and step
+;      both the C_ and R_ cursor sets by one char.  The trigger is SOFT == 4
+;      when SOFT counts up and SOFT == 4-SCROLL_SPEED when it counts down, which
+;      leaves 4/SCROLL_SPEED frames before the wrap either way -- that is the
+;      budget COPY_COL_FRAMES/COPY_ROW_FRAMES have to fit into.
+;   3. If the direction reversed since the last tile boundary, jump the cursor
+;      set that feeds this axis by a whole screen, because the edge being filled
+;      moved to the other side.  SCROLL_U_D/SCROLL_L_R remember the last
+;      direction per axis.
+;
+;   TODO: the sprites do not scroll with the map.  Doing it here by poking
+;   VIC_SPR_*_X/Y is futile -- last_irq in raster.acme rewrites those registers
+;   from SPR_X/SPR_Y every frame -- so it has to move the SPR_X/SPR_Y tables.
+;-------------------------------------------------------------------------------
 
+!macro scroll_axis .vertical, .dir {
+
+    ; ---- per-axis symbol selection --------------------------------------
+!if .vertical {
+    !set .tile          = TILE_ROW
+    !set .tile_mod      = TILE_ROWS
+    !set .copy_counter  = C_COPY
+    !set .copy_frames   = COPY_COL_FRAMES
+    !set .c_map         = C_MAP_POS_HI      ; a vertical step is a whole map row
+    !set .r_map         = R_MAP_POS_HI
+    !set .flag          = SCROLL_U_D
+    ; one char step along this axis, measured in screen chars
+    !set .char_delta    = SCROLL_COLS
+    ; the whole screen along this axis, measured in chars
+    !set .span          = SCROLL_ROWS-1
+    ; the cursor set fed by this axis, jumped wholesale on a direction reversal
+    !set .own_map       = C_MAP_POS_HI
+    !set .own_scr_lo    = C_SCR_POS_LO
+    !set .own_scr_hi    = C_SCR_POS_HI
+    !set .own_pix_lo    = C_PIX_POS_LO
+    !set .own_pix_hi    = C_PIX_POS_HI
+    ; SOFT_Y steps the same way the map cursor does
+    !set .soft_dir      = .dir
+} else {
+    !set .tile          = TILE_COL
+    !set .tile_mod      = TILE_COLS
+    !set .copy_counter  = R_COPY
+    !set .copy_frames   = COPY_ROW_FRAMES
+    !set .c_map         = C_MAP_POS_LO      ; a horizontal step is one map byte
+    !set .r_map         = R_MAP_POS_LO
+    !set .flag          = SCROLL_L_R
+    !set .char_delta    = 1
+    !set .span          = SCROLL_COLS-1
+    !set .own_map       = R_MAP_POS_LO
+    !set .own_scr_lo    = R_SCR_POS_LO
+    !set .own_scr_hi    = R_SCR_POS_HI
+    !set .own_pix_lo    = R_PIX_POS_LO
+    !set .own_pix_hi    = R_PIX_POS_HI
+    ; SOFT_X steps *against* the map cursor, exactly like HARD_X does
+    !set .soft_dir      = -.dir
+}
+
+    ; ---- 0. drag the world-fixed sprites along with the camera -----------
+!if SPRITES != 0 {
+  !if .vertical {
+    ; SPR_Y is full resolution, so it tracks the camera pixel for pixel
+    !if .dir = 1 { jsr SCROLL_SPRITES_UP } else { jsr SCROLL_SPRITES_DOWN }
+  } else {
+    ; SPR_X is half resolution, so it may only move every second pixel of
+    ; camera travel.  SOFT_X visits each of 0..7 once per char at SCROLL_SPEED 1
+    ; (giving 4 steps per 8 pixels) and only even values at SCROLL_SPEED 2
+    ; (giving 4 steps per 8 pixels again), so this one gate serves both.
+    lda SOFT_X
+    and #1
+    bne +
+    !if .dir = 1 { jsr SCROLL_SPRITES_LEFT } else { jsr SCROLL_SPRITES_RIGHT }
++
+  }
+}
+
+    ; ---- 1. soft scroll, and the hard scroll on wrap ---------------------
+!if .vertical {
+  !if .dir = -1 {
     +wrap_dec SOFT_Y, SCROLL_SPEED, 8, .check_copy_tiles
     jsr DEC_HARD_Y
-    rts
-
-.check_copy_tiles
-;   lda SOFT_Y
-    !if SCROLL_SPEED = 2 { cmp #2 } else { cmp #3 }
-    beq .prepare_copy_tiles
-    rts
-.prepare_copy_tiles
-    lda #COPY_COL_FRAMES
-    sta C_COPY
-
-    lda TILE_ROW
-    sec
-    sbc #1
-    bcs +
-    adc #TILE_ROWS
-    dec C_MAP_POS_HI
-    dec R_MAP_POS_HI
-+
-    sta TILE_ROW
-    +wrap_sub C_SCR_POS_LO, C_SCR_POS_HI, SCROLL_COLS, 4
-    +wrap_sub R_SCR_POS_LO, R_SCR_POS_HI, SCROLL_COLS, 4
-    +wrap_sub C_PIX_POS_LO, C_PIX_POS_HI, 8*SCROLL_COLS, 8*4
-    +wrap_sub R_PIX_POS_LO, R_PIX_POS_HI, 8*SCROLL_COLS, 8*4
-
-    lda SCROLL_U_D
-    beq +
-
-    sec
-    lda C_MAP_POS_HI
-    sbc #(SCROLL_ROWS-1)/TILE_ROWS
-    sta C_MAP_POS_HI
-    +wrap_sub C_SCR_POS_LO, C_SCR_POS_HI, (SCROLL_ROWS-1)*SCROLL_COLS, 4
-    +wrap_sub C_PIX_POS_LO, C_PIX_POS_HI, 8*(SCROLL_ROWS-1)*SCROLL_COLS, 8*4
-
-    lda #0
-    sta SCROLL_U_D
-+
-    rts
-}
-
-SCROLL_D !zone {
-;    !for .i, 0, 7 {
-;        ;inc VIC_SPR_0_Y + .i*2
-;    }
-
+  } else {
     +wrap_inc SOFT_Y, SCROLL_SPEED, 8, .check_copy_tiles
     jsr INC_HARD_Y
+  }
     rts
-
-.check_copy_tiles
-;   lda SOFT_Y
-    cmp #4
-    beq .prepare_copy_tiles
-    rts
-.prepare_copy_tiles
-    lda #COPY_COL_FRAMES
-    sta C_COPY
-
-    lda TILE_ROW
-    clc
-    adc #1
-    cmp #TILE_ROWS
-    bcc +
-    sbc #TILE_ROWS
-    inc C_MAP_POS_HI
-    inc R_MAP_POS_HI
-+
-    sta TILE_ROW
-    +wrap_add C_SCR_POS_LO, C_SCR_POS_HI, SCROLL_COLS, 4
-    +wrap_add R_SCR_POS_LO, R_SCR_POS_HI, SCROLL_COLS, 4
-    +wrap_add C_PIX_POS_LO, C_PIX_POS_HI, 8*SCROLL_COLS, 8*4
-    +wrap_add R_PIX_POS_LO, R_PIX_POS_HI, 8*SCROLL_COLS, 8*4
-
-    lda SCROLL_U_D
-    bne +
-
-    clc
-    lda C_MAP_POS_HI
-    adc #(SCROLL_ROWS-1)/TILE_ROWS
-    sta C_MAP_POS_HI
-    +wrap_add C_SCR_POS_LO, C_SCR_POS_HI, (SCROLL_ROWS-1)*SCROLL_COLS, 4
-    +wrap_add C_PIX_POS_LO, C_PIX_POS_HI, 8*(SCROLL_ROWS-1)*SCROLL_COLS, 8*4
-
-    lda #1
-    sta SCROLL_U_D
-+
-    rts
-}
-
-SCROLL_L !zone {
-;    !for .i, 0, 7 {
-;        ;dec VIC_SPR_0_X + .i*2
-;    }
-
+} else {
+  !if .dir = -1 {
+    ; note the inversion: retreating the map cursor advances SOFT_X and HARD_X
     +wrap_inc SOFT_X, SCROLL_SPEED, 8, .check_copy_tiles
     inc HARD_X
     lda #SCR_COLS
     cmp HARD_X
     bne +
-
     lda #0
     sta HARD_X
     jsr DEC_HARD_Y
-+
-    rts
-
-.check_copy_tiles
-;   lda SOFT_X
-    cmp #4
-    beq .prepare_copy_tiles
-    rts
-.prepare_copy_tiles
-    lda #COPY_ROW_FRAMES
-    sta R_COPY
-
-    lda TILE_COL
-    sec
-    sbc #1
-    bcs +
-    adc #TILE_COLS
-    dec C_MAP_POS_LO
-    dec R_MAP_POS_LO
-+
-    sta TILE_COL
-    +wrap_sub C_SCR_POS_LO, C_SCR_POS_HI, 1, 4
-    +wrap_sub R_SCR_POS_LO, R_SCR_POS_HI, 1, 4
-    +wrap_sub C_PIX_POS_LO, C_PIX_POS_HI, 8, 8*4
-    +wrap_sub R_PIX_POS_LO, R_PIX_POS_HI, 8, 8*4
-
-    lda SCROLL_L_R
-    beq +
-
-    sec
-    lda R_MAP_POS_LO
-    sbc #(SCROLL_COLS-1)/TILE_COLS
-    sta R_MAP_POS_LO
-    +wrap_sub R_SCR_POS_LO, R_SCR_POS_HI, SCROLL_COLS-1, 4
-    +wrap_sub R_PIX_POS_LO, R_PIX_POS_HI, 8*(SCROLL_COLS-1), 8*4
-
-    lda #0
-    sta SCROLL_L_R
-+
-    rts
-}
-
-SCROLL_R !zone {
-;    !for .i, 0, 7 {
-;        ;inc VIC_SPR_0_X + .i*2
-;    }
-
+  } else {
     +wrap_dec SOFT_X, SCROLL_SPEED, 8, .check_copy_tiles
     dec HARD_X
     bpl +
-
     lda #SCR_COLS-1
     sta HARD_X
     jsr INC_HARD_Y
-+
-    rts
-
-.check_copy_tiles
-;   lda SOFT_X
-    !if SCROLL_SPEED = 2 { cmp #2 } else { cmp #3 }
-    beq .prepare_copy_tiles
-    rts
-.prepare_copy_tiles
-    lda #COPY_ROW_FRAMES
-    sta R_COPY
-
-    lda TILE_COL
-    clc
-    adc #1
-    cmp #TILE_COLS
-    bcc +
-    sbc #TILE_COLS
-    inc C_MAP_POS_LO
-    inc R_MAP_POS_LO
-+
-    sta TILE_COL
-    +wrap_add C_SCR_POS_LO, C_SCR_POS_HI, 1, 4
-    +wrap_add R_SCR_POS_LO, R_SCR_POS_HI, 1, 4
-    +wrap_add C_PIX_POS_LO, C_PIX_POS_HI, 8, 8*4
-    +wrap_add R_PIX_POS_LO, R_PIX_POS_HI, 8, 8*4
-
-    lda SCROLL_L_R
-    bne +
-
-    clc
-    lda R_MAP_POS_LO
-    adc #(SCROLL_COLS-1)/TILE_COLS
-    sta R_MAP_POS_LO
-    +wrap_add R_SCR_POS_LO, R_SCR_POS_HI, SCROLL_COLS-1, 4
-    +wrap_add R_PIX_POS_LO, R_PIX_POS_HI, 8*(SCROLL_COLS-1), 8*4
-
-    lda #1
-    sta SCROLL_L_R
+  }
 +
     rts
 }
+
+    ; ---- 2. at the halfway point, start a copy and step the cursors ------
+.check_copy_tiles
+    ; a holds SOFT_X/SOFT_Y, left there by wrap_inc/wrap_dec.  The trigger
+    ; follows .soft_dir, not .dir: it is a property of how SOFT_* counts.
+!if .soft_dir = -1 {
+    cmp #4-SCROLL_SPEED
+} else {
+    cmp #4
+}
+    beq .prepare_copy_tiles
+    rts
+
+.prepare_copy_tiles
+    lda #.copy_frames
+    sta .copy_counter
+
+    ; step the tile-relative position, carrying into the map cursors
+    lda .tile
+!if .dir = -1 {
+    sec
+    sbc #1
+    bcs +
+    adc #.tile_mod  ; carry is clear here, so this is +.tile_mod
+    dec .c_map
+    dec .r_map
+} else {
+    clc
+    adc #1
+    cmp #.tile_mod
+    bcc +
+    sbc #.tile_mod  ; carry is set here, so this is -.tile_mod
+    inc .c_map
+    inc .r_map
+}
++
+    sta .tile
+
+    ; step both destination cursor sets by one char along this axis
+!if .dir = -1 {
+    +wrap_sub C_SCR_POS_LO, C_SCR_POS_HI, .char_delta, 4
+    +wrap_sub R_SCR_POS_LO, R_SCR_POS_HI, .char_delta, 4
+    +wrap_sub C_PIX_POS_LO, C_PIX_POS_HI, 8*.char_delta, 8*4
+    +wrap_sub R_PIX_POS_LO, R_PIX_POS_HI, 8*.char_delta, 8*4
+} else {
+    +wrap_add C_SCR_POS_LO, C_SCR_POS_HI, .char_delta, 4
+    +wrap_add R_SCR_POS_LO, R_SCR_POS_HI, .char_delta, 4
+    +wrap_add C_PIX_POS_LO, C_PIX_POS_HI, 8*.char_delta, 8*4
+    +wrap_add R_PIX_POS_LO, R_PIX_POS_HI, 8*.char_delta, 8*4
+}
+
+    ; ---- 3. on a direction reversal, jump this axis' cursor a whole screen
+    lda .flag
+!if .dir = -1 {
+    beq +           ; already going this way
+
+    sec
+    lda .own_map
+    sbc #.span/.tile_mod
+    sta .own_map
+    +wrap_sub .own_scr_lo, .own_scr_hi, .span*.char_delta, 4
+    +wrap_sub .own_pix_lo, .own_pix_hi, 8*.span*.char_delta, 8*4
+
+    lda #0
+} else {
+    bne +           ; already going this way
+
+    clc
+    lda .own_map
+    adc #.span/.tile_mod
+    sta .own_map
+    +wrap_add .own_scr_lo, .own_scr_hi, .span*.char_delta, 4
+    +wrap_add .own_pix_lo, .own_pix_hi, 8*.span*.char_delta, 8*4
+
+    lda #1
+}
+    sta .flag
++
+    rts
+}
+
+SCROLL_U !zone { +scroll_axis 1, -1 }
+SCROLL_D !zone { +scroll_axis 1,  1 }
+SCROLL_L !zone { +scroll_axis 0, -1 }
+SCROLL_R !zone { +scroll_axis 0,  1 }

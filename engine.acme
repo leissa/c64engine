@@ -20,8 +20,8 @@
 CONTROL_Y_MASK      = %10111111 ; bitmap mode
 LINE_0              = FIRST_BADLINE-3
 SCROLL_SPEED        = 1 ; supported are 1 or 2
-TILE_COLS           = 3 ; 40 - 1 / 3 = whole number = 13
-TILE_ROWS           = 2 ; 23 - 1 / 2 = whole number = 11
+TILE_COLS           = 3 ; must divide SCROLL_COLS-1 = 39 exactly (-> 13); asserted in scroll.acme
+TILE_ROWS           = 2 ; must divide SCROLL_ROWS-1 = 22 exactly (-> 11); asserted in scroll.acme
 SCR_COLS            = 40 ; horizontal screen chars in memory. the screen is in 38x24 mode
 SCR_ROWS            = 25 ; vertical screen chars in memory. the screen is in 38x24 mode
 MAP_WIDTH           = 256 ; assumed by the code, no other widths supported atm
@@ -30,6 +30,8 @@ SPRITES             = 24 ; 0 or at least 4 as this number includes the sprites i
 SPRITES_TOP_Y       = 60 ; sprite position in fld/crunch area, can be somewhere between 55 and 60
 SPRITES_MAX_Y       = 229 ; the lower, the more off-screen raster time we have to do other things
 TILES               = 185 ; TODO: calculate this with pixels.bin size / 8 / TILE_COLS / TILE_ROWS
+; must split SCROLL_ROWS/SCROLL_COLS exactly and fit in the 4/SCROLL_SPEED frames
+; a soft scroll leaves before the hard step; both asserted in tiles.acme
 COPY_ROW_FRAMES     = 2 ; use 2 frames to copy all rows, vertically
 !if SCROLL_SPEED = 2 {
 COPY_COL_FRAMES     = 2 ; use 2 frames to copy all cols, horizontally
@@ -242,6 +244,14 @@ init_screen !zone {
 
 !ifdef DEBUG {
     !warn "code ends on: ", *-1
+}
+
+; ACME only *warns* when the next segment starts inside this one, and the next
+; segment is SONG_DATA -- so overflowing here silently gets the tail of the code
+; overwritten by the song binary, which shows up as a dead engine rather than as
+; a build failure.  Make it a build failure.
+!if * > SONG_DATA {
+    !error "code segment ends at ", *-1, " and overruns SONG_DATA at ", SONG_DATA, " by ", *-SONG_DATA, " bytes"
 }
 
 *=SONG_DATA

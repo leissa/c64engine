@@ -13,6 +13,9 @@ CRT       ?= $(OUT).crt
 CART_NAME ?= c64engine
 
 MKCART    ?= tools/mkcart.py
+REGRESS   ?= tools/regress.sh
+X64SC     ?= x64sc
+REGRESS_OUT ?= regress
 
 # EAPI is not redistributed here.
 # Fetch its sources at a pinned revision and assemble them with the acme we already depend on.
@@ -49,7 +52,7 @@ Q ?= @
 # make would treat it as up to date
 .DELETE_ON_ERROR:
 
-.PHONY: all clean distclean run dev prg
+.PHONY: all clean distclean run dev prg regress
 
 all: $(CRT)
 
@@ -79,9 +82,17 @@ $(CRT): $(ENGINE_OBJ) $(EFBOOT_BIN) $(EAPI) $(MKCART)
 	    --eapi $(EAPI) --name "$(CART_NAME)" $(if $(Q),,-v) \
 	    $(foreach r,$(CART_SKIP),--skip $(r)) -o $@
 
+# Headless autopilot run; see tools/regress.sh and the AUTOPILOT block in
+# joystick.acme.  Pass a previously captured directory to also diff rendering:
+#   make regress REGRESS_REF=regress-before
+regress:
+	@echo '===> REGRESS'
+	$(Q)X64SC='$(X64SC)' ACME='$(ACME)' $(REGRESS) $(REGRESS_OUT) $(REGRESS_REF)
+
 clean:
 	@echo '===> CLEAN'
 	$(Q)rm -f $(CRT) $(ENGINE_OBJ) $(EFBOOT_BIN) $(OUT).prg labels.l
+	$(Q)rm -rf $(REGRESS_OUT)
 
 distclean: clean
 	@echo '===> DISTCLEAN'

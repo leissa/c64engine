@@ -9,8 +9,9 @@ It scrolls a full multicolor bitmap in all 8 directions using AGSP (FLD + line c
 streams tiles from a 256×96 map, and plays music — all inside one cycle-exact raster interrupt chain.
 It ships as a 1 MiB EasyFlash cartridge.
 
-There are no tests, no linter, and no test framework.
-Correctness is verified by running in VICE and watching for `jam` (see *Debugging*).
+There is no linter and no unit-test framework.
+The one automated check is `make regress` (see *Testing*), which replays a scripted joystick pattern in a headless VICE
+and fails on a blown raster budget or, against a saved reference, on any rendering change.
 
 ## Build
 
@@ -107,21 +108,56 @@ self-modifying code is the norm here, not an exception.
 
 ### Scrolling — `scroll.acme`
 
-`SCROLL_U/D/L/R` advance `SOFT_*` by `SCROLL_SPEED` and, on wrap, `HARD_*`.
+All four of `SCROLL_U/D/L/R` are generated from one `+scroll_axis .vertical, .dir` macro; they differ only in which
+axis they walk and in the sign of every step.
+They advance `SOFT_*` by `SCROLL_SPEED` and, on wrap, `HARD_*`.
 `INC_HARD_Y`/`DEC_HARD_Y` handle the AGSP coupling where a Y wrap shifts `HARD_X` by 16.
 At the halfway point of a soft scroll they seed `C_COPY`/`R_COPY` and step the `{C,R}_{MAP,SCR,PIX,CLR}_POS_*` pointer
 sets, which are the source (map) and destination (screen/bitmap/color) cursors for tile copying.
+
+**The horizontal axis runs backwards.** `SOFT_X` and `HARD_X` step *against* the map cursor, so `SCROLL_L`
+(`.dir = -1`) increments both — the VSP delay in `raster.acme` is `39-HARD_X`, which is where the inversion comes
+from.  The macro carries `.soft_dir` (`= .dir` vertically, `= -.dir` horizontally) for exactly this: anything reading
+or stepping `SOFT_*`/`HARD_X` keys off `.soft_dir`, everything else off `.dir`.  Getting that wrong swaps the copy
+trigger between the two horizontal directions and is invisible in a screenshot.
+
+`SCROLL_SPRITES_UP/DOWN/LEFT/RIGHT` keep the sprites pinned to the map: `SPR_X`/`SPR_Y` are screen coordinates, so a
+camera step has to move every sprite the other way.  Sprite ids `0..CRUNCH_SPRITES-1` are excluded — they are the ones
+`_spr_y` parks in the FLD/crunch area, and they must keep the smallest `SPR_Y` or `last_irq` hands the multiplexer a
+sprite starting before `SPRITES_TOP_Y` and the 44-cycle crunch path mistimes.  That is what the `SPR_WRAP_TOP` bound
+enforces.  `SPR_X` is half resolution (`last_irq` does an `asl`), so it only steps on every second pixel of camera
+travel.
+
+The tunable constraints that used to be comments are now `!error` assertions at the top of the file:
+`(SCROLL_ROWS-1) % TILE_ROWS` and `(SCROLL_COLS-1) % TILE_COLS` must be zero, because the direction-reversal cursor
+jump is expressed in tiles and ACME's division truncates.
 
 ### Tile copying — `tiles.acme`
 
 Copying a whole column or row of tiles doesn't fit in one frame's raster budget, so it's split across
 `COPY_COL_FRAMES`/`COPY_ROW_FRAMES` frames.
 `COPY_TILES` (called once per frame from `last_irq`) dispatches on the `C_COPY`/`R_COPY` counters into
-`copy_col_tiles1/2` and `copy_row_tiles1/2`.
-The `copy_tile_charN` routines are macro-generated, one per position within a tile (`TILE_COLS`×`TILE_ROWS` = 3×2).
+`copy_col_tiles1/2` and `copy_row_tiles1/2`, which set `ITERATIONS` and fall into one shared `copy_*_tiles` body.
+The `copy_tile_charN` routines are macro-generated, one per position within a tile (`TILE_COLS`×`TILE_ROWS` = 3×2);
+because they all come from the same macro they are equal-sized, and `+jsr_copy_tile_char` addresses one arithmetically
+instead of running a char index down a `cmp`/`bne` chain.
+
+The per-frame loop is **unrolled by the tile cycle and specialised on the fixed coordinate**: along a column copy the
+tile row is fixed and the sub-column cycles, along a row copy the reverse.  That makes the sub-char a compile-time
+constant per slot, and lets the map byte be fetched once per tile rather than once per char.  A frame boundary can
+fall anywhere in the cycle, so the loop is entered at the slot the previous frame stopped on and each slot has an exit
+recording where to resume; the invariant is that the saved map pointer addresses the tile holding the *next* slot,
+which is why the slot-0 exit (meaning "tile finished") steps it on.  Slot, exit and variant bodies must stay
+equal-sized so they can be reached by `base + n*SIZE` — all three are asserted.
+
+Keep an eye on the code segment.  It ends around `$1ae0` against `SONG_DATA` at `$2000`, and unrolling here eats that
+margin fast: expanding the loop per entry point instead of sharing it cost ~900 bytes.  ACME only *warns* when the
+next segment starts inside this one, so an overflow silently gets the tail of the code overwritten by the song binary
+and shows up as a dead engine, not a build failure — `engine.acme` now turns that into an `!error`.
 
 `init_screen` in `engine.acme` fills the initial screen by calling `SCROLL_L` + `COPY_TILES` in a loop rather than
-duplicating the copy logic.
+duplicating the copy logic.  It only exercises the *row* path, which makes it a good first check after touching
+`tiles.acme`: if the row copy is broken the screen comes up empty.
 
 ### Cartridge boot — `easyflash.acme` + `tools/mkcart.py`
 
@@ -186,6 +222,33 @@ cycle budgets.
   labels.
 - `lib/vic.acme` and `lib/cia.acme` are register/constant definitions with the relevant bit-field documentation in
   comments — prefer the named constants over raw `$d0xx`.
+
+## Testing
+
+```bash
+make regress                              # -> regress/, fails on any jam
+cp -r regress regress-before              # capture a baseline before a refactor
+make regress REGRESS_REF=regress-before   # ... and diff rendering against it
+```
+
+`tools/regress.sh` builds `engine.acme` with `-DAUTOPILOT=1 -DAP_FRAMES=n` at eight stop frames, runs each headless
+with `-jamaction 5` so a `jam` quits the emulator, and reports failures.
+`AP_TABLE` in `joystick.acme` is the scripted stick: each direction alone, both diagonals, and three direction-reversal
+patterns — reversals matter because they re-seed the copy counter and jump the cursor to the opposite edge while a copy
+is still in flight.
+
+**The autopilot freezes `JOYSTICK` completely once it has replayed `AP_FRAMES` frames** — no scroll, no colour cycling.
+That is not cosmetic: with the engine still animating, the exit screenshot depends on which cycle the emulator happens
+to be stopped on and the same binary produces different images run to run.  Don't remove the freeze.
+
+Two things this has already established, so don't re-derive them: rapid direction reversal and diagonal scrolling are
+clean at both `SCROLL_SPEED` values, and the copies overrunning their nominal frame budget on a diagonal (they
+serialise — `COPY_TILES` finishes `C_COPY` before touching `R_COPY`) is absorbed by the spare rows/columns
+`SCROLL_ROWS = SCR_ROWS-2` leaves.
+
+To measure the raster budget rather than just pass/fail it, temporarily parameterise the `-DDEVELOP` overrun check's
+`cmp #LINE_0-1` and bisect the threshold: the lowest value that does *not* jam is the line the frame ends on.
+As of the sprite-scrolling and tile-copy work that is line 18, against a limit of 47.
 
 ## Debugging
 

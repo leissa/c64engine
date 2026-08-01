@@ -30,42 +30,23 @@ copy_tile_char3 !zone { +copy_tile_char 3 }
 copy_tile_char4 !zone { +copy_tile_char 4 }
 copy_tile_char5 !zone { +copy_tile_char 5 }
 
-!macro iterate_source_pointers .cols, .map_pos {
-!if .cols = 1 {
-    !set .tile_char = C_TILE_COL
-} else {
-    !set .tile_char = R_TILE_ROW
+; Every copy_tile_charN comes out of the same macro, so they are all the same
+; length and the routine for char N can be addressed arithmetically.  That is
+; what lets the unrolled loop below call one directly instead of running a char
+; index down a cmp/bne chain.
+COPY_TILE_CHARS_N   = TILE_COLS * TILE_ROWS
+COPY_TILE_CHAR_SIZE = copy_tile_char1 - copy_tile_char0
+
+!if COPY_TILE_CHARS_N != 6 {
+    !error "TILE_COLS*TILE_ROWS = ", COPY_TILE_CHARS_N, " but only copy_tile_char0..5 are defined"
 }
 
-!if .cols = 1 or TILE_ROWS != 2 {
-    lda .tile_char
-    adc #1
-    !if .cols = 1 {
-        cmp #TILE_COLS
-    } else {
-        cmp #TILE_ROWS
-    }
-    sta .tile_char
-    bcc +
-    clc
-    lda #0
-    sta .tile_char
+!if copy_tile_char5 - copy_tile_char0 != 5 * COPY_TILE_CHAR_SIZE {
+    !error "copy_tile_charN routines are not uniformly sized"
 }
 
-!if .cols = 1 {
-    inc .map_pos + 1
-} else {
-    !if TILE_ROWS = 2 {
-        lda .tile_char
-        adc #1
-        and #1
-        sta .tile_char
-        bne +
-    }
-
-    inc .map_pos + 2
-}
-+
+!macro jsr_copy_tile_char .char {
+    jsr copy_tile_char0 + .char * COPY_TILE_CHAR_SIZE
 }
 
 !macro iterate_destination_pointers .cols {
@@ -187,7 +168,126 @@ copy_tile_char5 !zone { +copy_tile_char 5 }
     sta .scr_pos_lo_t
 }
 
-!macro copy_tile_chars .cols, .count {
+;-------------------------------------------------------------------------------
+;   the per frame slice of a column or row copy
+;
+;   A tile is TILE_COLS x TILE_ROWS screen chars, so walking the screen one char
+;   at a time visits the sub chars of a tile in a fixed cycle before stepping on
+;   to the next map byte.  Along a column copy (walking horizontally) the tile
+;   row is fixed and the sub column cycles 0..TILE_COLS-1; along a row copy
+;   (walking vertically) the tile column is fixed and the sub row cycles
+;   0..TILE_ROWS-1.
+;
+;   Once the loop is unrolled by the cycle length and specialised on the fixed
+;   coordinate, the sub char -- and so which copy_tile_charN to call -- is a
+;   compile time constant per slot.  That removes, per char, the recomputation of
+;   tile_row*TILE_COLS + tile_col, the cmp/bne chain that turned it into a call,
+;   and all of the sub char bookkeeping in the old iterate_source_pointers.  The
+;   map byte is shared by every slot of a tile, so it is now fetched once per
+;   tile rather than once per char.
+;
+;   A frame boundary can fall anywhere in the cycle, so the loop is entered at
+;   the slot the previous frame stopped on and every slot has an exit that
+;   records where to resume.  The invariant across frames is that the saved map
+;   pointer addresses the tile containing the *next* slot to copy, which is why
+;   the slot 0 exit -- the one that means "tile finished" -- steps it on.
+;
+;   Slot and exit bodies are deliberately uniform in size so that a slot can be
+;   reached as .slots + n*SLOT_SIZE; both are asserted below.
+;-------------------------------------------------------------------------------
+
+; one unrolled slot of a tile
+!macro tile_slot .cols, .char, .next_exit {
+    +jsr_copy_tile_char .char
+    clc
+    +iterate_destination_pointers .cols
+    dec ITERATIONS
+    +jeq .next_exit
+}
+
+; the loop specialised on one value of the copy's fixed tile coordinate
+!macro tile_variant .cols, .fixed, .epilogue {
+!if .cols = 1 {
+    !set .period = TILE_COLS
+    !set .phase  = C_TILE_COL       ; sub column, cycles
+} else {
+    !set .period = TILE_ROWS
+    !set .phase  = R_TILE_ROW       ; sub row, cycles
+}
+    ; aim both map reads at the tile the prologue staged
+    lda MAP_POS_LO_T
+    sta .map_entry+1
+    sta .map_loop+1
+    lda MAP_POS_HI_T
+    sta .map_entry+2
+    sta .map_loop+2
+
+    ; resume where the previous frame stopped
+    lda .phase
+.map_entry
+    ldx TILE_MAP                    ; does not disturb a
+    !for .s, 0, .period-1 {
+        !if .s != .period-1 {
+            cmp #.s
+            bne +
+        }
+        jmp .slots + .s * (.slot1 - .slots)
++
+    }
+
+.tile_loop
+.map_loop
+    ldx TILE_MAP                    ; one map byte serves every slot of the tile
+.slots
+    !for .s, 0, .period-1 {
+        !if .s = 1 {
+.slot1
+        }
+        !if .cols = 1 {
+            !set .char = .fixed * TILE_COLS + .s
+        } else {
+            !set .char = .s * TILE_COLS + .fixed
+        }
+        +tile_slot .cols, .char, .exits + ((.s+1) % .period) * (.exit1 - .exits)
+    }
+.slots_end
+    ; tile done, step to the next map byte
+!if .cols = 1 { inc .map_loop+1 } else { inc .map_loop+2 }
+    jmp .tile_loop
+
+.exits
+    !for .s, 0, .period-1 {
+        !if .s = 1 {
+.exit1
+        }
+        lda #.s
+        sta .phase
+        !if .s = 0 { jmp .finish_tile } else { jmp .finish }
+    }
+.exits_end
+
+.finish_tile
+    ; the tile was completed, so the next frame starts on the following one
+!if .cols = 1 { inc .map_loop+1 } else { inc .map_loop+2 }
+.finish
+    lda .map_loop+1
+    sta MAP_POS_LO_T
+    lda .map_loop+2
+    sta MAP_POS_HI_T
+    jmp .epilogue
+
+!if .slots_end - .slots != .period * (.slot1 - .slots) {
+    !error "tile slots are not uniformly sized"
+}
+!if .exits_end - .exits != .period * (.exit1 - .exits) {
+    !error "tile exits are not uniformly sized"
+}
+}
+
+; Expects the char count for this frame already in ITERATIONS -- copy_*_tiles1
+; and copy_*_tiles2 differ only in that count, and expanding the unrolled loop
+; once per entry point costs about 900 bytes of the code segment for nothing.
+!macro copy_tile_chars .cols {
 !if .cols = 1 {
     !set .tile_col_t = C_TILE_COL
     !set .tile_row_t = C_TILE_ROW
@@ -209,11 +309,18 @@ copy_tile_char5 !zone { +copy_tile_char 5 }
     !set .scr_pos_hi_t = R_SCR_POS_HI_T
     !set .clr_pos_hi_t = R_CLR_POS_HI_T
 }
+!if .cols = 1 {
+    !set .fixed_var  = .tile_row_t  ; tile row is fixed along a column copy
+    !set .n_variants = TILE_ROWS
+} else {
+    !set .fixed_var  = .tile_col_t  ; tile column is fixed along a row copy
+    !set .n_variants = TILE_COLS
+}
     lda .map_pos_lo_t
-    sta .next_tile_char + 1
+    sta MAP_POS_LO_T
 
     lda .map_pos_hi_t
-    sta .next_tile_char + 2
+    sta MAP_POS_HI_T
 
     lda .scr_pos_lo_t
     sta SCR_POS_LO_T
@@ -231,51 +338,35 @@ copy_tile_char5 !zone { +copy_tile_char 5 }
     lda .pix_pos_hi_t
     sta PIX_POS_HI_T
 
-    lda #.count
-    sta ITERATIONS
-
-    clc
-.next_tile_char
-    ldx TILE_MAP
-
-    ; pixel pointer
-    lda .tile_row_t
-    beq +
-    lda #TILE_COLS ; a = TILE_COLS * tile_row (TILE_ROWS = 2)
-+
-    adc .tile_col_t
-
-;    jsr select_and_copy_tile_char
-
-    !for .char, 0, 5 {
-        !if .char != 5 {
-            !if .char != 0 {
-                cmp #.char
-            }
+    ; pick the loop specialised on this copy's fixed tile coordinate
+    lda .fixed_var
+    !for .v, 0, .n_variants-1 {
+        !if .v != .n_variants-1 {
+            cmp #.v
             bne +
         }
-        !if .char = 0 { jsr copy_tile_char0 }
-        !if .char = 1 { jsr copy_tile_char1 }
-        !if .char = 2 { jsr copy_tile_char2 }
-        !if .char = 3 { jsr copy_tile_char3 }
-        !if .char = 4 { jsr copy_tile_char4 }
-        !if .char = 5 { jsr copy_tile_char5 }
-        !if .char != 5 { bne .iterate_pointers }
+        jmp .variants + .v * (.variant1 - .variants)
 +
     }
 
-.iterate_pointers
-    clc
-    +iterate_source_pointers .cols, .next_tile_char
-    +iterate_destination_pointers .cols
-    dec ITERATIONS
-    bne .next_tile_char
+.variants
+    !for .v, 0, .n_variants-1 {
+        !if .v = 1 {
+.variant1
+        }
+        +tile_variant .cols, .v, .epilogue
+    }
+.variants_end
 
-.exit
-    lda .next_tile_char + 1
+!if .variants_end - .variants != .n_variants * (.variant1 - .variants) {
+    !error "tile loop variants are not uniformly sized"
+}
+
+.epilogue
+    lda MAP_POS_LO_T
     sta .map_pos_lo_t
 
-    lda .next_tile_char + 2
+    lda MAP_POS_HI_T
     sta .map_pos_hi_t
 
     lda SCR_POS_LO_T
@@ -294,25 +385,77 @@ copy_tile_char5 !zone { +copy_tile_char 5 }
     sta .pix_pos_hi_t
 }
 
+;-------------------------------------------------------------------------------
+;   how a copy is split over its frames
+;
+;   copy_*_tiles1 runs once (it also does init_pointers) and copy_*_tiles2 runs
+;   the remaining COPY_*_FRAMES-1 times, so the per-frame counts have to add up
+;   to the whole column/row exactly.  The "+ (remainder != 0)" term below is
+;   added to *every* tiles2 call, not just the last one, so it only balances when
+;   the remainder happens to be COPY_*_FRAMES-1 (or zero).  Anything else makes
+;   tiles2 over-copy and walk past the end of the row -- assert instead of
+;   trusting that the current tunables stay put.
+;-------------------------------------------------------------------------------
+
+COPY_COL_TILES1_COUNT = SCROLL_COLS / COPY_COL_FRAMES
+COPY_COL_TILES2_COUNT = SCROLL_COLS / COPY_COL_FRAMES + ((SCROLL_COLS % COPY_COL_FRAMES) != 0)
+COPY_ROW_TILES1_COUNT = SCROLL_ROWS / COPY_ROW_FRAMES
+COPY_ROW_TILES2_COUNT = SCROLL_ROWS / COPY_ROW_FRAMES + ((SCROLL_ROWS % COPY_ROW_FRAMES) != 0)
+
+!if COPY_COL_TILES1_COUNT + (COPY_COL_FRAMES-1) * COPY_COL_TILES2_COUNT != SCROLL_COLS {
+    !error "COPY_COL_FRAMES (", COPY_COL_FRAMES, ") does not split SCROLL_COLS (", SCROLL_COLS, ") evenly: ", COPY_COL_TILES1_COUNT, " + ", COPY_COL_FRAMES-1, "*", COPY_COL_TILES2_COUNT, " chars would be copied"
+}
+
+!if COPY_ROW_TILES1_COUNT + (COPY_ROW_FRAMES-1) * COPY_ROW_TILES2_COUNT != SCROLL_ROWS {
+    !error "COPY_ROW_FRAMES (", COPY_ROW_FRAMES, ") does not split SCROLL_ROWS (", SCROLL_ROWS, ") evenly: ", COPY_ROW_TILES1_COUNT, " + ", COPY_ROW_FRAMES-1, "*", COPY_ROW_TILES2_COUNT, " chars would be copied"
+}
+
+; +scroll_axis fires the trigger 4/SCROLL_SPEED frames before the hard step, and
+; the copy has to be finished by then or a half-built row scrolls into view
+COPY_FRAMES_BUDGET = 4 / SCROLL_SPEED
+
+!if COPY_COL_FRAMES > COPY_FRAMES_BUDGET {
+    !error "COPY_COL_FRAMES (", COPY_COL_FRAMES, ") exceeds the ", COPY_FRAMES_BUDGET, " frames a soft scroll leaves at SCROLL_SPEED ", SCROLL_SPEED
+}
+
+!if COPY_ROW_FRAMES > COPY_FRAMES_BUDGET {
+    !error "COPY_ROW_FRAMES (", COPY_ROW_FRAMES, ") exceeds the ", COPY_FRAMES_BUDGET, " frames a soft scroll leaves at SCROLL_SPEED ", SCROLL_SPEED
+}
+
+; the "bne always" below relies on this
+!if COPY_COL_TILES1_COUNT = 0 or COPY_ROW_TILES1_COUNT = 0 {
+    !error "a first frame char count is 0"
+}
+
 copy_col_tiles1 !zone {
     +init_pointers 1
-    +copy_tile_chars 1, SCROLL_COLS / COPY_COL_FRAMES
-    rts
+    lda #COPY_COL_TILES1_COUNT
+    bne copy_col_tiles      ; always, the count is not 0
 }
 
 copy_col_tiles2 !zone {
-    +copy_tile_chars 1, SCROLL_COLS / COPY_COL_FRAMES + ((SCROLL_COLS % COPY_COL_FRAMES) != 0)
+    lda #COPY_COL_TILES2_COUNT
+}
+
+copy_col_tiles !zone {
+    sta ITERATIONS
+    +copy_tile_chars 1
     rts
 }
 
 copy_row_tiles1 !zone {
     +init_pointers SCR_COLS
-    +copy_tile_chars SCR_COLS, SCROLL_ROWS / COPY_ROW_FRAMES
-    rts
+    lda #COPY_ROW_TILES1_COUNT
+    bne copy_row_tiles      ; always, the count is not 0
 }
 
 copy_row_tiles2 !zone {
-    +copy_tile_chars SCR_COLS, SCROLL_ROWS / COPY_ROW_FRAMES + ((SCROLL_ROWS % COPY_ROW_FRAMES) != 0)
+    lda #COPY_ROW_TILES2_COUNT
+}
+
+copy_row_tiles !zone {
+    sta ITERATIONS
+    +copy_tile_chars SCR_COLS
     rts
 }
 
