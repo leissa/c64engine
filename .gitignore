@@ -1,9 +1,8 @@
-*.d64
-*.exo
+*.crt
 *.l
 *.obj
 *.prg
-*.tc
 config.default
-krill
-krill.zip
+eapi
+efboot.bin
+**/__pycache__

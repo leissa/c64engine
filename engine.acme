@@ -8,9 +8,6 @@
 !source "lib/vic.acme"
 !source "lib/cia.acme"
 !source "lib/std.acme"
-!ifndef DEVELOP {
-!source "krill/loader/build/loadersymbols-c64.inc"
-}
 
 !ifdef DEBUG {
     CONTROL_X           = %00011000 ; 40 cols
@@ -63,20 +60,8 @@ SPR_F
 *=CODE_START
 
 !zone {
-;-------------------------------------------------------------------------------
-;   install 1541 code (credits for the disk loader go to Krill)
-;-------------------------------------------------------------------------------
-
-!ifndef DEVELOP {
-    jsr install
-    bcc +
-    ldx #0
--
-    sta $d020
-    stx $d020
-    jmp -
-+
-}
+; Entered either from the BASIC starter above (DEVELOP builds) or by a jmp from the EasyFlash boot copier, which has
+; already placed all data in RAM and switched the cartridge off -- see easyflash.acme.
 
 ;-------------------------------------------------------------------------------
 ;   disable all basic, kernal and irq crap
@@ -113,25 +98,6 @@ SPR_F
 
     ; -> NMI is disabled as soon as EMPTY_INTERRUPT has been triggered since we will never ever ack NMI again
     ; -> zero page completely free on this spot except for the special regs $00 and $01
-
-;-------------------------------------------------------------------------------
-;   copy loader code to work area $0200 ~ $0400
-;-------------------------------------------------------------------------------
-
-!ifndef DEVELOP {
-    ; copy 2 pages
-    ldy #2
-    ldx #0
-.copy_loop
-    lda DISK_LOADER_SRC, x
-    sta DISK_LOADER, x
-    dex
-    bne .copy_loop
-    inc .copy_loop + 2
-    inc .copy_loop + 5
-    dey
-    bne .copy_loop
-}
 
 ;-------------------------------------------------------------------------------
 ;   setup VIC
@@ -219,55 +185,11 @@ SPR_F
     jsr INIT_SONG
 
 ;-------------------------------------------------------------------------------
-;   load map data and initialize screen
+;   initialize screen
+;
+;   Tile data is already in place:
+;   it is linked in below and, for the cartridge, copied from the EasyFlash banks into RAM before we were entered.
 ;-------------------------------------------------------------------------------
-
-!ifndef DEVELOP {
-    jmp .load
-
-.load_error
-    ldx #0
--
-    sta $d020
-    stx $d020
-    jmp -
-
-!convtab pet {
-tile_map
-    !tx "map"
-    !by 0
-tile_clr
-    !tx "colors"
-    !by 0
-tile_scr
-    !tx "screen"
-    !by 0
-tile_pix
-    !tx "pixels"
-    !by 0
-}
-
-.load
-    ldx #<tile_map
-    ldy #>tile_map
-    jsr loadcompd
-    bcs .load_error
-
-    ldx #<tile_clr
-    ldy #>tile_clr
-    jsr loadcompd
-    bcs .load_error
-
-    ldx #<tile_scr
-    ldy #>tile_scr
-    jsr loadcompd
-    bcs .load_error
-
-    ldx #<tile_pix
-    ldy #>tile_pix
-    jsr loadcompd
-    bcs .load_error
-}
 
     jsr init_screen
 
@@ -325,15 +247,6 @@ init_screen !zone {
 *=SONG_DATA
 !bin "snd/transylvanian.bin"
 
-!ifndef DEVELOP {
-*=DISK_LOADER_SRC
-!bin "krill/loader/build/loader-c64.prg",,2
-
-*=DISK_INSTALLER
-!bin "krill/loader/build/install-c64.prg",,2
-}
-
-!ifdef DEVELOP {
 *=TILE_MAP
 !bin "map.bin"
 
@@ -345,7 +258,6 @@ init_screen !zone {
 
 *=TILE_PIX
 !bin "pixels.bin"
-}
 
 *=SPR_FR
 !bin "spr/hero.raw", 64*4

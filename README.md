@@ -4,14 +4,15 @@ A game engine for the c64.
 
 ## Building
 
+The engine builds as a 1 MiB [EasyFlash](http://skoe.de/easyflash/) cartridge.
+
 Dependencies:
 * [acme](https://sourceforge.net/projects/acme-crossass/)
-* [cc65](https://github.com/cc65/cc65)
+* python3 and wget
 
-The following dependencies are automatically dealt with by the `Makefile`:
-* [Krill's loader](https://csdb.dk/release/?id=189130)
-* [exomizer](https://bitbucket.org/magli143/exomizer/wiki/Home) (using Krill's intree sources)
-* [tinycrunch](https://csdb.dk/release/?id=168629) (using Krill's intree sources)
+The following is fetched automatically by the `Makefile`:
+* [EAPI](http://skoe.de/easyflash/files/devdocs/EasyFlash-ProgRef.pdf), the EasyFlash flash driver, from a pinned
+  revision of the [EasySDK](https://github.com/luigidifraia/easyflash) and assembled with `acme`
 
 ```bash
 cp config.default.template config.default
@@ -19,24 +20,39 @@ vim config.default # edit
 make
 ```
 
+This produces `engine.crt`, ready to run in an emulator or to flash onto an EasyFlash 1/3 with the usual tools.
+It shows up in the EasyFlash 3 menu as `c64engine`; override with `make CART_NAME="..."`.
+
 ## Running
 
-Before running in VICE, make sure _True drive emulation_ is enabled and _IEC-device_ is **disabled**.
 ```bash
 make run
 ```
 
 Use joystick in port 2 to run the demo.
+Hold `RUN/STOP` while the machine resets to switch the cartridge off and drop to BASIC.
+
+The cartridge does not fit in ROM: the tile data at `$3000-$bfff` lies straight through both cartridge windows, so a
+small boot stub in bank 0 copies everything into RAM, switches the cartridge off and jumps to the engine.
+See `easyflash.acme` and `tools/mkcart.py`.
+
+Note that `make run` passes `+easyflashcrtwrite`.
+VICE otherwise writes the cartridge image back on exit, which rewrites the name and drops every unused bank from
+`engine.crt`.
 
 ## Features
 
 * Bitmap scrolling using [AGSP](https://codebase64.net/doku.php?id=base:agsp_any_given_screen_position)
 
-    This technique only requires 36 raster lines CPU time and 33 raster lines of screen space. All other screen space - including screen memory (used for colors ```%01``` and ```%10```) and color ram (color ```%11```) is moved around as well.
+    This technique only requires 36 raster lines CPU time and 33 raster lines of screen space.
+    All other screen space - including screen memory (used for colors ```%01``` and ```%10```) and color ram (color
+    ```%11```) is moved around as well.
 
 * Sprite-Multiplexer
 
-    Multiplixing 24 x 2 sprites. This means 24 virtual multi-color sprites where each sprite is overlayed with a single-color sprite for more colors and better resolution.
+    Multiplixing 24 x 2 sprites.
+    This means 24 virtual multi-color sprites where each sprite is overlayed with a single-color sprite for more colors
+    and better resolution.
 
 * Tile-Copying
 
@@ -60,9 +76,11 @@ Use joystick in port 2 to run the demo.
 
     Color `%00` (the shared background color) is black, but this can of course be changed to any of the 16 colors.
     If you are generating your own tile data, it is adviced to give priority to color number `%11`.
-    In this way it is possible to reduce the problem of the sprite pointers overwriting the screen colors if certain tiles use only color `%00` & color `%11`.
+    In this way it is possible to reduce the problem of the sprite pointers overwriting the screen colors if certain
+    tiles use only color `%00` & color `%11`.
 
-* Map-loader (credits for the disk loader go to Krill)
+    These four files are linked into the image by `engine.acme` at the addresses given in `lib/mem.acme`, and travel in
+    the cartridge from there.
 
 ## Useful Links
 

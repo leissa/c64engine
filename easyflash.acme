@@ -1,0 +1,362 @@
+; EasyFlash cartridge start-up.
+;
+; Assembled to a flat 1k binary covering $fc00-$ffff.
+; mkcart.py stores it at bank 0, ROMH chip, offset $1c00 -- which is exactly where this range appears while the
+; cartridge is in Ultimax mode.
+;
+; Register and layout details follow the EasyFlash Programmer's Guide (skoe, 2012-05-22); section numbers below refer
+; to it.
+;
+; The engine cannot run from ROM:
+; TILE_MAP..TILE_PIX ($3000-$bfff) sit straight through both cartridge windows, and the raster code self-modifies.
+; So the job here is to copy everything into RAM, switch the cartridge off and hand over.
+
+!cpu 6510
+
+!source "lib/mem.acme"
+!source "lib/vic.acme"
+!source "lib/cia.acme"
+!source "lib/std.acme"
+
+SID             = $d400
+
+;-------------------------------------------------------------------------------
+;   EasyFlash registers (ProgRef 2.4, 2.5)
+;-------------------------------------------------------------------------------
+
+EF_BANK         = $de00     ; write-only, bits 0..5 = bank, valid for both chips
+EF_CONTROL      = $de02     ; write-only: L 0 0 0 0 M X G
+
+    ; MXG = 111 -> 16k cartridge, plus L:
+    ; LED on (ProgRef table 2.5, 3.3).
+EF_16K          = $87
+    ; MXG = 100 -> cartridge ROM off, LED off.
+    ; RAM at $df00 stays available.
+EF_KILL         = $04
+    ; Same, but with the LED still on:
+    ; this is used for the write half of each page so the LED does not strobe through the whole copy.
+EF_RAM_LED      = $84
+
+    ; In 16k mode bank N presents a contiguous window:
+    ; ROML at $8000-$9fff and ROMH at $a000-$bfff, both from bank N.
+EF_WINDOW       = $8000
+EF_WINDOW_END   = $c000
+
+    ; Payload lives from bank 1 on; bank 0 ROMH is this code, EAPI and the name.
+EF_PAYLOAD_BANK = 1
+    ; First page of the payload bank is the chunk table, data follows page aligned from $8100 -- see mkcart.py.
+EF_TABLE        = EF_WINDOW
+
+    ; Scratch pointers.
+    ; The copier finishes before the engine touches any zero page, so anything outside $00/$01 is free here.
+EF_SRC          = $fb       ; - $fc
+EF_DST          = $fd       ; - $fe
+
+;-------------------------------------------------------------------------------
+;   Boot progress markers, in the same spirit as the DEBUG border bands in raster.acme.
+;   Build with -DEFDEBUG=1 and the border shows how far the boot got;
+;   if the engine takes over, it paints its own border black.
+;-------------------------------------------------------------------------------
+
+!ifndef EFDEBUG { EFDEBUG = 0 }
+
+!macro ef_mark .color {
+    !if EFDEBUG {
+        lda #.color
+        sta VIC_BORDER
+    }
+}
+
+;-------------------------------------------------------------------------------
+;   Ultimax start-up. The reset vector lands here (ProgRef 2.2, 4.1).
+;-------------------------------------------------------------------------------
+
+*= $fc00
+
+reset !zone {
+    sei
+    cld
+    ldx #$ff
+    txs
+
+    ; ProgRef 4.1 asks for $01 before $00:
+    ; at reset the data direction register is all-inputs, so setting the port latch first avoids glitching the pins.
+    lda #RAM_ROM_DEFAULT
+    sta RAM_ROM_SELECTION
+    lda #$2f
+    sta $00
+
+    ; Initialize the VIC (ProgRef 4.1).
+    ; Power-up register contents are undefined, and the engine only rewrites a subset of them per frame, so whatever
+    ; it does not touch has to be put in a known state here.
+    ;
+    ; VIC_CONTROL_X in particular:
+    ; the engine writes it once per frame from the raster IRQ and never otherwise, and leaving it undefined until then
+    ; leaves the right-hand border open from the VSP down.
+    ; Booting from disk this was masked, because the KERNAL had already put $c8 here.
+    ldx #$2e
+    lda #0
+-
+    sta VIC, x
+    dex
+    bpl -
+
+    lda #$c8                ; 40 columns, no soft scroll -- the KERNAL's value
+    sta VIC_CONTROL_X
+    lda #$15
+    sta VIC_ADDR_SELECT
+
+    ; screen off until the engine takes over, so the copy stays invisible
+    lda #0
+    sta VIC_CONTROL_Y
+    sta VIC_BORDER
+    sta VIC_BACKGROUND_0
+
+    ; silence the SID
+    ldx #$18
+-
+    sta SID, x
+    dex
+    bpl -
+
+    ; no timer interrupts, and acknowledge whatever is pending
+    +disable_timer_interrupts
+    lda CIA1_INTERRUPT_CONTROL
+    lda CIA2_INTERRUPT_CONTROL
+
+    ; Keyboard: drive rows on port A, read columns on port B.
+    ; These are the values the KERNAL would have left behind, which is what the engine's joystick reads on $dc00 expect.
+    lda #$ff
+    sta CIA1_DDR_A
+    lda #$00
+    sta CIA1_DDR_B
+
+    ; CIA2 port A drives the VIC bank select.
+    ; Without this the engine's write to $dd00 hits an all-inputs port and the VIC keeps reading bank 0.
+    lda #$3f
+    sta CIA2_DDR_A
+    lda #$00
+    sta CIA2_DDR_B
+
+    +ef_mark WHITE          ; 1: rom stub survived init
+
+    ; Relocate the copier and continue from RAM.
+    ; Everything past this point has to run from RAM:
+    ; both exits below switch the cartridge out, which would otherwise pull the executing code out from under the CPU.
+    ldx #0
+-
+    lda copier_src, x
+    sta EF_COPIER, x
+    dex
+    bne -
+
+    jmp EF_COPIER
+}
+
+;-------------------------------------------------------------------------------
+;   Copier -- stored here, runs at EF_COPIER ($0200)
+;-------------------------------------------------------------------------------
+
+copier_src
+!pseudopc EF_COPIER {
+
+copier !zone {
+    +ef_mark RED            ; 2: running from RAM
+
+    ; ProgRef 3.2: let the user reach BASIC without unplugging the cartridge.
+    lda #%01111111          ; select keyboard row 7
+    sta CIA1_PORT_2
+    lda CIA1_PORT_1
+    and #%10000000          ; column 7 of row 7 is RUN/STOP
+    bne .boot
+
+    lda #EF_KILL
+    sta EF_CONTROL
+    jmp ($fffc)             ; KERNAL is back at $e000 -- cold start it
+
+.boot
+    lda #EF_16K
+    sta EF_CONTROL
+
+    +ef_mark CYAN           ; 3: 16k mode selected
+
+    lda #EF_PAYLOAD_BANK
+    sta .bank
+    sta EF_BANK
+
+    ; Lift the chunk table out of the cartridge while bank 1 is still selected.
+    ; It only exists in bank 1, and walking the payload below switches banks.
+    ldx #0
+-
+    lda EF_TABLE, x
+    sta EF_TABLE_RAM, x
+    dex
+    bne -
+
+    ; Chunk data starts on the page after the table.
+    ; Both source pointers stay page aligned from here on, so a bank boundary can only ever be crossed at a page
+    ; boundary -- which is what .next_page relies on.
+    lda #0
+    sta EF_SRC
+    sta .tbl_idx
+    lda #>(EF_WINDOW + $100)
+    sta EF_SRC + 1
+
+    ldy #0
+
+.next_chunk
+    ldx .tbl_idx
+    lda EF_TABLE_RAM + 0, x
+    sta EF_DST
+    lda EF_TABLE_RAM + 1, x
+    sta EF_DST + 1
+    lda EF_TABLE_RAM + 2, x
+    sta .len
+    lda EF_TABLE_RAM + 3, x
+    sta .len + 1
+    ora .len
+    beq .done               ; a zero length terminates the table
+
+    txa
+    clc
+    adc #4
+    sta .tbl_idx
+
+    +ef_mark PURPLE         ; 4: a chunk header was read
+
+    ; whole pages first
+    lda .len + 1
+    sta .pages
+    beq .part
+.page
+    jsr .fetch
+    ldx #0                  ; 0 means a full page
+    jsr .store
+    inc EF_DST + 1
+    jsr .next_page
+    dec .pages
+    bne .page
+
+    ; then the remainder, if any
+.part
+    ldx .len
+    beq .next_chunk
+    jsr .fetch
+    jsr .store              ; X = .len bytes
+
+    ; skip the padding mkcart.py inserted to keep the next chunk page aligned
+    jsr .next_page
+    jmp .next_chunk
+
+.done
+    +ef_mark GREEN          ; 5: all chunks copied
+
+    lda #EF_KILL
+    sta EF_CONTROL
+    +ef_mark YELLOW         ; 6: cartridge off, handing over
+    jmp CODE_START
+
+    ; Read one page out of the cartridge window into the staging buffer.
+.fetch
+    ldy #0
+-
+    lda (EF_SRC), y
+    sta EF_BUFFER, y
+    iny
+    bne -
+    rts
+
+    ; Write X bytes (X = 0 means a full page) from the staging buffer to (EF_DST), with the cartridge switched off.
+    ;
+    ; The detour through the buffer exists because part of the payload lands in $8000-$bfff, underneath the cartridge.
+    ; Those writes reach RAM either way, but the flash chip sees them too, and the Am29F040 decodes particular
+    ; address/data sequences as unlock-and-program commands.
+    ; Pushing tens of kilobytes of map data through that interface is a good way to corrupt the cartridge on real
+    ; hardware, so the ROM is out of the way while we store.
+.store
+    lda #EF_RAM_LED
+    sta EF_CONTROL
+    ldy #0
+-
+    lda EF_BUFFER, y
+    sta (EF_DST), y
+    iny
+    dex
+    bne -
+    lda #EF_16K
+    sta EF_CONTROL
+    ldy #0
+    rts
+
+    ; Advance the source by one page, following the bank wrap. Returns Y = 0.
+.next_page
+    inc EF_SRC + 1
+    lda EF_SRC + 1
+    cmp #>EF_WINDOW_END
+    bne +
+    lda #>EF_WINDOW
+    sta EF_SRC + 1
+    inc .bank
+    lda .bank
+    sta EF_BANK
++
+    ldy #0
+    rts
+
+.len        !by 0, 0
+.pages      !by 0
+.bank       !by 0
+.tbl_idx    !by 0
+}
+
+;-------------------------------------------------------------------------------
+;   ef_eapi_init -- copy EAPI out of the cartridge and initialize it.
+;
+;   Nothing in the engine writes flash yet, so this is not called at boot:
+;   it would cost EAPI_RAM permanently and returns with the cartridge banked in at $8000-$bfff, which we would have to
+;   undo immediately.
+;   A future save feature should call it with the cartridge already switched to 16k mode, then kill the cartridge again.
+;   The jump table it installs lives in EasyFlash RAM at $df80-$dfff (ProgRef 5.3), which survives EF_KILL.
+;
+;   Returns with carry set if the flash chip is not supported (ProgRef 5.7).
+;-------------------------------------------------------------------------------
+
+ef_eapi_init !zone {
+    ; EAPI sits at bank 0, ROMH offset $1800 -> $b800 in 16k mode
+    lda #0
+    sta EF_BANK
+
+    ldx #0
+-
+    lda $b800, x
+    sta EAPI_RAM, x
+    lda $b900, x
+    sta EAPI_RAM + $100, x
+    lda $ba00, x
+    sta EAPI_RAM + $200, x
+    dex
+    bne -
+
+    jmp EAPI_RAM + 20       ; EAPIInit (ProgRef 5.7)
+}
+
+}
+copier_size = * - copier_src
+
+; One page only:
+; the relocation loop copies exactly $100 bytes, and EF_TABLE_RAM occupies the page right behind the copier.
+!if copier_size > $100 {
+    !error "copier does not fit in EF_COPIER ($0200-$02ff): ", copier_size, " bytes"
+}
+!if copier_src + $100 > $fffa {
+    !error "copier source overruns the vectors"
+}
+
+;-------------------------------------------------------------------------------
+;   Vectors. Only reset matters -- in Ultimax the CPU fetches it from here.
+;-------------------------------------------------------------------------------
+
+*= $fffa
+    !word reset             ; nmi
+    !word reset             ; reset
+    !word reset             ; irq

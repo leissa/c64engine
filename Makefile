@@ -9,107 +9,92 @@ endif
 endif
 
 OUT       ?= engine
-D64       ?= $(OUT).d64
-KRILL     ?= ./krill
-KRILL_URL ?= "http://csdb.dk/getinternalfile.php/196649/loader-v184.zip"
-INC       ?= $(KRILL)/loader/build/loadersymbols-c64.inc
-CC1541    ?= $(KRILL)/loader/tools/cc1541/cc1541
-EXO       ?= $(KRILL)/loader/tools/exomizer-3/src/exomizer
-TC        ?= $(KRILL)/loader/tools/tinycrunch_v1.2/tc_encode.py
+CRT       ?= $(OUT).crt
+CART_NAME ?= c64engine
+
+MKCART    ?= tools/mkcart.py
+
+# EAPI is not redistributed here.
+# Fetch its sources at a pinned revision and assemble them with the acme we already depend on.
+# Section references are to the EasyFlash Programmer's Guide;
+# 5.1 asks for the Am29F040 build in particular, because that is the chip emulators implement.
+EAPI_DIR  ?= ./eapi
+EAPI      ?= $(EAPI_DIR)/eapi-am29f040-14
+EAPI_REV  ?= 9c787d3b94697d247342a6146f2e27d69cf916e6
+EAPI_URL  ?= https://raw.githubusercontent.com/luigidifraia/easyflash/$(EAPI_REV)/EasySDK/eapi
+EAPI_SRC  := $(EAPI_DIR)/eapi-am29f040.s $(EAPI_DIR)/eapi_defs.s
 
 ENGINE_ACME := engine.acme
-ENGINE_OBJ := $(filter %.obj, $(ENGINE_ACME:.acme=.obj))
-ENGINE_EXO := $(filter %.exo, $(ENGINE_OBJ:.obj=.exo))
+ENGINE_OBJ  := $(ENGINE_ACME:.acme=.obj)
+EFBOOT_ACME := easyflash.acme
+EFBOOT_BIN  := efboot.bin
 
-ENGINE_BIN := $(sort $(wildcard *.bin))
-ENGINE_PRG := $(filter %.prg, $(ENGINE_BIN:.bin=.prg))
-ENGINE_TC  := $(filter %.tc,  $(ENGINE_PRG:.prg=.tc))
+# Everything the sources pull in via !source and !bin.
+# The two binaries have separate source lists so that editing one does not rebuild the other, and efboot.bin is
+# filtered out because it is a build product, not tile data.
+LIB_SRC     := $(sort $(wildcard lib/*.acme))
+ENGINE_SRC  := $(sort $(filter-out $(EFBOOT_ACME),$(wildcard *.acme))) $(LIB_SRC)
+ENGINE_DATA := $(sort $(filter-out $(EFBOOT_BIN),$(wildcard *.bin)) \
+                     $(wildcard snd/*.bin) $(wildcard spr/*.raw))
 
-# everything engine.acme pulls in via !source and !bin
-ENGINE_SRC  := $(sort $(wildcard *.acme) $(wildcard lib/*.acme))
-ENGINE_DATA := $(sort $(wildcard snd/*.bin) $(wildcard spr/*.raw))
-
-# keep the on-disk order in sync with the loadcompd calls in engine.acme so the
-# drive head only ever moves forward; anything not listed is appended
-DISK_ORDER := map.tc colors.tc screen.tc pixels.tc
-ENGINE_TC  := $(filter $(ENGINE_TC),$(DISK_ORDER)) $(filter-out $(DISK_ORDER),$(ENGINE_TC))
-
-# disk file names are the .bin base names, as expected by loadcompd in engine.acme
-CC1541_FILES = $(foreach f,$(ENGINE_TC),-f $(basename $(f)) -w $(f))
-
-map.bin.addr    := '\x00\x30'
-colors.bin.addr := '\x00\x90'
-screen.bin.addr := '\x00\x96'
-pixels.bin.addr := '\x00\x9c'
+# Memory the engine builds at runtime, so it does not have to travel in the cartridge:
+# HIRES ($c000-$dfff) and SCREEN ($e000-$e3ff), both filled by init_screen.
+# Keep in sync with lib/mem.acme.
+CART_SKIP ?= 0xc000:0xe400
 
 # use 'make Q=' to get a verbose output of all commands
 Q ?= @
 
-# never leave a half-written file behind: make would treat it as up to date
+# never leave a half-written file behind:
+# make would treat it as up to date
 .DELETE_ON_ERROR:
 
 .PHONY: all clean distclean run dev prg
 
-all: $(D64)
+all: $(CRT)
 
-$(INC):
-	@echo '===> INSTALL KRILL LOADER'
-	$(Q)$(WGET) $(KRILL_URL) -O krill.zip
-	$(Q)$(MKDIR) -p $(KRILL)
-	$(Q)$(UNZIP) krill.zip -d $(KRILL)
-	$(Q)$(MAKE)  -C $(KRILL)/loader
+$(EAPI_DIR):
+	$(Q)$(MKDIR) -p $@
 
-$(CC1541): $(INC)
-	@echo '===> INSTALL CC1541'
-	$(Q)$(MAKE)  -C $(KRILL)/loader/tools/cc1541
+$(EAPI_SRC): | $(EAPI_DIR)
+	@echo '===> FETCH $(@F)'
+	$(Q)$(WGET) -q $(EAPI_URL)/$(@F) -O $@
 
-$(EXO): $(INC)
-	@echo '===> INSTALL EXOMIZER'
-	$(Q)$(MAKE)  -C $(KRILL)/loader/tools/exomizer-3/src
+# acme resolves !source against the working directory, so build this in place
+$(EAPI): $(EAPI_SRC)
+	@echo '===> ACME $(@F)'
+	$(Q)cd $(EAPI_DIR) && $(ACME) -o $(@F) eapi-am29f040.s
 
-%.obj: %.acme $(INC)
+$(ENGINE_OBJ): $(ENGINE_ACME) $(ENGINE_SRC) $(ENGINE_DATA)
 	@echo '===> ACME $<'
 	$(Q)$(ACME) -f cbm -DSYSTEM=64 -o $@ $<
 
-# engine.acme !sources/!bins these, so they belong in the .obj dependencies.
-# naming .obj/.prg in an explicit rule would cost them their intermediate
-# status, so declare it back: they are rebuilt on demand and cleaned up after.
-$(ENGINE_OBJ): $(ENGINE_SRC) $(ENGINE_DATA)
-.INTERMEDIATE: $(ENGINE_OBJ) $(ENGINE_PRG)
+$(EFBOOT_BIN): $(EFBOOT_ACME) $(LIB_SRC)
+	@echo '===> ACME $<'
+	$(Q)$(ACME) -f plain -o $@ $<
 
-%.exo: %.obj $(EXO)
-	@echo '===> EXO $<'
-	$(Q)$(EXO) sfx sys $< -B -x1 -o $@
-
-%.prg: %.bin
-	@echo '===> BIN to PRG $<'
-	$(Q)$(if $($(<).addr),,$(error no load address for $< -- define '$(<).addr' in the Makefile, matching lib/mem.acme))
-	$(Q)printf $($(<).addr) | cat - $< > $@
-
-# $(INC) doubles as the marker for "krill is unpacked", which is where $(TC) lives
-%.tc: %.prg $(INC)
-	@echo '===> TC $<'
-	$(Q)$(PYTHON) $(TC) -i $< $@
-
-$(D64): $(CC1541) $(ENGINE_TC) $(ENGINE_EXO)
-	@echo '===> CC1541 $@'
-	$(Q)$(CC1541) -n $(OUT) -f "$(OUT)#a0,8,1" -w $(ENGINE_EXO) $(CC1541_FILES) $(D64)
+$(CRT): $(ENGINE_OBJ) $(EFBOOT_BIN) $(EAPI) $(MKCART)
+	@echo '===> MKCART $@'
+	$(Q)$(PYTHON) $(MKCART) --engine $(ENGINE_OBJ) --boot $(EFBOOT_BIN) \
+	    --eapi $(EAPI) --name "$(CART_NAME)" $(if $(Q),,-v) \
+	    $(foreach r,$(CART_SKIP),--skip $(r)) -o $@
 
 clean:
 	@echo '===> CLEAN'
-	$(Q)rm -f $(D64) $(ENGINE_EXO) $(ENGINE_OBJ) $(ENGINE_TC) $(ENGINE_PRG)
-	$(Q)rm -f $(OUT).prg labels.l krill.zip
+	$(Q)rm -f $(CRT) $(ENGINE_OBJ) $(EFBOOT_BIN) $(OUT).prg labels.l
 
 distclean: clean
 	@echo '===> DISTCLEAN'
-	$(Q)rm -rf $(KRILL)
+	$(Q)rm -rf $(EAPI_DIR)
 
-run: $(D64)
+# +easyflashcrtwrite matters:
+# VICE writes the cartridge image back on exit by default, which rewrites the CRT name and (with its optimizer) drops
+# every unused bank -- quietly replacing the build artifact with a 4 bank image.
+run: $(CRT)
 	@echo '===> RUN $<'
-	$(Q)$(X64) $(D64)
+	$(Q)$(X64) +easyflashcrtwrite -cartcrt $(CRT)
 
-# dev and prg write the same engine.prg with different flags, so they always
-# rebuild instead of tracking dependencies
+# dev and prg write the same engine.prg with different flags, so they always rebuild instead of tracking dependencies
 dev:
 	@echo '===> DEV'
 	$(Q)rm -f $(OUT).prg

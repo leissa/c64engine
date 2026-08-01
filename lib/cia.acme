@@ -5,6 +5,11 @@ CIA2 = $DD00
 
 CIA1_PORT_2 = $DC00
 CIA1_PORT_1 = $DC01
+
+    ; keyboard: rows are driven on port A, columns are read back on port B
+CIA1_DDR_A = $DC02
+CIA1_DDR_B = $DC03
+
 CIA1_TIMER_A_LO = $DC04
 CIA1_TIMER_A_HI = $DC05
 CIA1_TIMER_B_LO = $DC06
@@ -25,6 +30,11 @@ CIA1_INTERRUPT_CONTROL = $DC0D
     ;   * Bit 6: CLOCK IN
     ;   * Bit 7: DATA IN
 CIA2_DATA_PORT_A = $DD00
+
+    ; Bits 0..5 must be outputs for the VIC bank select above to have any effect.
+    ; The KERNAL sets this to $3f during its reset; a cartridge boot has to do it itself.
+CIA2_DDR_A = $DD02
+CIA2_DDR_B = $DD03
 
 CIA2_TIMER_A_LO = $DD04
 CIA2_TIMER_A_HI = $DD05

@@ -64,9 +64,25 @@ SPR_Y           = $58; - $6f
 
 ; zero page: $0000 - $00ff
 ; cpu stack: $0100 - $01ff
-DISK_LOADER     = $0200; ~ $0400
-;----------------------------------1k
-MEM_FOR_BASIC   = $0400; - $07ff
+
+; The EasyFlash boot copier relocates itself here and runs from RAM while the cartridge is banked in;
+; see easyflash.acme.
+; Both pages must stay below the lowest payload destination ($0801) so the copy cannot overwrite them.
+EF_COPIER       = $0200; - $02ff
+; The chunk table only exists in bank 1, but the copier switches banks as it walks the payload, so the table is lifted
+; into RAM before the walk starts.
+EF_TABLE_RAM    = $0300; - $03ff
+;----------------------------------512b
+
+; Reserved for EAPI, which must live page-aligned in $0200..$7fff or $c000..$cfff and may be up to 768 bytes
+; (EasyFlash ProgRef 5.4).
+; $c000 is the bitmap here, so it goes in what used to be the BASIC screen area.
+; Nothing copies or initializes it yet -- see ef_eapi_init in easyflash.acme.
+EAPI_RAM        = $0400; - $06ff
+EAPI_RAM_SIZE   = $0300
+; One page of scratch the boot copier stages cartridge data through, so it can write to RAM with the cartridge switched
+; off; see easyflash.acme.
+EF_BUFFER       = $0700; - $07ff
 ;----------------------------------1k
 
 SPR_DATA        = $080d; - $0883
@@ -74,8 +90,6 @@ CODE_START      = $0885; - $1fff,  6k
 SONG_DATA       = $2000; - $2fff,  4k
 ;---------------------------------12k
 
-DISK_LOADER_SRC = $3000; ~ $3200
-DISK_INSTALLER  = $4000; ~ $5b00
 TILE_MAP        = $3000; - $8fff, 24k
 TILE_CLR        = $9000; - $95ff,  1.5k
 TILE_SCR        = $9600; - $9bff,  1.5k
