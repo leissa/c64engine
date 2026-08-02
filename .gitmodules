@@ -1,0 +1,6 @@
+[submodule "submodules/aay1541"]
+	path = submodules/aay1541
+	url = ../aay1541.git
+[submodule "submodules/aay64"]
+	path = submodules/aay64
+	url = ../aay64.git
