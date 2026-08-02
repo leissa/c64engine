@@ -32,6 +32,10 @@ ENGINE_OBJ  := $(ENGINE_ACME:.acme=.obj)
 EFBOOT_ACME := easyflash.acme
 EFBOOT_BIN  := efboot.bin
 
+# Symbols for VICE's monitor: load with `ll "labels.vice"`.
+# This has to be a CLI switch -- engine.acme's !sl writes acme's own symbol list format, which the monitor cannot read.
+VICE_LABELS := labels.vice
+
 # Everything the sources pull in via !source and !bin.
 # The two binaries have separate source lists so that editing one does not rebuild the other, and efboot.bin is
 # filtered out because it is a build product, not tile data.
@@ -70,7 +74,7 @@ $(EAPI): $(EAPI_SRC)
 
 $(ENGINE_OBJ): $(ENGINE_ACME) $(ENGINE_SRC) $(ENGINE_DATA)
 	@echo '===> ACME $<'
-	$(Q)$(ACME) -f cbm -DSYSTEM=64 -o $@ $<
+	$(Q)$(ACME) -f cbm -DSYSTEM=64 --vicelabels $(VICE_LABELS) -o $@ $<
 
 $(EFBOOT_BIN): $(EFBOOT_ACME) $(LIB_SRC)
 	@echo '===> ACME $<'
@@ -87,11 +91,11 @@ $(CRT): $(ENGINE_OBJ) $(EFBOOT_BIN) $(EAPI) $(MKCART)
 #   make regress REGRESS_REF=regress-before
 regress:
 	@echo '===> REGRESS'
-	$(Q)X64SC='$(X64SC)' ACME='$(ACME)' $(REGRESS) $(REGRESS_OUT) $(REGRESS_REF)
+	$(Q)X64SC='$(X64SC)' ACME_BIN='$(ACME)' $(REGRESS) $(REGRESS_OUT) $(REGRESS_REF)
 
 clean:
 	@echo '===> CLEAN'
-	$(Q)rm -f $(CRT) $(ENGINE_OBJ) $(EFBOOT_BIN) $(OUT).prg labels.l
+	$(Q)rm -f $(CRT) $(ENGINE_OBJ) $(EFBOOT_BIN) $(OUT).prg labels.l $(VICE_LABELS)
 	$(Q)rm -rf $(REGRESS_OUT)
 
 distclean: clean
@@ -109,9 +113,9 @@ run: $(CRT)
 dev:
 	@echo '===> DEV'
 	$(Q)rm -f $(OUT).prg
-	$(Q)$(ACME) -DSYSTEM=64 -DDEVELOP=1 -DDEBUG=1 $(ENGINE_ACME)
+	$(Q)$(ACME) -DSYSTEM=64 -DDEVELOP=1 -DDEBUG=1 --vicelabels $(VICE_LABELS) $(ENGINE_ACME)
 
 prg:
 	@echo '===> PRG'
 	$(Q)rm -f $(OUT).prg
-	$(Q)$(ACME) -DSYSTEM=64 -DDEVELOP=1 $(ENGINE_ACME)
+	$(Q)$(ACME) -DSYSTEM=64 -DDEVELOP=1 --vicelabels $(VICE_LABELS) $(ENGINE_ACME)

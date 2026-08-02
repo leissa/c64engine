@@ -5,6 +5,7 @@
 config.default
 eapi
 efboot.bin
+labels.vice
 **/__pycache__
 regress
 regress-*

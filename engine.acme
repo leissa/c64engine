@@ -1,7 +1,7 @@
 !ifdef DEVELOP {
 !to "engine.prg", cbm   ; output program
 }
-!sl "labels.l"          ; create label file for vice
+!sl "labels.l"          ; acme symbol list; the vice one is the Makefile's --vicelabels
 !convtab scr            ; for conversion to c64 screen codes
 
 !source "lib/mem.acme"

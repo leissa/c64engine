@@ -16,8 +16,11 @@
 # screenshot depends on which cycle the emulator happens to stop on and is not
 # reproducible -- do not "simplify" it away.
 #
-# ACME and X64SC come from the environment; 'make regress' passes them through
-# from config.default, which is Makefile syntax and cannot be sourced here.
+# ACME_BIN and X64SC come from the environment; 'make regress' passes them
+# through from config.default, which is Makefile syntax and cannot be sourced
+# here.  The assembler's path is *not* passed as ACME: acme reads that variable
+# as its <...> include library path, so exporting it would point the library at
+# the executable.
 #
 # usage: tools/regress.sh <outdir> [reference-dir]
 
@@ -26,7 +29,7 @@ set -e
 OUT=${1:?usage: tools/regress.sh <outdir> [reference-dir]}
 REF=$2
 
-ACME=${ACME:-acme}
+ACME_BIN=${ACME_BIN:-acme}
 X64SC=${X64SC:-x64sc}
 
 # spread over the phases of AP_TABLE: each direction alone, the diagonal, and
@@ -40,7 +43,7 @@ mkdir -p "$OUT"
 fail=0
 
 for n in $STOPS; do
-    $ACME -DSYSTEM=64 -DDEVELOP=1 -DAUTOPILOT=1 -DAP_FRAMES="$n" \
+    $ACME_BIN -DSYSTEM=64 -DDEVELOP=1 -DAUTOPILOT=1 -DAP_FRAMES="$n" \
           -f cbm -o "$OUT/ap$n.prg" engine.acme > "$OUT/build$n.log" 2>&1 || {
         echo "FAIL build (stop=$n)"; cat "$OUT/build$n.log"; exit 1; }
 

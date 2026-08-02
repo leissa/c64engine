@@ -373,12 +373,79 @@ x64sc -warp -sounddev dummy +easyflashcrtwrite -limitcycles 12000000 \
 Comparing that against the same run on `engine.prg` (`-autostartprgmode 1 +drive8truedrive -autostart engine.prg`)
 isolates cartridge-boot bugs from engine bugs: the two should render the same frame apart from sprite animation phase.
 
+## The assembler's own manual — `/usr/share/doc/acme/`
+
+Plain text, installed with the `acme` package, and release 0.97 ("Zem", 11 Jul 2025) — the same release as the
+installed binary, so it describes the assembler that actually builds this tree.
+`QuickRef.txt` is the entry point and `Help.txt` indexes the rest;
+`Help.txt` also advertises a `cputypes/` directory, which this package does not ship.
+
+| file                              | content                                                                                                     |
+| --------------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| `QuickRef.txt`                    | syntax, the four kinds of symbol, the complete CLI switch list, and the operator/precedence table            |
+| `AllPOs.txt`                      | every pseudo opcode with call syntax, aliases and examples — grep this before writing any new `!` directive |
+| `AddrModes.txt`                   | how ACME picks zp vs absolute, and the two ways to override it                                               |
+| `Illegals.txt`                    | the illegal opcodes `!cpu 6510` unlocks, with opcode bytes, semantics and which ones are unstable            |
+| `Errors.txt`                      | every warning and error message spelled out — look the message up here instead of guessing                  |
+| `Floats.txt`                      | when arithmetic goes floating point and when it stays integer                                                |
+| `Upgrade.txt`, `Changes.txt`      | behaviour changes between releases and which `--dialect` restores the old one                                |
+| `Lib.txt`                         | the `<...>` include library and how its path is resolved                                                     |
+| `65816.txt`, `Example.txt`, `Source.txt`, `joe.txt` | irrelevant here: other CPU, shipped samples, building ACME, JOE syntax file                |
+
+What in there actually bears on this engine:
+
+- **An oversized addressing mode is a stolen cycle.**
+  If ACME cannot resolve a symbol in the first pass it assumes 16-bit addressing;
+  when a later pass finds the value fits in a byte it only _warns_ ("Using oversized addressing mode").
+  In `raster.acme` that silently turns a 3-cycle `lda zp` into a 4-cycle `lda abs` and invalidates the `; N` comments
+  around it, so never dismiss that warning.
+  It is avoided by defining zero-page symbols before use, which is what `!source "lib/mem.acme"` first in
+  `engine.acme` achieves.
+  To force the mode, postfix the mnemonic — `lda+1` is 8-bit, `lda+2` 16-bit;
+  leading zeros in a symbol's value (`$00fa`) do the same, and `<`/`>` force their result to 8 bits.
+  Forcing the _larger_ mode on purpose is legitimate here: it buys a cycle without spending a byte on a `nop`.
+- **Segment overlap is only a warning** — `Errors.txt`, "Segment reached another one, overwriting it" and "Segment
+  starts inside another one, overwriting it".
+  That is exactly the silent failure the code-segment-vs-`SONG_DATA` `!error` in `engine.acme` was written to catch.
+  `--strict-segments` promotes both to errors globally;
+  `engine.acme` and `easyflash.acme` both assemble cleanly with it today, so it is available if that hand-written
+  check ever needs replacing.
+- **`!align 255, 0` pads with `$ea`**, not with zero — the default fill is the NOP opcode (verified).
+  That is what the padding before `IRQ` in `raster.acme` and before the table in `joystick.acme` is made of, and what
+  `-DDEBUG` counts as wasted bytes.
+- **`/` truncates because it is integer division**, unless one operand is a float (`Floats.txt`: `1/2*2` is 0,
+  `1.0/2*2` is 1; `DIV` is always integer).
+  That is the truncation the `!error` assertions at the top of `scroll.acme` guard against.
+- **`&` un-does `!pseudopc`.**
+  Inside the `!pseudopc EF_COPIER { }` block in `easyflash.acme` a label evaluates to its _run_ address in RAM;
+  `&label` gives the address it is actually stored at in the cartridge, which is how you'd compute the copier's
+  source range from labels rather than by hand.
+- **Macro scoping is why `+scroll_axis` can be instantiated four times**:
+  each macro _call_ gets its own scope for `.local` symbols, and anonymous `+`/`-` labels work inside macros too.
+  Macros may also be overloaded on parameter count, and `~param` passes by reference.
+- **Two label files, and only one of them is for VICE.**
+  `!sl "labels.l"` in `engine.acme` writes ACME source (`SYMBOL = $xxxx`), which is loadable back into another
+  assembly with `!source` but means nothing to the emulator.
+  VICE's monitor `ll` wants `al C:xxxx .name`, which only the `--vicelabels FILE` CLI switch emits;
+  the `Makefile` passes it as `$(VICE_LABELS)` on every `engine.acme` build, so `ll "labels.vice"` in the monitor
+  gets you symbols.
+- **`acme -v2` prints every segment's start, end and size**, and `-r FILE` writes a listing with the address and the
+  emitted bytes next to each source line.
+  Both are cheaper than the `-DDEBUG` `!warn`s when the question is just how much room is left in a segment.
+- `<...>` includes need the library path, which acme reads from the **`ACME` environment variable** (or `--libpath`).
+  Nothing here uses them, but the name is a trap:
+  `make regress` has to hand the assembler's path to `tools/regress.sh`, and calling that variable `ACME` would
+  export it straight into acme's own environment as a library path pointing at the executable.
+  It is called `ACME_BIN` for that reason — the `ACME` in `config.default` is a make variable and is never exported.
+
 ## External references — `submodules/`
 
-Two _All About Your …_ HTML references, checked out as submodules.
+Three references, checked out as submodules:
+the two _All About Your …_ HTML sets and `c64docs`.
 They are hardware/ROM documentation, not build inputs — nothing in the `Makefile` reads them.
 
-They are HTML with no plain-text copy, so read them with the tags stripped and search them with `grep`:
+Everything except `c64docs/vic-ii.txt` is HTML with no plain-text copy, so read it with the tags stripped and search it
+with `grep`:
 
 ```bash
 cd submodules/aay64
@@ -388,6 +455,38 @@ grep -ril badline *.HTM              # find the page first
 
 `INDEX.HTM` / `INDEXLST.HTM` are the hand-written entry points, but the filenames are systematic enough to jump
 straight in.
+
+### `submodules/c64docs` — VIC-II internals and a one-page memory map
+
+`vic-ii.txt` is Christian Bauer's _The MOS 6567/6569 video controller (VIC-II) and its application in the Commodore 64_
+(1996).
+This is the reference `raster.acme` was missing:
+section 3.14 describes every technique the engine is built on, by name and in terms of the VIC's internal counters.
+
+It is UTF-8 with Unix line endings, so it reads and greps directly.
+(It was converted from the shipped Latin-1/CRLF original, which `grep` classified as binary and returned no hits for.)
+
+| section              | content                                                                                                                                                                        |
+| -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 3.5                  | the Bad Line Condition, stated literally — the rule every stage of the IRQ chain plays against                                                                                 |
+| 3.6.3                | cycle-by-cycle timing of a raster line: `BA`/`AEC`, VIC vs 6510 access per clock phase, X coordinate per cycle. The 6569 diagrams are the sprite-less ones; sprites are in 3.8.1 |
+| 3.7.2                | `VC`/`RC` — the counters that make linecrunch and DMA delay shift the display at all                                                                                           |
+| 3.8.1                | sprite DMA: p-/s-accesses in statically assigned cycles, `BA` low three cycles ahead, the Y-expansion flip flop. The cycle numbers here _are_ 6569                              |
+| 3.9                  | the border unit's comparators, i.e. how the borders are opened                                                                                                                 |
+| 3.14.2/3.14.4/3.14.6 | FLD, Linecrunch, and DMA delay — the last is what this repo calls VSP                                                                                                          |
+| 3.14.1/3/5/7         | Hyperscreen, FLI, doubled text lines, sprite stretching — the neighbouring tricks                                                                                              |
+
+3.14.6 closes by naming the combination the engine _is_:
+DMA delay plus FLD plus Linecrunch scrolls a whole graphics screen in all directions without moving bytes — AGSP.
+It also explains a symptom worth recognising when the VSP misfires:
+the first three c-accesses after the late bad line read `$ff` as character pointers and the low nibble of the opcode
+following the `$d011` write as colour, because `AEC` trails `BA` by three cycles.
+
+`cbm64mem.html` is a single-page `$0000-$ffff` map — zero-page/KERNAL variables, then every VIC, SID and CIA register
+with its bit fields and power-up default.
+Faster to grep than aay64's one-page-per-register when you just want a bit meaning.
+Its defaults `$d011 = $1b` and `$d016 = $c8` are the KERNAL's `$9b`/`$08` from _Cartridge boot_ above, minus the
+read-only raster MSB and plus `$d016`'s unused high bits, which always read as set.
 
 ### `submodules/aay64` — the C64
 
@@ -410,6 +509,7 @@ The boot-stub rules in _Cartridge boot_ above are all checkable here: `ROMFDA3.H
 and `ROMECB9.HTM` gives the `$d011 = $9b` / `$d016 = $08` the KERNAL would have left behind.
 What it does **not** cover is the demo-coding side — there is no page on FLD, VSP, line crunch, AGSP or badline timing,
 so `raster.acme` has no reference here beyond the raw register semantics.
+That is what `c64docs/vic-ii.txt` is for.
 
 ### `submodules/aay1541` — the drive
 
