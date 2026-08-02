@@ -18,6 +18,18 @@
 }
 
 CONTROL_Y_MASK      = %10111111 ; bitmap mode
+
+; Every $d011 the engine writes carries CONTROL_Y_INVALID's RSEL bit, so that bit
+; decides where the vertical border flag switches and hence where the display
+; window begins and ends.  See lib/vic.acme.
+!if (CONTROL_Y_INVALID & VIC_RSEL) != 0 {
+V_BORDER_TOP        = VIC_V_BORDER_TOP_25
+V_BORDER_BOTTOM     = VIC_V_BORDER_BOTTOM_25
+} else {
+V_BORDER_TOP        = VIC_V_BORDER_TOP_24
+V_BORDER_BOTTOM     = VIC_V_BORDER_BOTTOM_24
+}
+
 LINE_0              = FIRST_BADLINE-3
 SCROLL_SPEED        = 1 ; supported are 1 or 2
 TILE_COLS           = 3 ; must divide SCROLL_COLS-1 = 39 exactly (-> 13); asserted in scroll.acme
@@ -40,14 +52,14 @@ SPRITES             = 16 ; world sprites; must be SPRITE_SLOTS * 4, see SPR_ZONE
 PANEL_SPRITES       = 8  ; one per hardware sprite, so all of them
 SPRITE_SLOTS        = 4  ; hardware sprite pairs available to the multiplexer
 SPRITE_HEIGHT       = 21 ; raster lines a sprite covers; a slot is busy this long
-SPRITES_TOP_Y       = 60 ; the panel row, in the fld/crunch area, between 55 and 60
+SPRITES_TOP_Y       = 60 ; the panel row, in the fld/crunch area, at or below V_BORDER_TOP
 
 ; A sprite must still be placeable at the very bottom of the window or it pops
 ; into view instead of sliding out of the border.  Two separate lines matter:
 ; SPRITES_MAX_Y is where the multiplexer stops trying to reuse a slot, and
 ; LAST_IRQ_LINE is where last_irq takes the hardware back for the panel row --
 ; a sprite whose raster line has not been reached by then never gets latched.
-DISPLAY_BOTTOM      = FIRST_BADLINE + 8*SCR_ROWS - 2 ; last line of the 24 row window
+DISPLAY_BOTTOM      = V_BORDER_BOTTOM - 1 ; last line before the bottom border
 LAST_IRQ_LINE       = 242 ; last_irq takes the hardware back here for the panel row
 SPRITES_MAX_Y       = 229 ; multiplexer gives up past this line
 TILES               = 185 ; TODO: calculate this with pixels.bin size / 8 / TILE_COLS / TILE_ROWS
@@ -58,7 +70,21 @@ TILES               = 185 ; TODO: calculate this with pixels.bin size / 8 / TILE
 ; every fourth frame.  See "sprite scheduling" in raster.acme.
 SPR_ZONES_MAX       = SPRITES / SPRITE_SLOTS
 
+; The SCR_ROWS rows of screen matrix have to end exactly where the border comes
+; on, or the bottom row is either cut off or scrolled in under the border.  That
+; the two agree is a coincidence of FIRST_BADLINE and SCR_ROWS and not a
+; derivation, so say so out loud.  The debug build runs RSEL set and a taller
+; window, and does not have to line up.
+!if (CONTROL_Y_INVALID & VIC_RSEL) = 0 {
+  !if DISPLAY_BOTTOM != FIRST_BADLINE + 8*SCR_ROWS - 2 {
+    !error "the ", SCR_ROWS, " rows from FIRST_BADLINE (", FIRST_BADLINE, ") end at ", FIRST_BADLINE + 8*SCR_ROWS - 2, ", but the bottom border starts at ", V_BORDER_BOTTOM
+  }
+}
+
 !if SPRITES != 0 {
+  !if SPRITES_TOP_Y < V_BORDER_TOP {
+    !error "SPRITES_TOP_Y (", SPRITES_TOP_Y, ") is above the first visible line (", V_BORDER_TOP, "), so the panel row would sit in the border"
+  }
   !if SPRITES % SPRITE_SLOTS != 0 {
     !error "SPRITES (", SPRITES, ") must be a multiple of SPRITE_SLOTS (", SPRITE_SLOTS, ")"
   }

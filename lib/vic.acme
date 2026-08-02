@@ -38,6 +38,18 @@ VIC_SPR_COORDS = VIC_SPR_0_X
     ;       010 -> 1 pixel up
 VIC_CONTROL_Y   = $D011
 
+    ; What ends the display window is the VIC's vertical border flag, not the row count.
+    ; The VIC clears the flag on VIC_V_BORDER_TOP_* and sets it again on VIC_V_BORDER_BOTTOM_*,
+    ; so the last visible raster line is one above the latter.
+    ; Which pair applies depends on bit 3 (RSEL) of VIC_CONTROL_Y.
+    ; The clear only happens at all if DEN was set in cycle 1 of line $30.
+    ; Source: submodules/c64docs/victiming.pdf, table "V-flag latch action".
+VIC_RSEL               = %00001000
+VIC_V_BORDER_TOP_24    = $37
+VIC_V_BORDER_BOTTOM_24 = $f7
+VIC_V_BORDER_TOP_25    = $33
+VIC_V_BORDER_BOTTOM_25 = $fb
+
     ; read: current line:
     ; write: interrupt request at line
 VIC_RASTER      = $D012

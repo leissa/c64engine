@@ -237,8 +237,12 @@ Two that already bit:
   The engine rewrites `$d011` several times per frame and always with RSEL clear, so this looks like it cannot
   matter — and under `x64sc` it does not. Under `x64` booting with RSEL clear produces a **25-row display window**:
   four extra raster lines top and bottom, showing the FLD band above and one row too much map below, which reads as
-  the bottom border wobbling as the AGSP shifts. DEN makes no difference, so it stays clear and the copy stays
-  hidden. Booting from disk this never showed, because the KERNAL had already put `$1b` here.
+  the bottom border wobbling as the AGSP shifts. Booting from disk this never showed, because the KERNAL had already
+  put `$1b` here.
+  DEN stays clear, and `victiming.pdf` says why that reliably hides the copy rather than merely happening to:
+  DEN is sampled **only in cycle 1 of raster line `$30`**, and what it sets there — the D-flag — is the condition on
+  clearing the vertical border flag at the top of the window.
+  Boot with DEN clear and the border never opens for that whole frame, whatever else touches `$d011` later.
 - **The whole VIC register file must be initialised, `VIC_CONTROL_X` above all.**
   The engine writes `$d016` exactly once
   per frame from the raster IRQ (`raster.acme:96` is the only write in the tree) and never touches the registers it does
@@ -444,8 +448,8 @@ Three references, checked out as submodules:
 the two _All About Your …_ HTML sets and `c64docs`.
 They are hardware/ROM documentation, not build inputs — nothing in the `Makefile` reads them.
 
-Everything except `c64docs/vic-ii.txt` is HTML with no plain-text copy, so read it with the tags stripped and search it
-with `grep`:
+The _All About Your …_ sets and `c64docs/cbm64mem.html` are HTML with no plain-text copy, so read them with the tags
+stripped and search them with `grep`:
 
 ```bash
 cd submodules/aay64
@@ -456,7 +460,7 @@ grep -ril badline *.HTM              # find the page first
 `INDEX.HTM` / `INDEXLST.HTM` are the hand-written entry points, but the filenames are systematic enough to jump
 straight in.
 
-### `submodules/c64docs` — VIC-II internals and a one-page memory map
+### `submodules/c64docs` — VIC-II internals, a cycle chart, and a one-page memory map
 
 `vic-ii.txt` is Christian Bauer's _The MOS 6567/6569 video controller (VIC-II) and its application in the Commodore 64_
 (1996).
@@ -481,6 +485,36 @@ DMA delay plus FLD plus Linecrunch scrolls a whole graphics screen in all direct
 It also explains a symptom worth recognising when the VSP misfires:
 the first three c-accesses after the late bad line read `$ff` as character pointers and the low nibble of the opcode
 following the `$d011` write as colour, because `AEC` trails `BA` by three cycles.
+
+`victiming.pdf` is Linus Åkesson's _VIC 6569/8565 Timing Chart_, one landscape A4 page
+(<http://www.linusakesson.net/programming/vic-timing/>).
+Where `vic-ii.txt` explains the chip in prose, this is the same state machine as a lookup table:
+rows are the 63 cycles of a raster line, columns are the conditions — border wide/narrow, graphics idle vs display vs
+display+badline with `RC = 7` or `RC < 7`, per-sprite DMA and Y-expansion — and each cell is what the VIC does then.
+Two smaller tables at the bottom give the per-raster-line border-flag actions and the sprite crunch function.
+
+It reads well as text; render it only if you want the actual grid:
+
+```bash
+pdftotext -layout victiming.pdf -                       # keeps the columns aligned
+pdftoppm -r 130 -png -singlefile victiming.pdf /tmp/vt  # the chart as an image
+```
+
+What it answers at a glance, and the prose does not:
+
+- **Which cycle each badline consequence lands in** — `VCBASE -> VC` in 11-13, clear `RC` in 14, the c-access in
+  15-16, `VC -> VCBASE` plus "go idle or increment `RC`" in 58.
+  That is the timeline `raster.acme` is steering every time it moves a badline.
+- **The sprite cycle steal, per sprite** — sprite 0 fetches in cycle 58, 1 in 60-61, 2 in 62-63, and 3-7 in cycles
+  1-10, so sprites 0-2 are paid for out of the _previous_ line;
+  the footnote adds that the CPU stalls three cycles before each fetch.
+  This is the accounting behind the crunch band's `63-19 = 44` cycle path.
+- **The border flip-flops**, which is the reference for anything touching the bottom border:
+  the vertical flag is cleared on line `$33` and set on `$fb` when RSEL is set, `$37`/`$f7` when it is clear, and the
+  main border switches in cycles 17/57 (CSEL set) or 18/56 (clear).
+  The same table shows `DEN` being sampled in cycle 1 of line `$30` only — the D-flag that gates every later badline.
+- **The sprite crunch function `Cr(MCBASE)`** — the from/to/deviation table for what `MCBASE` becomes when `$d017`
+  is written in cycle 15. Nothing here does that yet.
 
 `cbm64mem.html` is a single-page `$0000-$ffff` map — zero-page/KERNAL variables, then every VIC, SID and CIA register
 with its bit fields and power-up default.
