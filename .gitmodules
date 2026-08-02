@@ -4,3 +4,6 @@
 [submodule "submodules/aay64"]
 	path = submodules/aay64
 	url = ../aay64.git
+[submodule "submodules/c64docs"]
+	path = submodules/c64docs
+	url = ../c64docs.git
