@@ -10,7 +10,7 @@ streams tiles from a 256×96 map, and plays music — all inside one cycle-exact
 It ships as a 1 MiB EasyFlash cartridge.
 
 There is no linter and no unit-test framework.
-The one automated check is `make regress` (see *Testing*), which replays a scripted joystick pattern in a headless VICE
+The one automated check is `make regress` (see _Testing_), which replays a scripted joystick pattern in a headless VICE
 and fails on a blown raster budget or, against a saved reference, on any rendering change.
 
 ## Build
@@ -31,7 +31,7 @@ Use `make Q=` to echo every command and to pass `-v` to `mkcart.py`.
 
 `make dev` / `make prg` are the fast iteration path: `-DDEVELOP=1` (plus `-DDEBUG=1` for `dev`) makes `engine.acme` emit
 `engine.prg` via its own `!to`, which you can load in VICE directly.
-That `.prg` *is* the cartridge payload — same image, just entered from the BASIC starter instead of from the boot stub,
+That `.prg` _is_ the cartridge payload — same image, just entered from the BASIC starter instead of from the boot stub,
 which makes it a good A/B reference when the cartridge misbehaves.
 Both targets are deliberately phony and rebuild unconditionally: they write the same `engine.prg` with different flags,
 so timestamp tracking would wrongly skip a rebuild when you switch between them.
@@ -61,7 +61,7 @@ runtime, and must stay in sync with `lib/mem.acme`.
 
 ### Memory map — `lib/mem.acme`
 
-This file is the single source of truth for the *entire* address space: zero-page variable allocation, code/data segment
+This file is the single source of truth for the _entire_ address space: zero-page variable allocation, code/data segment
 bases, and VIC bank layout.
 Read it before touching anything that allocates memory.
 Highlights:
@@ -98,7 +98,7 @@ Stages, in order:
 4. **VSP** — the self-modified nop field lands the badline on the right cycle.
    Guarded by `!if (>IRQ) != (>*) { !error }`:
    the critical code must not cross a page, which is why `IRQ` is `!align 255, 0`.
-5. **Soft scroll**, then **sprite multiplexing** — see *Sprites* below.
+5. **Soft scroll**, then **sprite multiplexing** — see _Sprites_ below.
 6. **`last_irq`** — the "off-screen" budget: `JOYSTICK`, `COPY_TILES`, `PLAY_SONG`, the panel row, an insertion-sort
    pass over `SPR_I` by `SPR_Y`, and the sprite scheduling for the next frame.
 
@@ -114,25 +114,25 @@ They advance `SOFT_*` by `SCROLL_SPEED` and, on wrap, `HARD_*`.
 At the halfway point of a soft scroll they seed `C_COPY`/`R_COPY` and step the `{C,R}_{MAP,SCR,PIX,CLR}_POS_*` pointer
 sets, which are the source (map) and destination (screen/bitmap/color) cursors for tile copying.
 
-**The horizontal axis runs backwards.** `SOFT_X` and `HARD_X` step *against* the map cursor, so `SCROLL_L`
+**The horizontal axis runs backwards.** `SOFT_X` and `HARD_X` step _against_ the map cursor, so `SCROLL_L`
 (`.dir = -1`) increments both — the VSP delay in `raster.acme` is `39-HARD_X`, which is where the inversion comes
-from.  The macro carries `.soft_dir` (`= .dir` vertically, `= -.dir` horizontally) for exactly this: anything reading
-or stepping `SOFT_*`/`HARD_X` keys off `.soft_dir`, everything else off `.dir`.  Getting that wrong swaps the copy
+from. The macro carries `.soft_dir` (`= .dir` vertically, `= -.dir` horizontally) for exactly this: anything reading
+or stepping `SOFT_*`/`HARD_X` keys off `.soft_dir`, everything else off `.dir`. Getting that wrong swaps the copy
 trigger between the two horizontal directions and is invisible in a screenshot.
 
 `SCROLL_SPRITES_UP/DOWN/LEFT/RIGHT` keep the sprites pinned to the map: `SPR_X`/`SPR_Y` are screen coordinates, so a
-camera step has to move every sprite the other way.  Sprite ids `0..CRUNCH_SPRITES-1` are excluded — they are the ones
+camera step has to move every sprite the other way. Sprite ids `0..CRUNCH_SPRITES-1` are excluded — they are the ones
 `_spr_y` parks in the FLD/crunch area, and they must keep the smallest `SPR_Y` or `last_irq` hands the multiplexer a
-sprite starting before `SPRITES_TOP_Y` and the 44-cycle crunch path mistimes.  That is what the `SPR_WRAP_TOP` bound
-enforces.  `SPR_X` is half resolution (`last_irq` does an `asl`), so it only steps on every second pixel of camera
+sprite starting before `SPRITES_TOP_Y` and the 44-cycle crunch path mistimes. That is what the `SPR_WRAP_TOP` bound
+enforces. `SPR_X` is half resolution (`last_irq` does an `asl`), so it only steps on every second pixel of camera
 travel.
 
-**Recycling a sprite must reposition it in `SPR_I` by hand.**  Shifting every sprite by the same amount leaves the
+**Recycling a sprite must reposition it in `SPR_I` by hand.** Shifting every sprite by the same amount leaves the
 sorted order intact, but a sprite that wraps travels from one end of the Y range to the other and has to travel the
-whole length of `SPR_I` with it.  Left to the insertion sort in `last_irq` that is its O(n²) case, and it cost **~26 of
-the 47 raster lines** of off-screen budget for a single wrap — measured, not estimated.  So the wrap moves the entry in
-`SPR_I` directly and the sort then finds nothing to do.  `SPR_WRAP_MARGIN` exists because the order read there is the
-one sorted at the end of the *previous* frame, so a wrap can be noticed a frame or two late.
+whole length of `SPR_I` with it. Left to the insertion sort in `last_irq` that is its O(n²) case, and it cost **~26 of
+the 47 raster lines** of off-screen budget for a single wrap — measured, not estimated. So the wrap moves the entry in
+`SPR_I` directly and the sort then finds nothing to do. `SPR_WRAP_MARGIN` exists because the order read there is the
+one sorted at the end of the _previous_ frame, so a wrap can be noticed a frame or two late.
 
 The tunable constraints that used to be comments are now `!error` assertions at the top of the file:
 `(SCROLL_ROWS-1) % TILE_ROWS` and `(SCROLL_COLS-1) % TILE_COLS` must be zero, because the direction-reversal cursor
@@ -143,34 +143,34 @@ jump is expressed in tiles and ACME's division truncates.
 Two disjoint sets share the eight hardware sprites, and the split is what keeps the crunch band's timing honest.
 
 `PANEL_SPRITES` (8) sit on one raster row inside the black FLD/crunch band, one hardware sprite each, single colour —
-meant for hitpoints, weapons, text.  `last_irq` writes them straight out from `PANEL_X`/`PANEL_C`/`PANEL_F` (X is full
+meant for hitpoints, weapons, text. `last_irq` writes them straight out from `PANEL_X`/`PANEL_C`/`PANEL_F` (X is full
 9-bit, with `PANEL_X_MSB`); they take no part in the sort or the multiplexer.
 **They must share one Y**: the 44-cycle crunch path is `63-19`, i.e. all eight sprites DMA-active across the whole
 band, so staggering them would need the FLD/crunch loop to carry a per-line cycle count.
 
 `SPRITES` (16) are the world sprites below that, two hardware sprites each — a hires overlay over a multicolour one —
-multiplexed over `SPRITE_SLOTS` (4) pairs.  `VIC_SPR_MULTI` is flipped between the two: `last_irq` clears it for the
+multiplexed over `SPRITE_SLOTS` (4) pairs. `VIC_SPR_MULTI` is flipped between the two: `last_irq` clears it for the
 panel row, the multiplexer sets `%10101010` when it takes over (safe, because the panel row ends at
 `SPRITES_TOP_Y + SPRITE_HEIGHT`, just above the soft-scroll release line).
 
-**Scheduling is decided in `last_irq`, before the frame is drawn.**  A slot is busy for `SPRITE_HEIGHT` lines, so
-sprite *n* of the display list can only use slot `n % SPRITE_SLOTS` if it is that far below sprite `n-SPRITE_SLOTS`.
+**Scheduling is decided in `last_irq`, before the frame is drawn.** A slot is busy for `SPRITE_HEIGHT` lines, so
+sprite _n_ of the display list can only use slot `n % SPRITE_SLOTS` if it is that far below sprite `n-SPRITE_SLOTS`.
 The old code discovered this the hard way and dropped whatever it could not place — sprites blinking out at random
-whenever they clustered in Y.  Now the list is thinned until it fits:
+whenever they clustered in Y. Now the list is thinned until it fits:
 
-| zones | shown per frame | each sprite appears |
-|---|---|---|
-| 4 | all 16 | every frame |
-| 2 | every 2nd in Y order | every 2nd frame |
-| 1 | every 4th in Y order | every 4th frame |
+| zones | shown per frame      | each sprite appears |
+| ----- | -------------------- | ------------------- |
+| 4     | all 16               | every frame         |
+| 2     | every 2nd in Y order | every 2nd frame     |
+| 1     | every 4th in Y order | every 4th frame     |
 
 Thinning **in Y order, not by sprite id**, is the point: it halves the density of a cluster instead of leaving its
-members to collide.  One zone is always feasible — `SPRITE_SLOTS` sprites over `SPRITE_SLOTS` slots — so the chain
-terminates and nothing ever vanishes; it just degrades to a steady, controlled flicker.  `SPR_SHOWN` is how many
+members to collide. One zone is always feasible — `SPRITE_SLOTS` sprites over `SPRITE_SLOTS` slots — so the chain
+terminates and nothing ever vanishes; it just degrades to a steady, controlled flicker. `SPR_SHOWN` is how many
 entries of `SPR_Q` the multiplexer walks, `SPR_FRAME` picks the phase.
 
-The invariant worth re-checking after any change here is that the multiplexer places *every* scheduled sprite, i.e.
-the `.last_irq` "too late" path is now unreachable.  Verified by stashing X at that exit and comparing it against
+The invariant worth re-checking after any change here is that the multiplexer places _every_ scheduled sprite, i.e.
+the `.last_irq` "too late" path is now unreachable. Verified by stashing X at that exit and comparing it against
 `SPR_SHOWN` in `last_irq`, over Y spacings from 8 down to 0.
 
 Because the phase advances in `last_irq`, a clustered layout would keep the screen changing after the autopilot has
@@ -188,20 +188,20 @@ because they all come from the same macro they are equal-sized, and `+jsr_copy_t
 instead of running a char index down a `cmp`/`bne` chain.
 
 The per-frame loop is **unrolled by the tile cycle and specialised on the fixed coordinate**: along a column copy the
-tile row is fixed and the sub-column cycles, along a row copy the reverse.  That makes the sub-char a compile-time
-constant per slot, and lets the map byte be fetched once per tile rather than once per char.  A frame boundary can
+tile row is fixed and the sub-column cycles, along a row copy the reverse. That makes the sub-char a compile-time
+constant per slot, and lets the map byte be fetched once per tile rather than once per char. A frame boundary can
 fall anywhere in the cycle, so the loop is entered at the slot the previous frame stopped on and each slot has an exit
-recording where to resume; the invariant is that the saved map pointer addresses the tile holding the *next* slot,
-which is why the slot-0 exit (meaning "tile finished") steps it on.  Slot, exit and variant bodies must stay
+recording where to resume; the invariant is that the saved map pointer addresses the tile holding the _next_ slot,
+which is why the slot-0 exit (meaning "tile finished") steps it on. Slot, exit and variant bodies must stay
 equal-sized so they can be reached by `base + n*SIZE` — all three are asserted.
 
-Keep an eye on the code segment.  It ends around `$1ae0` against `SONG_DATA` at `$2000`, and unrolling here eats that
-margin fast: expanding the loop per entry point instead of sharing it cost ~900 bytes.  ACME only *warns* when the
+Keep an eye on the code segment. It ends around `$1ae0` against `SONG_DATA` at `$2000`, and unrolling here eats that
+margin fast: expanding the loop per entry point instead of sharing it cost ~900 bytes. ACME only _warns_ when the
 next segment starts inside this one, so an overflow silently gets the tail of the code overwritten by the song binary
 and shows up as a dead engine, not a build failure — `engine.acme` now turns that into an `!error`.
 
 `init_screen` in `engine.acme` fills the initial screen by calling `SCROLL_L` + `COPY_TILES` in a loop rather than
-duplicating the copy logic.  It only exercises the *row* path, which makes it a good first check after touching
+duplicating the copy logic. It only exercises the _row_ path, which makes it a good first check after touching
 `tiles.acme`: if the row copy is broken the screen comes up empty.
 
 ### Cartridge boot — `easyflash.acme` + `tools/mkcart.py`
@@ -235,10 +235,10 @@ Two that already bit:
   reading bank 0, and you get a screen of structured garbage that looks like a corrupt copy but isn't.
 - **`VIC_CONTROL_Y` must be left with RSEL set**, the way the KERNAL leaves `$1b`.
   The engine rewrites `$d011` several times per frame and always with RSEL clear, so this looks like it cannot
-  matter — and under `x64sc` it does not.  Under `x64` booting with RSEL clear produces a **25-row display window**:
+  matter — and under `x64sc` it does not. Under `x64` booting with RSEL clear produces a **25-row display window**:
   four extra raster lines top and bottom, showing the FLD band above and one row too much map below, which reads as
-  the bottom border wobbling as the AGSP shifts.  DEN makes no difference, so it stays clear and the copy stays
-  hidden.  Booting from disk this never showed, because the KERNAL had already put `$1b` here.
+  the bottom border wobbling as the AGSP shifts. DEN makes no difference, so it stays clear and the copy stays
+  hidden. Booting from disk this never showed, because the KERNAL had already put `$1b` here.
 - **The whole VIC register file must be initialised, `VIC_CONTROL_X` above all.**
   The engine writes `$d016` exactly once
   per frame from the raster IRQ (`raster.acme:96` is the only write in the tree) and never touches the registers it does
@@ -290,7 +290,7 @@ is still in flight.
 
 **The autopilot freezes `JOYSTICK` completely once it has replayed `AP_FRAMES` frames** — no scroll, no colour cycling.
 That is not cosmetic: with the engine still animating, the exit screenshot depends on which cycle the emulator happens
-to be stopped on and the same binary produces different images run to run.  Don't remove the freeze.
+to be stopped on and the same binary produces different images run to run. Don't remove the freeze.
 
 Two things this has already established, so don't re-derive them: rapid direction reversal and diagonal scrolling are
 clean at both `SCROLL_SPEED` values, and the copies overrunning their nominal frame budget on a diagonal (they
@@ -299,43 +299,43 @@ serialise — `COPY_TILES` finishes `C_COPY` before touching `R_COPY`) is absorb
 
 ### Measuring the off-screen budget
 
-`make regress` only tells you whether the budget was blown.  To measure how much is left, temporarily parameterise the
+`make regress` only tells you whether the budget was blown. To measure how much is left, temporarily parameterise the
 `-DDEVELOP` overrun check's `cmp #LINE_0-1`, force a constant stick direction (`sed` the `lda CIA1_PORT_2` in
 `joystick.acme` to `lda #$f5` for down+right), and bisect the threshold over a long run: the lowest value that does
-*not* jam is the raster line `last_irq` finishes on.  `LINE_0-1 = 47` is the limit.
+_not_ jam is the raster line `last_irq` finishes on. `LINE_0-1 = 47` is the limit.
 
 Do this over **thousands** of frames with a constant direction, not over the autopilot — the worst case is rare.
 Measuring the diagonal phase of one `AP_TABLE` pass reported line 18 for a build whose true worst case was 36.
 Reference points, all diagonal:
 
-| build | frame ends on |
-|---|---|
-| before world-fixed sprites | < line 6 |
-| sprites, wrap left to the sort | line 36 |
-| sprites, wrap fixing `SPR_I` itself | line 20 |
-| 16 world + 8 panel, scheduled | line 12 |
+| build                               | frame ends on |
+| ----------------------------------- | ------------- |
+| before world-fixed sprites          | < line 6      |
+| sprites, wrap left to the sort      | line 36       |
+| sprites, wrap fixing `SPR_I` itself | line 20       |
+| 16 world + 8 panel, scheduled       | line 12       |
 
 Beware a **spurious jam**: one sweep of this reported line 40 for a build whose real worst case is 12, and a rerun of
-the identical tree gave 10.  Confirm any surprising reading with a repeat before acting on it.
+the identical tree gave 10. Confirm any surprising reading with a repeat before acting on it.
 
 The same technique works for any other invariant that should hold every frame — stash the value in a spare zero-page
 byte inside the cycle-exact code (there is documented slack before the soft-scroll wait), then compare and `jam` in
-`last_irq` where timing is free.  That is how the AGSP end line, the soft-scroll wait target, RSEL and `SPR_I`'s
+`last_irq` where timing is free. That is how the AGSP end line, the soft-scroll wait target, RSEL and `SPR_I`'s
 permutation invariant were all checked.
 
 ### What headless screenshots cannot tell you
 
 `-exitscreenshot` stops the emulator at a cycle count, not at a frame boundary, and the capture is **not reproducible
 at frame granularity** — the same binary at the same `-limitcycles` has been observed to produce a 24-row and a 25-row
-window on different runs.  Roughly one capture in 30 shows a display area 4 lines taller at each end.  This happens on
-old commits too, at the same rate.  It is a capture artifact; do not go hunting for it in the engine.
+window on different runs. Roughly one capture in 30 shows a display area 4 lines taller at each end. This happens on
+old commits too, at the same rate. It is a capture artifact; do not go hunting for it in the engine.
 
 That is why the autopilot freezes the screen before the screenshot is taken, and why anything frame-by-frame has to be
 measured from inside the program with a `jam`, not from images.
 
-**Test the cartridge under `x64`, not just the `.prg` under `x64sc`.**  The cartridge payload is byte-identical to the
+**Test the cartridge under `x64`, not just the `.prg` under `x64sc`.** The cartridge payload is byte-identical to the
 `.prg`, so anything that reproduces on one and not the other is boot state, not engine code — that is exactly how the
-`VIC_CONTROL_Y` RSEL bug above was found, after a long detour chasing it in the scroll code.  The four combinations
+`VIC_CONTROL_Y` RSEL bug above was found, after a long detour chasing it in the scroll code. The four combinations
 are cheap to run and disagreeing pairs localise the fault immediately:
 
 ```bash
@@ -372,3 +372,47 @@ x64sc -warp -sounddev dummy +easyflashcrtwrite -limitcycles 12000000 \
 
 Comparing that against the same run on `engine.prg` (`-autostartprgmode 1 +drive8truedrive -autostart engine.prg`)
 isolates cartridge-boot bugs from engine bugs: the two should render the same frame apart from sprite animation phase.
+
+## External references — `submodules/`
+
+Two _All About Your …_ HTML references, checked out as submodules.
+They are hardware/ROM documentation, not build inputs — nothing in the `Makefile` reads them.
+
+They are HTML with no plain-text copy, so read them with the tags stripped and search them with `grep`:
+
+```bash
+cd submodules/aay64
+sed -e 's/<[^>]*>//g' VIC17.HTM      # one page, readable
+grep -ril badline *.HTM              # find the page first
+```
+
+`INDEX.HTM` / `INDEXLST.HTM` are the hand-written entry points, but the filenames are systematic enough to jump
+straight in.
+
+### `submodules/aay64` — the C64
+
+| files                                       | content                                                                                                                                                                                |
+| ------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `VICnn.HTM`                                 | one page per VIC register, `nn` = **decimal** index — `VIC17.HTM` is `$d011`. Bit fields, power-up default, and the KERNAL addresses that read/write it                                |
+| `ROMECB9.HTM`                               | the KERNAL's _Video Chip Setup Table_: the defaults `$d000-$d02e` get, copied by `ROME5A0.HTM`                                                                                         |
+| `ROMFDA3.HTM`                               | KERNAL `IOINIT` disassembled — CIA1/CIA2 ICR, CRA/CRB, DDRs, `$00`/`$01`                                                                                                               |
+| `ROMFF5B.HTM`, `ROME518.HTM`, `ROME5A0.HTM` | `CINT` → I/O defaults → the table copy                                                                                                                                                 |
+| `CIA1n.HTM`, `CIA2n.HTM`, `SIDn.HTM`        | CIA and SID registers, same layout as the VIC pages                                                                                                                                    |
+| `MEMCFG.HTM`                                | the `$01` truth table, including how /CharEn, /LoRam and /HiRam derive it                                                                                                              |
+| `B*.HTM`                                    | one page per opcode: bytes and cycles per addressing mode, **illegal opcodes included** (`BLAX` = `lax`, `BSAX`, `BDCP`, `BISB`, `BSLO`, `BSRE`, `BSHX/Y/A/S`, `BSBX`, `BLAE`, `BJAM`) |
+| `ADDR*.HTM`, `CPUBUGS.HTM`                  | addressing modes with timings, CPU quirks                                                                                                                                              |
+| `VICTYPES.HTM`, `VICTBL*.HTM`               | 6569 vs 6567: lines, cycles per line, vblank range, X coordinate per cycle                                                                                                             |
+| `CARTMAIN.HTM`, `MMC*.HTM`                  | expansion port and cartridge basics — the EasyFlash ProgRef stays authoritative for this build                                                                                         |
+| `GFX*.HTM`                                  | picture _file formats_ (Koala, Art Studio, FLI variants), not techniques                                                                                                               |
+| `ROMxxxx.HTM`                               | commented BASIC/KERNAL disassembly, named by address                                                                                                                                   |
+
+The boot-stub rules in _Cartridge boot_ above are all checkable here: `ROMFDA3.HTM` is where `DDRA = $3f` comes from,
+and `ROMECB9.HTM` gives the `$d011 = $9b` / `$d016 = $08` the KERNAL would have left behind.
+What it does **not** cover is the demo-coding side — there is no page on FLD, VSP, line crunch, AGSP or badline timing,
+so `raster.acme` has no reference here beyond the raw register semantics.
+
+### `submodules/aay1541` — the drive
+
+1541 ROM disassembly (`RO41*.HTM`), drive zero page and RAM (`RA41*.HTM`), VIA registers (`VIA*.HTM`), job and error
+codes.
+Nothing the current build touches — it becomes relevant only if disk loading or a fastloader is ever added.
