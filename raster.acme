@@ -370,12 +370,14 @@ rotate
             ; y-coord
             lda SPR_Y, y
 
-            ; are we too late?
+            ; Are we too late?  Then skip this one and try the next.  Do NOT
+            ; abandon the frame here: the list is sorted, so everything after
+            ; this sprite is further down the screen and may well still fit.
+            ; Running out of screen is .next_sprite's job -- once a slot we
+            ; still need cannot be reused before SPRITES_MAX_Y, no slot can,
+            ; because the other three hold sprites that free up even later.
             cmp VIC_RASTER
             bcs .do_display_sprite
-            lda #SPRITES_MAX_Y
-            cmp VIC_RASTER
-            bcc .last_irq
             jmp .check_done
 
 .do_display_sprite

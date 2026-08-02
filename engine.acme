@@ -42,20 +42,13 @@ SPRITE_SLOTS        = 4  ; hardware sprite pairs available to the multiplexer
 SPRITE_HEIGHT       = 21 ; raster lines a sprite covers; a slot is busy this long
 SPRITES_TOP_Y       = 60 ; the panel row, in the fld/crunch area, between 55 and 60
 
-; KNOWN LIMITATION -- sprites pop in and out at the bottom instead of sliding
-; into the border.  SPRITES_MAX_Y is 17 lines above DISPLAY_BOTTOM, so a sprite
-; is already 18 rows tall by the time it first appears.
-;
-; The chain that holds it there: the multiplexer must finish before last_irq is
-; armed at LAST_IRQ_LINE, and it abandons the whole frame (.next_sprite and the
-; too-late path in .display_sprite) once a slot it still needs holds a sprite
-; that cannot be reused before SPRITES_MAX_Y.  Raising these was tried and does
-; buy the extra rows, but the abandon path then fires while sprites are still
-; unplaced and they get dropped -- worse than the pop.  Making it work needs the
-; abandon to skip just that slot rather than the frame; the scheduler cannot
-; currently prove the frame is safe against it.
+; A sprite must still be placeable at the very bottom of the window or it pops
+; into view instead of sliding out of the border.  Two separate lines matter:
+; SPRITES_MAX_Y is where the multiplexer stops trying to reuse a slot, and
+; LAST_IRQ_LINE is where last_irq takes the hardware back for the panel row --
+; a sprite whose raster line has not been reached by then never gets latched.
 DISPLAY_BOTTOM      = FIRST_BADLINE + 8*SCR_ROWS - 2 ; last line of the 24 row window
-LAST_IRQ_LINE       = 242 ; where last_irq is scheduled; must clear SPRITES_MAX_Y
+LAST_IRQ_LINE       = 242 ; last_irq takes the hardware back here for the panel row
 SPRITES_MAX_Y       = 229 ; multiplexer gives up past this line
 TILES               = 185 ; TODO: calculate this with pixels.bin size / 8 / TILE_COLS / TILE_ROWS
 ; must split SCROLL_ROWS/SCROLL_COLS exactly and fit in the 4/SCROLL_SPEED frames

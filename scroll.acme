@@ -54,14 +54,19 @@ SCROLL_ROWS = SCR_ROWS-2
 ; sprite cannot slide out from *behind* the panel row -- the hardware is busy
 ; with it until SPRITES_TOP_Y+SPRITE_HEIGHT -- so this edge always pops.
 ;
-; SPR_WRAP_MARGIN cannot go much below 6: the four slots are filled in sequence
+; SPR_WRAP_MARGIN cannot go much below 4: the four slots are filled in sequence
 ; over the first few lines, so the last of them needs more room than the first,
-; and 3 was measured to drop sprites.  See the KNOWN LIMITATION at
-; SPRITES_MAX_Y in engine.acme for the matching problem at the bottom edge.
+; and 3 was measured to drop sprites.
+;
+; SPR_WRAP_BOTTOM is one line *past* the display window, so a recycled sprite
+; starts out completely hidden in the bottom border and slides into view a line
+; at a time.  It may sit below SPRITES_MAX_Y: that bound is tested against the
+; sprite a slot *already holds*, not the one arriving, and the arriving sprite is
+; written long before the raster reaches it.
 SPR_MUX_START   = FIRST_BADLINE+SCR_ROWS+8+1
-SPR_WRAP_MARGIN = 6             ; slack for a wrap noticed a frame or two late
+SPR_WRAP_MARGIN = 4             ; slack for a wrap noticed a frame or two late
 SPR_WRAP_TOP    = SPR_MUX_START + SPR_WRAP_MARGIN
-SPR_WRAP_BOTTOM = SPRITES_MAX_Y
+SPR_WRAP_BOTTOM = DISPLAY_BOTTOM + 1
 
 !if SPRITES != 0 {
   !if SPR_WRAP_MARGIN < 2 * SCROLL_SPEED {
@@ -70,8 +75,8 @@ SPR_WRAP_BOTTOM = SPRITES_MAX_Y
   !if SPR_WRAP_TOP < SPRITES_TOP_Y + SPRITE_HEIGHT {
     !error "SPR_WRAP_TOP (", SPR_WRAP_TOP, ") would overlap the panel row"
   }
-  !if SPR_WRAP_BOTTOM > SPRITES_MAX_Y {
-    !error "SPR_WRAP_BOTTOM (", SPR_WRAP_BOTTOM, ") is past SPRITES_MAX_Y (", SPRITES_MAX_Y, "), so a recycled sprite could never be placed"
+  !if SPR_WRAP_BOTTOM > DISPLAY_BOTTOM + 1 {
+    !error "SPR_WRAP_BOTTOM (", SPR_WRAP_BOTTOM, ") is below the display window, so a recycled sprite would stay invisible"
   }
 
 ; camera moved towards larger map coordinates, so the world slides up
