@@ -261,13 +261,22 @@ SOFT_Y = *+1
 
     ; todo
 
+; Which raster line did the AGSP region actually end on?  This is pure slack --
+; the wait below polls for a fixed line -- so the stash is free here, and
+; last_irq does the comparing where timing is free too.  See "Measuring the AGSP
+; band" in CLAUDE.md.
+!ifdef AGSP_LIMIT {
+    lda VIC_RASTER
+    sta AGSP_MARK
+}
+
 ;-------------------------------------------------------------------------------
 ; issue soft scroll
 ;-------------------------------------------------------------------------------
 
     pla
     ; wait till end of AGSP region
-    ldy #FIRST_BADLINE+SCR_ROWS+8+1
+    ldy #SPR_MUX_START
 -
     cpy VIC_RASTER
     bne -
@@ -689,6 +698,17 @@ last_irq
 !ifdef SPR_DROP_LIMIT {
     lda SPR_DROPPED
     cmp #SPR_DROP_LIMIT
+    bcc +
+    jam
++
+}
+
+; Same bisect for the line the AGSP region ends on: the lowest limit that does
+; not jam is that line, plus one.  It should not vary with HARD_Y -- the region
+; is always 25 raster lines -- so a run that scrolls vertically also checks that.
+!ifdef AGSP_LIMIT {
+    lda AGSP_MARK
+    cmp #AGSP_LIMIT
     bcc +
     jam
 +

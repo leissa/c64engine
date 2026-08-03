@@ -60,6 +60,7 @@ INIT_SCREEN_LO  = $34
 INIT_SCREEN_HI  = $35
 AP_FROZEN       = $38   ; -DAUTOPILOT only: set once the scripted run has finished
 SPR_DROPPED     = $39   ; -DDEVELOP only: counts sprites the multiplexer was too late for
+AGSP_MARK       = $3a   ; -DAGSP_LIMIT only: raster line the AGSP region ended on
 SPR_SHOWN       = $36   ; how many entries of SPR_Q the multiplexer walks this frame
 SPR_FRAME       = $37   ; frame counter, picks the flicker phase
 

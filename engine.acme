@@ -52,7 +52,18 @@ SPRITES             = 16 ; world sprites; must be SPRITE_SLOTS * 4, see SPR_ZONE
 PANEL_SPRITES       = 8  ; one per hardware sprite, so all of them
 SPRITE_SLOTS        = 4  ; hardware sprite pairs available to the multiplexer
 SPRITE_HEIGHT       = 21 ; raster lines a sprite covers; a slot is busy this long
-SPRITES_TOP_Y       = 60 ; the panel row, in the fld/crunch area, at or below V_BORDER_TOP
+; Lowering this frees the sprite hardware earlier, and 54 is as low as it can go:
+; a sprite at y displays y+1 .. y+21, so below 54 the panel's first line falls
+; inside the top border (V_BORDER_TOP) and its last line stops short of AGSP_END,
+; leaving band lines with no sprites on them that the 44 cycle path in raster.acme
+; assumes are full.  Both bounds are asserted below.
+;
+; It stays at 60 anyway, because freeing the hardware earlier buys nothing on its
+; own: what actually gates the world sprites is SPR_MUX_START, the soft scroll
+; release, and that cannot move -- see the note in scroll.acme.
+SPRITES_TOP_Y       = 60 ; panel row, inside the FLD/crunch band
+AGSP_END            = 75 ; last line of the 25 line AGSP region; measured, see CLAUDE.md
+SPR_FLOOR           = SPRITES_TOP_Y + SPRITE_HEIGHT + 1 ; first line a world sprite can use
 
 ; A sprite must still be placeable at the very bottom of the window or it pops
 ; into view instead of sliding out of the border.  Two separate lines matter:
@@ -82,8 +93,19 @@ SPR_ZONES_MAX       = SPRITES / SPRITE_SLOTS
 }
 
 !if SPRITES != 0 {
-  !if SPRITES_TOP_Y < V_BORDER_TOP {
-    !error "SPRITES_TOP_Y (", SPRITES_TOP_Y, ") is above the first visible line (", V_BORDER_TOP, "), so the panel row would sit in the border"
+  ; a sprite at y displays y+1 .. y+21, so it is the *first displayed* line that
+  ; has to clear the border, not y itself
+  !if SPRITES_TOP_Y + 1 < V_BORDER_TOP {
+    !error "SPRITES_TOP_Y (", SPRITES_TOP_Y, ") puts the panel's first line above the first visible line (", V_BORDER_TOP, ")"
+  }
+  ; A world sprite going DMA-active inside the band would make the per-line steal
+  ; vary and mistime the whole AGSP, so the floor has to sit below the band ...
+  !if SPR_FLOOR <= AGSP_END {
+    !error "SPR_FLOOR (", SPR_FLOOR, ") is inside the AGSP band, which ends at ", AGSP_END
+  }
+  ; ... and the panel has to stay DMA-active all the way to the band's last line
+  !if SPRITES_TOP_Y + SPRITE_HEIGHT < AGSP_END {
+    !error "the panel row ends at ", SPRITES_TOP_Y + SPRITE_HEIGHT, ", above the band's last line ", AGSP_END
   }
   !if SPRITES % SPRITE_SLOTS != 0 {
     !error "SPRITES (", SPRITES, ") must be a multiple of SPRITE_SLOTS (", SPRITE_SLOTS, ")"

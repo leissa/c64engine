@@ -99,6 +99,15 @@ Stages, in order:
    Guarded by `!if (>IRQ) != (>*) { !error }`:
    the critical code must not cross a page, which is why `IRQ` is `!align 255, 0`.
 5. **Soft scroll**, then **sprite multiplexing** — see _Sprites_ below.
+   The AGSP region is always 25 raster lines and **ends on line `AGSP_END` = 75** — measured, see
+   _Measuring the AGSP band_ under _Testing_; it does not move with `HARD_Y`.
+   The soft scroll is released at `SPR_MUX_START` = `FIRST_BADLINE+SCR_ROWS+8+1` = 82, a **full text row past
+   the band**, and that row of apparent slack is load-bearing: the release writes YSCROLL, and a write landing
+   inside the row still being fetched can assert the bad line condition a second time in that row, so it is
+   re-fetched from a shifted `VC` and the map's first 0-7 lines come out corrupt.
+   Tried releasing at 76 to win six lines of sprite travel; it shows as a ragged partial row under the panel.
+   It is scroll-offset dependent, so **a full-screen screenshot at one scroll position does not clear a change
+   here** — crop the strip under the panel and compare it across several autopilot stops.
 6. **`last_irq`** — the "off-screen" budget: `JOYSTICK`, `COPY_TILES`, `PLAY_SONG`, the panel row, an insertion-sort
    pass over `SPR_I` by `SPR_Y`, and the sprite scheduling for the next frame.
 
@@ -143,6 +152,9 @@ What stops it going lower is the off-screen budget, not placement:
 at 2 the frozen autopilot frames at stops 60 and 90 sit right on the limit — they jam with the `SPR_DROPPED` tracking
 compiled in and pass without it.
 One raster line is not worth being unable to instrument the frame, so 3 it is.
+So `SPR_WRAP_TOP` is 85, one line better than the 86 it was. It is a pop, not a slide, and it stays one: the sprite
+is 21 rows tall, so its body covers the top of the map whatever its top row is doing. Hiding it needs the mask
+below, and lowering it further needs `SPR_MUX_START` to move, which it cannot — see stage 5 of the IRQ chain.
 
 The tunable constraints that used to be comments are now `!error` assertions at the top of the file:
 `(SCROLL_ROWS-1) % TILE_ROWS` and `(SCROLL_COLS-1) % TILE_COLS` must be zero, because the direction-reversal cursor
@@ -157,6 +169,16 @@ meant for hitpoints, weapons, text. `last_irq` writes them straight out from `PA
 9-bit, with `PANEL_X_MSB`); they take no part in the sort or the multiplexer.
 **They must share one Y**: the 44-cycle crunch path is `63-19`, i.e. all eight sprites DMA-active across the whole
 band, so staggering them would need the FLD/crunch loop to carry a per-line cycle count.
+
+**`SPRITES_TOP_Y` cannot go below 54, and there is no point going below 60.** A sprite at `y` displays `y+1 .. y+21`,
+so below 54 the panel's first row falls inside the top border (`V_BORDER_TOP` = 55) while its last row stops short of
+`AGSP_END` = 75 — leaving band lines that the 44-cycle path believes have eight sprites on them. Both bounds are
+`!error` assertions now. But lowering it frees the sprite hardware earlier only in theory: what actually gates the
+world sprites is the soft-scroll release at 82, which cannot move, so 54 buys nothing and 60 is where it stays.
+
+`SPR_FLOOR` = `SPRITES_TOP_Y + SPRITE_HEIGHT + 1` = 76 is the first line a world sprite can use, and the assertion
+that matters is `SPR_FLOOR > AGSP_END`: a world sprite going DMA-active _inside_ the band would make the per-line
+steal vary and mistime the whole AGSP. That, not the panel's hardware claim, is what caps how high sprites may go.
 
 `SPRITES` (16) are the world sprites below that, two hardware sprites each — a hires overlay over a multicolour one —
 multiplexed over `SPRITE_SLOTS` (4) pairs. `VIC_SPR_MULTI` is flipped between the two: `last_irq` clears it for the
@@ -186,6 +208,43 @@ the `.last_irq` "too late" path is now unreachable. Verified by stashing X at th
 The _other_ "too late" exit — the one in `.display_sprite`, which skips a single sprite and carries on — is reachable
 by design, and how far down the screen it reaches is what decides the top edge. Measured: nowhere that shows.
 See _Measuring sprite placement_ under _Testing_.
+
+### The band can hide sprites — `$d01b` over invalid mode
+
+Not used yet, but established and worth not re-deriving, because it is the mechanism for a genuinely smooth top edge.
+
+A sprite cannot be started mid-image (`Cr(MCBASE)` reaches only non-row-multiple values and needs a cycle-15 write per
+line), so partial visibility needs either pre-shifted frame data or a mask. **The band is already a usable mask.**
+
+- `vic-ii.txt` §3.7.3.9: in **idle state** the g-access reads `$3fff`, or **`$39ff` when ECM is set**, and repeats
+  that byte across the line. Bank 3 → **`$f9ff`**, currently the unused 64th byte of `SPR_FR` block 87.
+- §3.7.3.8: in **invalid bitmap mode 2** (`ECM/BMM/MCM = 1/1/1`, which `CONTROL_Y_INVALID` + `CONTROL_X` already
+  select for the band) every bit pair renders black, but `10` and `11` count as **foreground**.
+- §3.8.2 spells the trick out: "by setting the sprites to appear behind the foreground graphics, the foreground
+  graphics will actually become visible as black pixels overlaying the sprite pixels." Foreground/background is
+  decided by **MCM in `$d016` alone**, "independently of ... the BMM and ECM bits", and that "is also valid for the
+  graphics generated in idle state."
+
+So `$f9ff = $ff` makes the band black _and_ foreground: any sprite with its `$d01b` bit set is hidden behind it, while
+the panel sprites keep theirs clear and stay on top.
+
+Both halves were verified with a standalone test program rather than by surgery on the band (`x64sc` and `x64` agree):
+in invalid bitmap mode 2 a `MxDP=1` sprite is masked while a `MxDP=0` control sprite beside it stays fully visible,
+and flipping `$d01b` mid-frame cuts a sprite horizontally at exactly the line of the write — so **`MxDP` is sampled
+per pixel, not latched per sprite.** Isolating it in ~60 lines of ACME was far cheaper than instrumenting the
+cycle-exact loop, and is the right move for any similar "does the VIC really do X" question.
+
+Two caveats before building on it:
+
+- **Crunch lines are not idle.** §3.14.4: a crunched line stays in display state, so there the mask comes from real
+  bitmap data and leaks wherever the art has `00`/`01` pairs. The band's bottom `HARD_Y` lines are the crunch ones.
+- **Inside a closed border there is no mask at all** — §3.8.2, last paragraph: when the vertical border flag is set
+  the graphics sequencer output is turned off entirely. So the mask spans `V_BORDER_TOP` down, and opening the border
+  _extends_ it upward rather than destroying it.
+
+The remaining blocker for using it is not the mask but the hardware: sprites still cannot be displayed above
+`SPR_FLOOR`, so the panel would have to move up into the border region, which means opening the vertical border and
+teaching the band loop to tolerate a varying number of active sprites.
 
 Because the phase advances in `last_irq`, a clustered layout would keep the screen changing after the autopilot has
 frozen `JOYSTICK`, which would break the reproducibility `make regress` depends on — hence `AP_FROZEN`, which stops
@@ -340,6 +399,20 @@ The same technique works for any other invariant that should hold every frame �
 byte inside the cycle-exact code (there is documented slack before the soft-scroll wait), then compare and `jam` in
 `last_irq` where timing is free. That is how the AGSP end line, the soft-scroll wait target, RSEL and `SPR_I`'s
 permutation invariant were all checked.
+
+### Measuring the AGSP band
+
+`AGSP_MARK` (`lib/mem.acme`) plus `-DAGSP_LIMIT=n` bisects the raster line the AGSP region ends on. The stash sits in
+the slack between the VSP and the soft-scroll wait — free, because that wait polls for a fixed line — and `last_irq`
+jams once the stashed line reaches the limit.
+
+```bash
+acme -DSYSTEM=64 -DDEVELOP=1 -DAGSP_LIMIT=76 -f cbm -o ap.prg engine.acme
+```
+
+The answer is **75**, constant over a long vertical-scrolling run, as "always 25 raster lines" requires. Everything
+about the panel row's position, `SPR_FLOOR` and the soft-scroll release derives from it, so it should not need
+measuring again — but the recipe is here if the band's line count ever changes.
 
 ### Measuring sprite placement
 

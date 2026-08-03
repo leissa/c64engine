@@ -54,6 +54,19 @@ SCROLL_ROWS = SCR_ROWS-2
 ; sprite cannot slide out from *behind* the panel row -- the hardware is busy
 ; with it until SPRITES_TOP_Y+SPRITE_HEIGHT -- so this edge always pops.
 ;
+; **The release must stay a whole text row past the band.**  It looks like slack
+; -- the band ends at AGSP_END = 75 and the panel frees the hardware at SPR_FLOOR
+; = 82, so releasing at 76 would win six lines of sprite travel -- and it does not
+; work: the release writes YSCROLL, and a write landing inside the row that is
+; still being fetched can assert the bad line condition a second time in that row,
+; so it gets re-fetched from a shifted VC and the map's first 0-7 lines come out
+; corrupt.  Tried, and it is visible as a ragged partial row under the panel.
+;
+; It is also scroll-offset dependent -- whether a stray bad line lands in the row
+; depends on SOFT_Y -- so a full-screen screenshot at one scroll position is not
+; enough to clear a change here.  Crop the strip under the panel and compare it
+; across several autopilot stops.
+;
 ; SPR_WRAP_MARGIN is what a sprite is recycled *above* SPR_MUX_START, and the
 ; only thing it has to cover is the wrap being noticed late: the order consulted
 ; is the one sorted at the end of the previous frame, so a wrap can be seen up to
