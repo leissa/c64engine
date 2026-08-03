@@ -1,3 +1,41 @@
+; The camera is clamped to the current area, so a scroll is refused once the window
+; would show what lies outside it.  Only the scroll is skipped -- the CUR_SPR nudge
+; below still happens either way, it is a debug aid and not part of the camera.
+;
+; init_screen calls SCROLL_L directly rather than going through here, so the
+; startup fill is not clamped and does not have to be.
+!macro scroll_towards_max .scroll, .lo, .hi, .max {
+    lda .lo
+    cmp #<.max
+    lda .hi
+    sbc #>.max
+    bcs +                   ; camera is at the bound
+    jsr .scroll
+    lda .lo
+    clc
+    adc #SCROLL_SPEED
+    sta .lo
+    bcc +
+    inc .hi
++
+}
+
+!macro scroll_towards_zero .scroll, .lo, .hi {
+    lda .lo                 ; less than one step left?  compare against the step
+    cmp #SCROLL_SPEED       ; rather than against zero, so an odd position cannot
+    lda .hi                 ; step straight past it and wrap
+    sbc #0
+    bcc +                   ; camera is at the bound
+    jsr .scroll
+    lda .lo
+    sec
+    sbc #SCROLL_SPEED
+    sta .lo
+    bcs +
+    dec .hi
++
+}
+
 JOYSTICK !zone {
 !ifdef AUTOPILOT {
     ; -DAUTOPILOT=1 -DAP_FRAMES=n replaces the stick with the scripted pattern in
@@ -45,7 +83,7 @@ AP_IDX = *+1
     bcs .left
 
     pha
-    jsr SCROLL_R
+    +scroll_towards_max SCROLL_R, CAM_X_LO, CAM_X_HI, CAM_X_MAX
     pla
 
     ldx CUR_SPR
@@ -56,7 +94,7 @@ AP_IDX = *+1
     bcs .down
 
     pha
-    jsr SCROLL_L
+    +scroll_towards_zero SCROLL_L, CAM_X_LO, CAM_X_HI
     pla
 
     ldx CUR_SPR
@@ -67,7 +105,7 @@ AP_IDX = *+1
     bcs .up
 
     pha
-    jsr SCROLL_D
+    +scroll_towards_max SCROLL_D, CAM_Y_LO, CAM_Y_HI, CAM_Y_MAX
     pla
 
     ldx CUR_SPR
@@ -80,7 +118,7 @@ AP_IDX = *+1
     asl
     bcs .exit
 
-    jsr SCROLL_U
+    +scroll_towards_zero SCROLL_U, CAM_Y_LO, CAM_Y_HI
 
     ldx CUR_SPR
     ldy SPR_Y, x

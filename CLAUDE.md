@@ -6,7 +6,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 A Commodore 64 game engine written entirely in 6510 assembly for the **ACME** cross-assembler.
 It scrolls a full multicolor bitmap in all 8 directions using AGSP (FLD + line crunch + VSP), multiplexes 24×2 sprites,
-streams tiles from a 256×96 map, and plays music — all inside one cycle-exact raster interrupt chain.
+streams tiles from a Zelda-style 32×32-tile area, and plays music — all inside one cycle-exact raster interrupt
+chain.
 It ships as a 1 MiB EasyFlash cartridge.
 
 There is no linter and no unit-test framework.
@@ -48,6 +49,8 @@ one that `make` then considers up to date.
 `cartconv -c` validates the result).
 Tile data is `!bin`'d into the image at the `TILE_*` addresses, so there is no separate asset pipeline — adding a
 tile-data file means only picking an address in `lib/mem.acme` and a `!bin` in `engine.acme`.
+The one generated asset is `map.bin`, cut out of `map-world.bin` by `tools/mkarea.py`; it is checked in, so the build
+does not depend on the tool — see _World layout and the camera_.
 
 Everything about the layout follows the [EasyFlash Programmer's
 Guide](http://skoe.de/easyflash/files/devdocs/EasyFlash-ProgRef.pdf);
@@ -159,6 +162,41 @@ below, and lowering it further needs `SPR_MUX_START` to move, which it cannot �
 The tunable constraints that used to be comments are now `!error` assertions at the top of the file:
 `(SCROLL_ROWS-1) % TILE_ROWS` and `(SCROLL_COLS-1) % TILE_COLS` must be zero, because the direction-reversal cursor
 jump is expressed in tiles and ACME's division truncates.
+
+### World layout and the camera
+
+The world is built from **areas of `AREA_COLS`×`AREA_ROWS` = 32×32 tiles**, which at 24×16 pixels a tile is about
+2.4 by 2.6 screens.
+
+The map cursor packs the map **row in its high byte and the column in its low byte**, and the address is
+`TILE_MAP + row*256 + col` — so **the row stride is 256 whatever the area size is**, and that is what
+`MAP_WIDTH = 256 ; assumed by the code` means. Do not try to make the map 32 bytes wide; an area is a 32×32 _window_
+into that address space instead. The upside is that the same 24k holds an **8×3 grid of areas** for free, with
+`AREA_ORG_C`/`AREA_ORG_R` selecting which one the demo uses; adding neighbours later is a matter of filling more of
+the grid and moving the origin.
+
+`map.bin` is generated, not authored: `map-world.bin` is the original 256×96 world and `tools/mkarea.py` cuts an area
+out of it, places it at the origin, and fills everything else with tile 0 (dense undergrowth), so the camera running
+past its bounds would show impassable growth rather than stray tiles.
+
+```bash
+tools/mkarea.py --src map-world.bin -o map.bin --cut 40,2 --at 96,32   # the village
+```
+
+**The camera is real state now**: `CAM_X`/`CAM_Y` in `lib/mem.acme`, 16-bit, in pixels into the area. It only exists
+to clamp the scroll — `JOYSTICK` guards each of its four `SCROLL_*` calls with `+scroll_towards_max` /
+`+scroll_towards_zero`, which skip the scroll at the bound and otherwise step the camera by `SCROLL_SPEED`. Three
+things about it that are not obvious:
+
+- **`init_screen` deliberately bypasses it**, calling `SCROLL_L` directly. The startup fill scrolls a whole screen
+  width and must not be clamped; `CAM_*_INIT` is then written after the fill to match where it left the camera.
+- **The bounds deduct a whole tile** beyond the screen size, because `COPY_TILES` works one tile ahead of the window.
+  Without that the trailing edge shows the first tile outside the area — a sliver a few pixels wide at the very edge
+  of the screen, easy to miss.
+- **`CAM_*_INIT` is measured, not derived.** Rebuild with `tools/mkarea.py --pad 136` (solid blue instead of
+  undergrowth), force one stick direction the way _Measuring the off-screen budget_ describes, run to the bound and
+  screenshot: blue anywhere means the bound is too generous, an early stop means it is too tight. All four
+  directions, since the horizontal and vertical read-ahead differ.
 
 ### Sprites
 

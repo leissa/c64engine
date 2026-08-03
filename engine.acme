@@ -36,8 +36,48 @@ TILE_COLS           = 3 ; must divide SCROLL_COLS-1 = 39 exactly (-> 13); assert
 TILE_ROWS           = 2 ; must divide SCROLL_ROWS-1 = 22 exactly (-> 11); asserted in scroll.acme
 SCR_COLS            = 40 ; horizontal screen chars in memory. the screen is in 38x24 mode
 SCR_ROWS            = 25 ; vertical screen chars in memory. the screen is in 38x24 mode
-MAP_WIDTH           = 256 ; assumed by the code, no other widths supported atm
-MAP_HEIGHT          = 96 ; not really used in the code, but good to know nonetheless
+; The map cursor packs the map row in its high byte and the map column in its low
+; byte, and the address is TILE_MAP + row*256 + col -- so the row stride is 256
+; whatever else changes.  These are the dimensions of that address space, not of
+; the playable world.
+MAP_WIDTH           = 256 ; the row stride; assumed by the code, no other widths supported
+MAP_HEIGHT          = 96 ; rows of address space available for areas
+
+; The world is built from Zelda-style areas of AREA_COLS x AREA_ROWS tiles, and a
+; 32x32 area is about 2.4 by 2.6 screens.  An area is a window into the map's
+; address space, so the 24k holds an 8x3 grid of them; only one is filled today.
+; tools/mkarea.py cuts an area out of map-world.bin and places it at AREA_ORG_*.
+AREA_COLS           = 32
+AREA_ROWS           = 32
+AREA_ORG_C          = 96 ; where the demo area sits in the map, in tiles
+AREA_ORG_R          = 32
+
+; How far the camera may travel before the window would show what is outside the
+; area, in pixels.  SCR_ROWS rather than the 24 visible rows keeps a row in hand,
+; and a further tile is deducted because COPY_TILES works one tile ahead of the
+; window: without it the incoming edge shows the tile just outside the area, which
+; is visible as a sliver at the trailing edge.  Measured, not derived.
+CAM_X_MAX           = (AREA_COLS*TILE_COLS - SCR_COLS - TILE_COLS)*8
+CAM_Y_MAX           = (AREA_ROWS*TILE_ROWS - SCR_ROWS - TILE_ROWS)*8
+
+; Where init_screen leaves the camera, in pixels into the area.  The initial map
+; cursor is 27 tiles into the area and init_screen scrolls left by a screen
+; (8*SCR_COLS = 320 pixels = 13 1/3 tiles), which lands it here.
+CAM_X_INIT          = 328
+CAM_Y_INIT          = 32
+
+!if CAM_X_INIT > CAM_X_MAX {
+    !error "CAM_X_INIT (", CAM_X_INIT, ") starts outside CAM_X_MAX (", CAM_X_MAX, ")"
+}
+!if CAM_Y_INIT > CAM_Y_MAX {
+    !error "CAM_Y_INIT (", CAM_Y_INIT, ") starts outside CAM_Y_MAX (", CAM_Y_MAX, ")"
+}
+!if AREA_ORG_C + AREA_COLS > MAP_WIDTH {
+    !error "area at column ", AREA_ORG_C, " does not fit in ", MAP_WIDTH, " columns"
+}
+!if AREA_ORG_R + AREA_ROWS > MAP_HEIGHT {
+    !error "area at row ", AREA_ORG_R, " does not fit in ", MAP_HEIGHT, " rows"
+}
 ; Two disjoint sets share the eight hardware sprites.
 ;
 ; PANEL_SPRITES sit on one raster row in the black FLD/crunch band, one hardware
@@ -303,6 +343,13 @@ PANEL_F
 ;-------------------------------------------------------------------------------
 
     jsr init_screen
+
+    ; init_screen is what establishes where the camera ends up: it scrolls left by
+    ; a full screen while filling it, so the window lands CAM_*_INIT into the area.
+    ; Measured by walking to each bound and checking the area's edge is reached
+    ; exactly -- see "Camera bounds" in CLAUDE.md.
+    +set16 CAM_X_INIT, CAM_X_LO
+    +set16 CAM_Y_INIT, CAM_Y_LO
 
 ;-------------------------------------------------------------------------------
 ;   setup raster irq
