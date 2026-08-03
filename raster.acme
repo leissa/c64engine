@@ -378,6 +378,15 @@ rotate
             ; because the other three hold sprites that free up even later.
             cmp VIC_RASTER
             bcs .do_display_sprite
+!ifdef SPR_DROP_LIMIT {
+            ; remember the lowest sprite (largest y) we were ever too late for.
+            ; -DSPR_DROP_LIMIT only: this costs cycles on a path the budget has
+            ; no room to spare on, see last_irq.
+            cmp SPR_DROPPED
+            bcc +
+            sta SPR_DROPPED
++
+}
             jmp .check_done
 
 .do_display_sprite
@@ -669,6 +678,19 @@ last_irq
     cmp #LINE_0-1 ; ok if VIC_RASTER < LINE_0-1
     bcc +
     jam ; if there is too little time, stop execution
++
+
+}
+
+; How far down the screen does the multiplexer still miss sprites?  SPR_DROPPED
+; holds the largest y it was ever too late for; bisect SPR_DROP_LIMIT and the
+; lowest limit that does not jam is that y, plus one.  Opt-in rather than part of
+; -DDEVELOP because the tracking itself costs enough to blow the budget.
+!ifdef SPR_DROP_LIMIT {
+    lda SPR_DROPPED
+    cmp #SPR_DROP_LIMIT
+    bcc +
+    jam
 +
 }
 

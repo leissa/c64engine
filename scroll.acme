@@ -54,9 +54,25 @@ SCROLL_ROWS = SCR_ROWS-2
 ; sprite cannot slide out from *behind* the panel row -- the hardware is busy
 ; with it until SPRITES_TOP_Y+SPRITE_HEIGHT -- so this edge always pops.
 ;
-; SPR_WRAP_MARGIN cannot go much below 4: the four slots are filled in sequence
-; over the first few lines, so the last of them needs more room than the first,
-; and 3 was measured to drop sprites.
+; SPR_WRAP_MARGIN is what a sprite is recycled *above* SPR_MUX_START, and the
+; only thing it has to cover is the wrap being noticed late: the order consulted
+; is the one sorted at the end of the previous frame, so a wrap can be seen up to
+; two frames late and the sprite travels SCROLL_SPEED lines in each of them.
+;
+; It used to be 4 on the theory that the four slots fill in sequence and the last
+; one needs room.  Measured, that is not the binding constraint: instrument the
+; "too late" exit in raster.acme (see SPR_DROPPED) and the largest y ever skipped
+; is 42, thirteen lines above the first visible line, unchanged from margin 4 all
+; the way down to margin 2 -- over the autopilot and over 5000 frames of constant
+; down+right.  The multiplexer places everything that can be seen.
+;
+; What stops it going lower still is raster time, not placement.  2 assembles and
+; runs, but it puts the frozen autopilot frames at stops 60 and 90 right on the
+; budget: with the SPR_DROPPED tracking compiled in they jam in the LINE_0
+; stabilisation check, without it they pass.  Sitting that close to the edge buys
+; one raster line and costs the room to instrument anything, so this stays at 3,
+; which is clean over the whole autopilot and over 5000 frames of constant
+; down+right, tracking on or off.  Below 3, budget first, then this constant.
 ;
 ; SPR_WRAP_BOTTOM is one line *past* the display window, so a recycled sprite
 ; starts out completely hidden in the bottom border and slides into view a line
@@ -64,7 +80,9 @@ SCROLL_ROWS = SCR_ROWS-2
 ; sprite a slot *already holds*, not the one arriving, and the arriving sprite is
 ; written long before the raster reaches it.
 SPR_MUX_START   = FIRST_BADLINE+SCR_ROWS+8+1
-SPR_WRAP_MARGIN = 4             ; slack for a wrap noticed a frame or two late
+!ifndef SPR_WRAP_MARGIN {       ; -D-overridable so it can be swept, see above
+SPR_WRAP_MARGIN = 3 * SCROLL_SPEED
+}
 SPR_WRAP_TOP    = SPR_MUX_START + SPR_WRAP_MARGIN
 SPR_WRAP_BOTTOM = DISPLAY_BOTTOM + 1
 

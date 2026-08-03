@@ -134,6 +134,16 @@ the 47 raster lines** of off-screen budget for a single wrap — measured, not e
 `SPR_I` directly and the sort then finds nothing to do. `SPR_WRAP_MARGIN` exists because the order read there is the
 one sorted at the end of the _previous_ frame, so a wrap can be noticed a frame or two late.
 
+`SPR_WRAP_MARGIN` is what sets the top edge: a sprite is recycled at `SPR_MUX_START + SPR_WRAP_MARGIN`, so the margin
+is exactly the band below the panel row where a sprite is gone instead of sliding out of view.
+It was 4 on the theory that the four slots fill in sequence and the last one needs room;
+that turns out not to be the binding constraint (see the sprite-placement measurement under _Testing_), and it is now
+`3 * SCROLL_SPEED`.
+What stops it going lower is the off-screen budget, not placement:
+at 2 the frozen autopilot frames at stops 60 and 90 sit right on the limit — they jam with the `SPR_DROPPED` tracking
+compiled in and pass without it.
+One raster line is not worth being unable to instrument the frame, so 3 it is.
+
 The tunable constraints that used to be comments are now `!error` assertions at the top of the file:
 `(SCROLL_ROWS-1) % TILE_ROWS` and `(SCROLL_COLS-1) % TILE_COLS` must be zero, because the direction-reversal cursor
 jump is expressed in tiles and ACME's division truncates.
@@ -172,6 +182,10 @@ entries of `SPR_Q` the multiplexer walks, `SPR_FRAME` picks the phase.
 The invariant worth re-checking after any change here is that the multiplexer places _every_ scheduled sprite, i.e.
 the `.last_irq` "too late" path is now unreachable. Verified by stashing X at that exit and comparing it against
 `SPR_SHOWN` in `last_irq`, over Y spacings from 8 down to 0.
+
+The _other_ "too late" exit — the one in `.display_sprite`, which skips a single sprite and carries on — is reachable
+by design, and how far down the screen it reaches is what decides the top edge. Measured: nowhere that shows.
+See _Measuring sprite placement_ under _Testing_.
 
 Because the phase advances in `last_irq`, a clustered layout would keep the screen changing after the autopilot has
 frozen `JOYSTICK`, which would break the reproducibility `make regress` depends on — hence `AP_FROZEN`, which stops
@@ -326,6 +340,30 @@ The same technique works for any other invariant that should hold every frame �
 byte inside the cycle-exact code (there is documented slack before the soft-scroll wait), then compare and `jam` in
 `last_irq` where timing is free. That is how the AGSP end line, the soft-scroll wait target, RSEL and `SPR_I`'s
 permutation invariant were all checked.
+
+### Measuring sprite placement
+
+`SPR_DROPPED` (`lib/mem.acme`) plus `-DSPR_DROP_LIMIT=n` is the same bisect applied to the multiplexer's
+`.display_sprite` "too late" exit, which skips one sprite and continues.
+The skip path keeps the largest Y it ever skipped;
+`last_irq` jams once that reaches `SPR_DROP_LIMIT`, so the lowest limit that does _not_ jam is the largest Y ever
+skipped, plus one.
+
+```bash
+acme -DSYSTEM=64 -DDEVELOP=1 -DAUTOPILOT=1 -DAP_FRAMES=240 -DSPR_DROP_LIMIT=43 -f cbm -o ap.prg engine.acme
+```
+
+The answer, over the whole autopilot and over 5000 frames of constant down+right, is **42** — thirteen lines above
+the first visible line, and forty above the top of the map.
+Unchanged from `SPR_WRAP_MARGIN` 4 down to 2.
+So the multiplexer places every sprite that could be seen, and the top edge is set by the wrap threshold alone;
+`SPR_WRAP_MARGIN` is the knob, not the placement code.
+
+It is opt-in rather than part of `-DDEVELOP` for a reason worth remembering:
+the tracking costs a handful of cycles on a path the budget has no room for, and compiling it in is by itself enough
+to push `SPR_WRAP_MARGIN = 2` from passing to jamming.
+Which is also the warning — **this harness perturbs what it measures.**
+Confirm any budget-adjacent result with the tracking compiled out.
 
 ### What headless screenshots cannot tell you
 
