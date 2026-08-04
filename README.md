@@ -116,6 +116,41 @@ VICE otherwise writes the cartridge image back on exit, which rewrites the name 
   In this way it is possible to reduce the problem of the sprite pointers overwriting the screen colors if certain
   tiles use only color `%00` & color `%11`.
 
+  Screen memory is a 1024 byte ring and the VIC reads the sprite pointers from a slot inside it, so eight char cells of
+  the map always take their `%01`/`%10` colors from pointer bytes that change every frame.
+  Which cells those are is set by `RING_PHASE`, and it is chosen so that as many of them as possible land where the
+  camera and the AGSP band can never show them — 32 instead of 57 out of 32 x 32 tiles.
+  `tools/ringphase.py` enumerates all 1024 phases; the choice is pure geometry, so it holds for any map, and the `%11`
+  advice above is what removes the rest.
+
+  They are fixed cells of the map, not of the screen, so they do not move with the camera.
+  For `RING_PHASE` = 544 they are these seven runs of eight, in char coordinates into the area — column `0`-`95`, row
+  `0`-`63`, so char `(col, row)` belongs to tile `(col/3, row/2)` at sub-position `(col%3, row%2)`:
+
+  | char row | char cols | tile row | tile sub-row | tile cols touched | ever visible |
+  | -------: | --------: | -------: | -----------: | ----------------: | ------------ |
+  |       10 |     72-79 |        5 |            0 |             24-26 | yes          |
+  |       11 |     32-39 |        5 |            1 |             10-13 | yes          |
+  |       36 |     56-63 |       18 |            0 |             18-21 | yes          |
+  |       37 |     16-23 |       18 |            1 |               5-7 | yes          |
+  |       61 |     80-87 |       30 |            1 |             26-29 | never        |
+  |       62 |     40-47 |       31 |            0 |             13-15 | never        |
+  |       63 |       0-7 |       31 |            1 |               0-2 | never        |
+
+  56 cells in total, of which the last three runs — 24 cells — sit where the camera clamp and the AGSP band can never
+  show them.
+  Within a run the cells are hardware sprites `0` to `7` from left to right: a cell's `%01` color is the high nibble of
+  that sprite's pointer byte, `%10` the low nibble.
+  The four visible runs are exactly where a tile drawn with only `%00` and `%11` pays off, and on the current village
+  map 9 of those 32 cells already are.
+
+  The coordinates follow from `(RING_PHASE + col + SCREEN_COLS*row) mod 1024` landing in the eight pointer bytes, so
+  regenerate the table after changing `RING_PHASE`, the area size or the camera clamp:
+
+  ```bash
+  tools/ringphase.py --phase 544 --art
+  ```
+
   All four files are linked into the image by `engine.acme` at the addresses given in `lib/mem.acme`, and travel in
   the cartridge from there — there is no separate asset pipeline.
 

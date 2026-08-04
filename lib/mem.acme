@@ -138,6 +138,11 @@ SPRITE_FRAMES = $e400; - $ffbf,  7k 111 sprite frames
 ;---------------------------------16k
 
 SPRITE_FRAMES_BASE = (SPRITE_FRAMES-VIC_BANK)/64
+; The VIC reads the sprite pointers from the last 8 bytes of the screen block, which is also the
+; ring the scroll walks the screen cursor around -- so those 8 cells are screen codes the
+; multiplexer overwrites every frame.  RING_PHASE in engine.acme is what decides which chars of
+; the map land on them.
 SPRITE_PTR         = SCREEN+$0400-8
+SCREEN_RING        = $0400
 INIT_SONG          = SONG_DATA
 PLAY_SONG          = INIT_SONG+3

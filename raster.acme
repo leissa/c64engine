@@ -71,7 +71,7 @@ IRQ !zone {
     lda #SCREEN_COLS-1                         ;  2
     sec                                     ;  2
 HARD_X = *+1
-    sbc #0                                  ;  2
+    sbc #HARD_X_INIT                        ;  2
     lsr                                     ;  2
     sta .self_modifying_branch__nops + 1    ;  4
                                             ;--> 12
@@ -123,7 +123,7 @@ SOFT_X = *+1
     lda #SCREEN_ROWS                           ;  2
     sec                                     ;  2
 HARD_Y = *+1
-    sbc #0                                  ;  2
+    sbc #HARD_Y_INIT                        ;  2
     tax                                     ;  2
                                             ;-->  8
 

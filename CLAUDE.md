@@ -377,6 +377,51 @@ by the song binary and shows up as a dead engine, not a build failure — `engin
 than duplicating the copy logic. It only exercises the _row_ path, which makes it a good first check after touching
 `tiles.acme`: if the row copy is broken the screen comes up empty.
 
+### The sprite pointers sit in the screen ring — `RING_PHASE`
+
+Screen memory is a **1024 byte ring** — `tiles.acme` masks a cursor's high byte with `%11111011`, and the VIC's `VC` is
+a 10 bit counter — and the VIC reads the sprite pointers from `SCREEN+$3f8`, which is inside it.
+So ring offsets **1016-1023 hold the eight sprite pointers instead of screen codes**, and the char cells that map there
+take their `%01`/`%10` colours from bytes the multiplexer rewrites every frame.
+That is the blinking cells in the map, and the README's "give priority to colour `%11`" note is the art side of the
+same problem.
+
+Which cells they are is a free parameter, and the geometry is worth knowing before touching any of it:
+
+- **The mapping is forced, not chosen**: char `(mc, mr)` of the area lives at ring offset
+  `(RING_PHASE + mc + SCREEN_COLS*mr) mod 1024`, with `+1` per column and `+40` per row, because the VIC's `VC` counts
+  up as it scans. There is no sign freedom to get wrong.
+- **The spoiled cells are fixed map cells**, not screen positions — they do not move with the camera, so a given cell
+  is spoiled at every camera position that shows it.
+- They land in **runs of up to 8 consecutive chars within one map row**, in clusters of two or three adjacent rows, and
+  the clusters repeat **every 26 rows**: `26*SCREEN_COLS = 1040 = 1024 + 16`, the same 16 chars `INCREMENT_HARD_Y`
+  corrects `HARD_X` by on a Y wrap.
+- Only **one cluster fits** in the frame of the area the camera clamp and the AGSP band never show, because the clamp
+  hides rows 0-1 and 60-63 and the clusters are 26 rows apart. So **32 cells stay visible whatever the phase** — the
+  phase cannot fix this alone, it can only halve it. Getting below 32 needs the art (`%00`/`%11` only) or a real fix
+  such as the `$d01b` mask.
+- The total number of cells varies with the phase (32-64), because the area's 96 char columns do not tile the ring
+  evenly and a run can fall off the row.
+
+`RING_PHASE` is **544**: 32 visible, chosen on geometry alone so it holds for any map, and tie-broken on the current
+area's art (23 of the 32 land on chars that use `%01`/`%10`). The plain pairing — screen cursor 0 at `MAP_INIT` — is
+phase **741** and leaves **57 of 59** visible, which is what the blinking used to be. `tools/ringphase.py` enumerates
+all 1024, with `--art` for the tie-break.
+
+The **exact cells of the configured phase are tabulated in `README.md`** — seven runs of eight, of which rows 61-63 are
+the ones nothing can show. `tools/ringphase.py --phase 544 --art` prints that table in the shape the README carries it,
+so regenerate rather than hand-edit it.
+
+**Rotating the phase means moving the write cursors and the AGSP origin together.** `RING_INIT`, `PIXEL_INIT`,
+`HARD_X_INIT` and `HARD_Y_INIT` all derive from `RING_PHASE` in `engine.acme`, because the display starts at ring offset
+`SCREEN_COLS*HARD_Y - HARD_X` while the cursors decide where the tiles are written: change one without the other and the
+picture comes up shifted by whole cells, permanently, since both then step in lockstep. The derivation is asserted to
+stay in `HARD_X` 0-39 and `HARD_Y` 0-25.
+
+To check a change here, **compare a screenshot against a render of the area** — a spoiled cell mismatches the render,
+so the spoiled set can be read off directly; see _Measuring the visible window_. Diffing two frames also finds them, but
+only the ones whose pointer byte happened to change between the two.
+
 ### Cartridge boot — `easyflash.acme` + `tools/mkcart.py`
 
 EasyFlash powers up in Ultimax with bank 0 selected, so the reset vector and start-up code live at the end of bank 0's
@@ -438,6 +483,10 @@ Its `petscii()` reproduces the `EF-Name:` magic from section 6 as a plain case s
 `SPRITES_TOP_Y`/`SPRITES_MAX_Y`, `TILES`, `COPY_*_FRAMES`. These feed `!if`/`!for` conditionals throughout
 `raster.acme` and `tiles.acme` that generate structurally different code — e.g. `SPRITES = 0` inlines
 `increment_vic_ctrl_y` as a macro, otherwise it becomes a `jsr`-able routine with different cycle budgets.
+
+`RING_PHASE` looks like a free constant and is one, but it is not independent: `RING_INIT`, `PIXEL_INIT` and the
+`HARD_X`/`HARD_Y` start values all derive from it and have to stay derived — see _The sprite pointers sit in the screen
+ring_.
 
 `TILES` is the least free of the lot despite looking like a pure size:
 it is the plane stride of the tile bins, so changing it means rerunning `tools/mkarea.py` with the same value — the bin sizes are asserted.
@@ -572,6 +621,43 @@ the tracking costs a handful of cycles on a path the budget has no room for, and
 to push `SPRITE_WRAP_MARGIN = 2` from passing to jamming.
 Which is also the warning — **this harness perturbs what it measures.**
 Confirm any budget-adjacent result with the tracking compiled out.
+
+### Measuring the visible window
+
+`RING_PHASE`'s whole value comes from the frame of the area that can never be shown, so those bounds are measured rather
+than derived from `SCREEN_ROWS` and the border constants.
+The result, in chars relative to the camera:
+
+| visible          | from            | to               |
+| ---------------- | --------------- | ---------------- |
+| rows             | camera + 2.125  | camera + 22.625  |
+| columns          | camera + 2.875  | camera + 40.75   |
+
+The AGSP band eats the first 25 raster lines of the display window and pushes the last rows of screen matrix past the
+bottom border, which is where the missing 4.4 rows go; 38 column mode accounts for the sides.
+With the clamp at 53 columns and 37 rows that makes **map rows 0-1 and 60-63, and columns 0-1 and 94-95, permanently
+invisible** — six rows and four columns of the area that nothing can ever show.
+
+The recipe, which works for any question of the form "what is actually on screen":
+
+1. Force a stick direction (`sed` the `lda CIA1_DATA_PORT_A` in `joystick.acme`) and run until the camera **parks at a
+   clamp**. The position is then exact and frame timing stops mattering, which is what makes this reproducible where
+   `-exitscreenshot` normally is not.
+2. Render the whole area from `map.bin` plus the tileset, quantise both images to palette indices, and slide the render
+   over the screenshot. The correct alignment scores **1.0** — anything less means the model of the data is wrong, not
+   that the alignment is approximate.
+3. Read the visible extent off the per-row and per-column agreement profile.
+
+Three traps, each of which produced a wrong answer first:
+
+- **The black band matches any dark part of the render.** A row inside the band scores high wherever the map happens to
+  be mostly `%00`, which reported the visible area as starting five rows above the camera. Require the render row to be
+  less than ~60% black before believing a match.
+- **The art repeats, so a small patch matches in several places.** A 100x18 patch had five perfect matches, one of them
+  nonsense that looked plausible. Use a patch of 50+ rows and check whether the best score is a tie.
+- **`CAMERA_X_INIT` is not pixel exact** — the true initial view sits 2 px off it. That is sub-char and well inside the
+  one-tile clamp margin, but it will make a cell-by-cell comparison against a render fail everywhere if the alignment is
+  assumed from the camera rather than measured.
 
 ### What headless screenshots cannot tell you
 

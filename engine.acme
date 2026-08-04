@@ -47,12 +47,49 @@ AREA_ROWS = 32
 ; The map in pages, for the wrap_add/wrap_sub masks that keep a cursor inside it.
 MAP_PAGES = AREA_COLS*AREA_ROWS/256
 
-; Where the map cursor starts, in tiles into the map.  TILE_COL/TILE_ROW below add
-; the sub-tile offset, and init_screen then scrolls left by a screen while filling
-; it -- which is what CAMERA_*_INIT records.
-MAP_INIT_COL = 27
-MAP_INIT_ROW = 2
-MAP_INIT     = MAP_INIT_ROW*AREA_COLS + MAP_INIT_COL
+; Where the map cursor starts, in tiles into the map, plus the sub-tile offset the copy
+; starts on; init_screen then scrolls left by a screen while filling it -- which is what
+; CAMERA_*_INIT records.
+MAP_INIT_COL  = 27
+MAP_INIT_ROW  = 2
+MAP_INIT      = MAP_INIT_ROW*AREA_COLS + MAP_INIT_COL
+TILE_COL_INIT = 2
+TILE_ROW_INIT = 1
+; The same position in chars, which is what the ring phase below is measured against.
+MAP_INIT_CHAR_COL = MAP_INIT_COL*TILE_COLS + TILE_COL_INIT
+MAP_INIT_CHAR_ROW = MAP_INIT_ROW*TILE_ROWS + TILE_ROW_INIT
+
+; Screen memory is a SCREEN_RING byte ring -- tiles.acme masks a cursor's high byte -- and the VIC
+; reads the sprite pointers from SCREEN+$3f8, which is inside it.
+; So ring offsets 1016..1023 hold pointers the multiplexer rewrites every frame rather than screen
+; codes, and the char cells mapping there take their %01/%10 colours from them: blinking garbage, in
+; runs of up to 8 chars within one map row.  The README's "give priority to colour %11" note is the
+; art side of the same problem.
+;
+; Which cells they are is free, because the phase of the ring is free:
+;   char (mc, mr) of the area sits at ring offset (RING_PHASE + mc + SCREEN_COLS*mr) mod SCREEN_RING.
+; The runs come in clusters of two or three adjacent rows that repeat every 26 rows -- 26*SCREEN_COLS
+; = SCREEN_RING+16, the same coupling INCREMENT_HARD_Y corrects HARD_X by -- so exactly one cluster
+; fits in the frame of the area that the camera clamp and the AGSP band never show, and 32 cells stay
+; visible whatever the phase.  544 is that optimum, from geometry alone so it holds for any map, and
+; it is also the best of the 85 tied phases on the current area's art.  tools/ringphase.py enumerates
+; all of them.  The plain pairing -- screen cursor 0 at MAP_INIT -- is phase 741 and leaves 57 of its
+; 59 cells visible, which is what the blinking cells in the map used to be.
+RING_PHASE = 544
+
+; The write cursors and the AGSP origin must start on the same ring cell or the picture comes up
+; shifted, so both follow from RING_PHASE: init_ptrs pairs RING_INIT with the map char above, and the
+; bitmap runs 8 bytes per char.
+RING_INIT  = (RING_PHASE + MAP_INIT_CHAR_COL + SCREEN_COLS*MAP_INIT_CHAR_ROW) & (SCREEN_RING-1)
+PIXEL_INIT = (8*RING_INIT) & 8191
+; raster.acme starts the display at ring offset SCREEN_COLS*HARD_Y - HARD_X, so name RING_INIT as the
+; one (x, y) in range that reaches it.
+HARD_Y_INIT = (RING_INIT + SCREEN_COLS-1) / SCREEN_COLS
+HARD_X_INIT = SCREEN_COLS*HARD_Y_INIT - RING_INIT
+
+!if HARD_X_INIT >= SCREEN_COLS or HARD_Y_INIT > SCREEN_ROWS {
+    !error "RING_PHASE (", RING_PHASE, ") wants HARD_X/HARD_Y to start at ", HARD_X_INIT, "/", HARD_Y_INIT, ", outside 0..", SCREEN_COLS-1, " and 0..", SCREEN_ROWS
+}
 
 ; How far the camera may travel before the window would show what is outside the
 ; area, in pixels.  SCREEN_ROWS rather than the 24 visible rows keeps a row in hand,
@@ -337,9 +374,9 @@ PANEL_FRAME
     stx VIC_BACKGROUND_0
     stx VIC_BORDER
 
-    ldx #2
+    ldx #TILE_COL_INIT
     stx TILE_COL
-    ldx #1
+    ldx #TILE_ROW_INIT
     stx TILE_ROW
 
     ; both cursors are 16 bit offsets into the map; init_ptrs adds TILE_MAP
@@ -350,14 +387,20 @@ PANEL_FRAME
     stx COL_MAP_POS_HI
     stx ROW_MAP_POS_HI
 
-    ldx #0
+    ; The screen and bitmap cursors are offsets into the ring, not zero: RING_INIT is what pairs
+    ; the map char above with the ring cell RING_PHASE asks for.  The colour cursor is derived
+    ; from the screen one per copy, so it follows on its own.
+    ldx #<RING_INIT
     stx COL_SCREEN_POS_LO
-    stx COL_SCREEN_POS_HI
     stx ROW_SCREEN_POS_LO
+    ldx #>RING_INIT
+    stx COL_SCREEN_POS_HI
     stx ROW_SCREEN_POS_HI
+    ldx #<PIXEL_INIT
     stx COL_PIXEL_POS_LO
-    stx COL_PIXEL_POS_HI
     stx ROW_PIXEL_POS_LO
+    ldx #>PIXEL_INIT
+    stx COL_PIXEL_POS_HI
     stx ROW_PIXEL_POS_HI
     ;----------------------------------
 
@@ -396,6 +439,10 @@ PANEL_FRAME
     +set 1, VIC_IRQ_CTRL
     ; enable IRQs
     cli
+
+    ; The spin loop below is 16 bytes, so aligning it keeps the +bcs inside one page and its 3
+    ; cycles at 3.  Before, that held only by luck of where the code above happened to end.
+!align 15, 0
 -
     ; some 7 cycle garbage instructions
     lda ($f0), y
