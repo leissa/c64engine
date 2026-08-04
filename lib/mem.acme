@@ -1,81 +1,94 @@
-DO_NOT_USE      = $00
-RAM_ROM_SWITCH  = $01
-ITERATIONS      = $02
-PLAY_SONG_REG1  = $03
-PLAY_SONG_REG2  = $04
+; $00 is the 6510's data direction register and $01 its port -- RAM_ROM_SELECTION in lib/std.acme.
+; Neither is available as storage, which is why the allocation below starts at $02.
 
-TILE_COL        = $05
-TILE_ROW        = $06
-C_TILE_COL      = $07
-C_TILE_ROW      = $08
-R_TILE_COL      = $09
-R_TILE_ROW      = $0a
+ITERATIONS          = $02
+; Reserved for the song driver, which uses $03/$04 as a 16 bit scratch pair.
+PLAY_SONG_SCRATCH_1 = $03
+PLAY_SONG_SCRATCH_2 = $04
 
-MAP_POS_LO_T    = $0b
-MAP_POS_HI_T    = $0c
-C_MAP_POS_LO    = $0d
-C_MAP_POS_HI    = $0e
-R_MAP_POS_LO    = $0f
-R_MAP_POS_HI    = $10
-C_MAP_POS_LO_T  = $11
-C_MAP_POS_HI_T  = $12
-R_MAP_POS_LO_T  = $13
-R_MAP_POS_HI_T  = $14
+; Position inside the current tile, in screen chars.
+; TILE_* is the live one the scroll steps; COL_*/ROW_* are the copies a column or row copy runs off.
+TILE_COL     = $05
+TILE_ROW     = $06
+COL_TILE_COL = $07
+COL_TILE_ROW = $08
+ROW_TILE_COL = $09
+ROW_TILE_ROW = $0a
 
-SCR_POS_LO_T    = $15
-SCR_POS_HI_T    = $16
-C_SCR_POS_LO    = $17
-C_SCR_POS_HI    = $18
-R_SCR_POS_LO    = $19
-R_SCR_POS_HI    = $1a
-C_SCR_POS_LO_T  = $1b
-C_SCR_POS_HI_T  = $1c
-R_SCR_POS_LO_T  = $1d
-R_SCR_POS_HI_T  = $1e
+; Four cursor sets, one per thing a tile copy touches: the map it reads and the screen, bitmap and color RAM it writes.
+; Each comes in three tiers:
+;
+;   *_TMP                 the pointer the copy body works through, shared by both axes
+;   COL_*/ROW_*            the persistent cursor the scroll steps, per axis
+;   COL_*_TMP/ROW_*_TMP  where a copy split over several frames resumes, per axis
+MAP_POS_LO_TMP     = $0b
+MAP_POS_HI_TMP     = $0c
+COL_MAP_POS_LO     = $0d
+COL_MAP_POS_HI     = $0e
+ROW_MAP_POS_LO     = $0f
+ROW_MAP_POS_HI     = $10
+COL_MAP_POS_LO_TMP = $11
+COL_MAP_POS_HI_TMP = $12
+ROW_MAP_POS_LO_TMP = $13
+ROW_MAP_POS_HI_TMP = $14
 
-PIX_POS_LO_T    = $1f
-PIX_POS_HI_T    = $20
-C_PIX_POS_LO    = $21
-C_PIX_POS_HI    = $22
-R_PIX_POS_LO    = $23
-R_PIX_POS_HI    = $24
-C_PIX_POS_LO_T  = $25
-C_PIX_POS_HI_T  = $26
-R_PIX_POS_LO_T  = $27
-R_PIX_POS_HI_T  = $28
+SCREEN_POS_LO_TMP     = $15
+SCREEN_POS_HI_TMP     = $16
+COL_SCREEN_POS_LO     = $17
+COL_SCREEN_POS_HI     = $18
+ROW_SCREEN_POS_LO     = $19
+ROW_SCREEN_POS_HI     = $1a
+COL_SCREEN_POS_LO_TMP = $1b
+COL_SCREEN_POS_HI_TMP = $1c
+ROW_SCREEN_POS_LO_TMP = $1d
+ROW_SCREEN_POS_HI_TMP = $1e
 
-CLR_POS_LO_T    = $29
-CLR_POS_HI_T    = $2a
-C_CLR_POS_HI_T  = $2b
-R_CLR_POS_HI_T  = $2c
+PIXEL_POS_LO_TMP     = $1f
+PIXEL_POS_HI_TMP     = $20
+COL_PIXEL_POS_LO     = $21
+COL_PIXEL_POS_HI     = $22
+ROW_PIXEL_POS_LO     = $23
+ROW_PIXEL_POS_HI     = $24
+COL_PIXEL_POS_LO_TMP = $25
+COL_PIXEL_POS_HI_TMP = $26
+ROW_PIXEL_POS_LO_TMP = $27
+ROW_PIXEL_POS_HI_TMP = $28
 
-C_COPY          = $2d
-R_COPY          = $2e
-SCROLL_U_D      = $2f
-SCROLL_L_R      = $30
-SPR_COUNTER     = $31
-PLAY            = $32
-CTRL_Y_INVALID  = $33
-INIT_SCREEN_LO  = $34
-INIT_SCREEN_HI  = $35
-AP_FROZEN       = $38   ; -DAUTOPILOT only: set once the scripted run has finished
-SPR_DROPPED     = $39   ; -DDEVELOP only: counts sprites the multiplexer was too late for
-AGSP_MARK       = $3a   ; -DAGSP_LIMIT only: raster line the AGSP region ended on
+; The color cursor shares its low byte with the screen cursor, so the per-axis tiers only keep the high one.
+COLOR_POS_LO_TMP     = $29
+COLOR_POS_HI_TMP     = $2a
+COL_COLOR_POS_HI_TMP = $2b
+ROW_COLOR_POS_HI_TMP = $2c
+
+COL_COPY               = $2d ; frames left in the column copy in flight, 0 = none
+ROW_COPY               = $2e ; frames left in the row copy in flight, 0 = none
+SCROLL_LAST_VERTICAL   = $2f ; direction the last vertical scroll went, so a reversal can be spotted
+SCROLL_LAST_HORIZONTAL = $30 ; ... and the same for the horizontal axis
+SPRITE_COUNTER         = $31 ; display list position the multiplexer resumes its next irq at
+;                        $32   free
+; A zero page copy of engine.acme's CTRL_Y_INVALID.
+; The cycle exact code reads it instead of the immediate to spend one more cycle.
+CTRL_Y_INVALID_COPY    = $33
+INIT_SCREEN_LO         = $34 ; 16 bit countdown over init_screen's fill loop
+INIT_SCREEN_HI         = $35
+SPRITES_SHOWN          = $36 ; how many entries of SPRITE_QUEUE the multiplexer walks this frame
+SPRITE_PHASE           = $37 ; incremented once per frame; picks which subset a thinned display list shows
+AUTOPILOT_FROZEN       = $38 ; -DAUTOPILOT only: set once the scripted run has finished
+SPRITE_DROPPED         = $39 ; -DDEVELOP only: counts sprites the multiplexer was too late for
+AGSP_MARK              = $3a ; -DAGSP_LIMIT only: raster line the AGSP region ended on
 ; Camera position inside the current area, in pixels, so the scroll can be stopped
 ; at the area bounds.  16 bit: an area is 32*24 = 768 pixels wide.
-CAM_X_LO        = $3b
-CAM_X_HI        = $3c
-CAM_Y_LO        = $3d
-CAM_Y_HI        = $3e
-SPR_SHOWN       = $36   ; how many entries of SPR_Q the multiplexer walks this frame
-SPR_FRAME       = $37   ; frame counter, picks the flicker phase
+CAMERA_X_LO            = $3b
+CAMERA_X_HI            = $3c
+CAMERA_Y_LO            = $3d
+CAMERA_Y_HI            = $3e
 
 ; World sprite bookkeeping, all indexed by world sprite id 0..SPRITES-1 except
-; SPR_Q/SPR_YQ, which are indexed by position in the sorted order.
-SPR_I           = $40; - $4f, sprite ids sorted by SPR_Y, maintained across frames
-SPR_Y           = $50; - $5f, screen y per sprite id
-SPR_Q           = $60; - $6f, the subset the multiplexer shows this frame, in y order
-SPR_YQ          = $70; - $7f, SPR_Y read out in sorted order, for the zone check
+; SPRITE_QUEUE/SPRITE_Y_SORTED, which are indexed by position in the sorted order.
+SPRITE_ORDER    = $40; - $4f, sprite ids sorted by SPRITE_Y, maintained across frames
+SPRITE_Y        = $50; - $5f, screen y per sprite id
+SPRITE_QUEUE    = $60; - $6f, the subset the multiplexer shows this frame, in y order
+SPRITE_Y_SORTED = $70; - $7f, SPRITE_Y read out in sorted order, for the zone check
 
 ; zero page: $0000 - $00ff
 ; cpu stack: $0100 - $01ff
@@ -83,41 +96,40 @@ SPR_YQ          = $70; - $7f, SPR_Y read out in sorted order, for the zone check
 ; The EasyFlash boot copier relocates itself here and runs from RAM while the cartridge is banked in;
 ; see easyflash.acme.
 ; Both pages must stay below the lowest payload destination ($0801) so the copy cannot overwrite them.
-EF_COPIER       = $0200; - $02ff
+EF_COPIER  = $0200; - $02ff
 ; The chunk table only exists in bank 1, but the copier switches banks as it walks the payload, so the table is lifted
 ; into RAM before the walk starts.
-EF_TABLE_RAM    = $0300; - $03ff
+EF_TBL_RAM = $0300; - $03ff
 ;----------------------------------512b
 
 ; Reserved for EAPI, which must live page-aligned in $0200..$7fff or $c000..$cfff and may be up to 768 bytes
 ; (EasyFlash ProgRef 5.4).
 ; $c000 is the bitmap here, so it goes in what used to be the BASIC screen area.
 ; Nothing copies or initializes it yet -- see ef_eapi_init in easyflash.acme.
-EAPI_RAM        = $0400; - $06ff
-EAPI_RAM_SIZE   = $0300
+EAPI_RAM  = $0400; - $06ff
 ; One page of scratch the boot copier stages cartridge data through, so it can write to RAM with the cartridge switched
 ; off; see easyflash.acme.
-EF_BUFFER       = $0700; - $07ff
+EF_BUFFER = $0700; - $07ff
 ;----------------------------------1k
 
-SPR_DATA        = $080d; - $0883
-CODE_START      = $0885; - $1fff,  6k
-SONG_DATA       = $2000; - $2fff,  4k
+SPRITE_DATA = $080d; - $0883
+CODE_START  = $0885; - $1fff,  6k
+SONG_DATA   = $2000; - $2fff,  4k
 ;---------------------------------12k
 
-TILE_MAP        = $3000; - $8fff, 24k
-TILE_CLR        = $9000; - $95ff,  1.5k
-TILE_SCR        = $9600; - $9bff,  1.5k
-TILE_PIX        = $9c00; - $bfff,  9k
+TILE_MAP    = $3000; - $8fff, 24k
+TILE_COLOR  = $9000; - $95ff,  1.5k
+TILE_SCREEN = $9600; - $9bff,  1.5k
+TILE_PIXELS = $9c00; - $bfff,  9k
 ;---------------------------------36k
 
-VIC_BANK        = $c000;
-HIRES           = $c000; - $dfff,  8k, 4k under I/O area
-SCREEN          = $e000; - $e3ff,  1k
-SPR_FR          = $e400; - $ffbf,  7k 111 sprite frames
+VIC_BANK      = $c000;
+BITMAP        = $c000; - $dfff,  8k, 4k under I/O area
+SCREEN        = $e000; - $e3ff,  1k
+SPRITE_FRAMES = $e400; - $ffbf,  7k 111 sprite frames
 ;---------------------------------16k
 
-SPR_FR_BASE     = (SPR_FR-VIC_BANK)/64
-SPR_PTR         = SCREEN+$0400-8
-INIT_SONG       = SONG_DATA
-PLAY_SONG       = INIT_SONG+3
+SPRITE_FRAMES_BASE = (SPRITE_FRAMES-VIC_BANK)/64
+SPRITE_PTR         = SCREEN+$0400-8
+INIT_SONG          = SONG_DATA
+PLAY_SONG          = INIT_SONG+3

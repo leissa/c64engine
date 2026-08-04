@@ -10,73 +10,73 @@
 !source "lib/std.acme"
 
 !ifdef DEBUG {
-    CONTROL_X           = %00011000 ; 40 cols
-    CONTROL_Y_INVALID   = %00111000 ; 25 rows
+    CTRL_X         = %00011000 ; 40 cols
+    CTRL_Y_INVALID = %00111000 ; 25 rows
 } else {
-    CONTROL_X           = %00010000 ; multi color
-    CONTROL_Y_INVALID   = %01110000 ; invalid mode
+    CTRL_X         = %00010000 ; multi color
+    CTRL_Y_INVALID = %01110000 ; invalid mode
 }
 
-CONTROL_Y_MASK      = %10111111 ; bitmap mode
+CTRL_Y_MASK = %10111111 ; bitmap mode
 
-; Every $d011 the engine writes carries CONTROL_Y_INVALID's RSEL bit, so that bit
+; Every $d011 the engine writes carries CTRL_Y_INVALID's RSEL bit, so that bit
 ; decides where the vertical border flag switches and hence where the display
 ; window begins and ends.  See lib/vic.acme.
-!if (CONTROL_Y_INVALID & VIC_RSEL) != 0 {
-V_BORDER_TOP        = VIC_V_BORDER_TOP_25
-V_BORDER_BOTTOM     = VIC_V_BORDER_BOTTOM_25
+!if (CTRL_Y_INVALID & VIC_RSEL) != 0 {
+VERTICAL_BORDER_TOP = VIC_VERTICAL_BORDER_TOP_25
+VERTICAL_BORDER_BOT = VIC_VERTICAL_BORDER_BOT_25
 } else {
-V_BORDER_TOP        = VIC_V_BORDER_TOP_24
-V_BORDER_BOTTOM     = VIC_V_BORDER_BOTTOM_24
+VERTICAL_BORDER_TOP = VIC_VERTICAL_BORDER_TOP_24
+VERTICAL_BORDER_BOT = VIC_VERTICAL_BORDER_BOT_24
 }
 
-LINE_0              = FIRST_BADLINE-3
-SCROLL_SPEED        = 1 ; supported are 1 or 2
-TILE_COLS           = 3 ; must divide SCROLL_COLS-1 = 39 exactly (-> 13); asserted in scroll.acme
-TILE_ROWS           = 2 ; must divide SCROLL_ROWS-1 = 22 exactly (-> 11); asserted in scroll.acme
-SCR_COLS            = 40 ; horizontal screen chars in memory. the screen is in 38x24 mode
-SCR_ROWS            = 25 ; vertical screen chars in memory. the screen is in 38x24 mode
+LINE_0       = FIRST_BADLINE-3
+SCROLL_SPEED = 1 ; supported are 1 or 2
+TILE_COLS    = 3 ; must divide SCROLL_COLS-1 = 39 exactly (-> 13); asserted in scroll.acme
+TILE_ROWS    = 2 ; must divide SCROLL_ROWS-1 = 22 exactly (-> 11); asserted in scroll.acme
+SCREEN_COLS  = 40 ; horizontal screen chars in memory. the screen is in 38x24 mode
+SCREEN_ROWS  = 25 ; vertical screen chars in memory. the screen is in 38x24 mode
 ; The map cursor packs the map row in its high byte and the map column in its low
 ; byte, and the address is TILE_MAP + row*256 + col -- so the row stride is 256
 ; whatever else changes.  These are the dimensions of that address space, not of
 ; the playable world.
-MAP_WIDTH           = 256 ; the row stride; assumed by the code, no other widths supported
-MAP_HEIGHT          = 96 ; rows of address space available for areas
+MAP_WIDTH    = 256 ; the row stride; assumed by the code, no other widths supported
+MAP_HEIGHT   = 96 ; rows of address space available for areas
 
 ; The world is built from Zelda-style areas of AREA_COLS x AREA_ROWS tiles, and a
 ; 32x32 area is about 2.4 by 2.6 screens.  An area is a window into the map's
 ; address space, so the 24k holds an 8x3 grid of them; only one is filled today.
-; tools/mkarea.py cuts an area out of map-world.bin and places it at AREA_ORG_*.
-AREA_COLS           = 32
-AREA_ROWS           = 32
-AREA_ORG_C          = 96 ; where the demo area sits in the map, in tiles
-AREA_ORG_R          = 32
+; tools/mkarea.py cuts an area out of map-world.bin and places it at AREA_ORIGIN_*.
+AREA_COLS       = 32
+AREA_ROWS       = 32
+AREA_ORIGIN_COL = 96 ; where the demo area sits in the map, in tiles
+AREA_ORIGIN_ROW = 32
 
 ; How far the camera may travel before the window would show what is outside the
-; area, in pixels.  SCR_ROWS rather than the 24 visible rows keeps a row in hand,
+; area, in pixels.  SCREEN_ROWS rather than the 24 visible rows keeps a row in hand,
 ; and a further tile is deducted because COPY_TILES works one tile ahead of the
 ; window: without it the incoming edge shows the tile just outside the area, which
 ; is visible as a sliver at the trailing edge.  Measured, not derived.
-CAM_X_MAX           = (AREA_COLS*TILE_COLS - SCR_COLS - TILE_COLS)*8
-CAM_Y_MAX           = (AREA_ROWS*TILE_ROWS - SCR_ROWS - TILE_ROWS)*8
+CAMERA_X_MAX = (AREA_COLS*TILE_COLS - SCREEN_COLS - TILE_COLS)*8
+CAMERA_Y_MAX = (AREA_ROWS*TILE_ROWS - SCREEN_ROWS - TILE_ROWS)*8
 
 ; Where init_screen leaves the camera, in pixels into the area.  The initial map
 ; cursor is 27 tiles into the area and init_screen scrolls left by a screen
-; (8*SCR_COLS = 320 pixels = 13 1/3 tiles), which lands it here.
-CAM_X_INIT          = 328
-CAM_Y_INIT          = 32
+; (8*SCREEN_COLS = 320 pixels = 13 1/3 tiles), which lands it here.
+CAMERA_X_INIT = 328
+CAMERA_Y_INIT = 32
 
-!if CAM_X_INIT > CAM_X_MAX {
-    !error "CAM_X_INIT (", CAM_X_INIT, ") starts outside CAM_X_MAX (", CAM_X_MAX, ")"
+!if CAMERA_X_INIT > CAMERA_X_MAX {
+    !error "CAMERA_X_INIT (", CAMERA_X_INIT, ") starts outside CAMERA_X_MAX (", CAMERA_X_MAX, ")"
 }
-!if CAM_Y_INIT > CAM_Y_MAX {
-    !error "CAM_Y_INIT (", CAM_Y_INIT, ") starts outside CAM_Y_MAX (", CAM_Y_MAX, ")"
+!if CAMERA_Y_INIT > CAMERA_Y_MAX {
+    !error "CAMERA_Y_INIT (", CAMERA_Y_INIT, ") starts outside CAMERA_Y_MAX (", CAMERA_Y_MAX, ")"
 }
-!if AREA_ORG_C + AREA_COLS > MAP_WIDTH {
-    !error "area at column ", AREA_ORG_C, " does not fit in ", MAP_WIDTH, " columns"
+!if AREA_ORIGIN_COL + AREA_COLS > MAP_WIDTH {
+    !error "area at column ", AREA_ORIGIN_COL, " does not fit in ", MAP_WIDTH, " columns"
 }
-!if AREA_ORG_R + AREA_ROWS > MAP_HEIGHT {
-    !error "area at row ", AREA_ORG_R, " does not fit in ", MAP_HEIGHT, " rows"
+!if AREA_ORIGIN_ROW + AREA_ROWS > MAP_HEIGHT {
+    !error "area at row ", AREA_ORIGIN_ROW, " does not fit in ", MAP_HEIGHT, " rows"
 }
 ; Two disjoint sets share the eight hardware sprites.
 ;
@@ -88,60 +88,60 @@ CAM_Y_INIT          = 32
 ; SPRITES are the world sprites below that, two hardware sprites each (a hires
 ; over a multicolour one) multiplexed over SPRITE_SLOTS pairs.  SPRITES = 0
 ; compiles out both sets.
-SPRITES             = 16 ; world sprites; must be SPRITE_SLOTS * 4, see SPR_ZONES_MAX
-PANEL_SPRITES       = 8  ; one per hardware sprite, so all of them
-SPRITE_SLOTS        = 4  ; hardware sprite pairs available to the multiplexer
-SPRITE_HEIGHT       = 21 ; raster lines a sprite covers; a slot is busy this long
+SPRITES       = 16 ; world sprites; must be SPRITE_SLOTS * 4, see SPRITE_ZONES_MAX
+PANEL_SPRITES = 8  ; one per hardware sprite, so all of them
+SPRITE_SLOTS  = 4  ; hardware sprite pairs available to the multiplexer
+SPRITE_HEIGHT = 21 ; raster lines a sprite covers; a slot is busy this long
 ; Lowering this frees the sprite hardware earlier, and 54 is as low as it can go:
 ; a sprite at y displays y+1 .. y+21, so below 54 the panel's first line falls
-; inside the top border (V_BORDER_TOP) and its last line stops short of AGSP_END,
+; inside the top border (VERTICAL_BORDER_TOP) and its last line stops short of AGSP_END,
 ; leaving band lines with no sprites on them that the 44 cycle path in raster.acme
 ; assumes are full.  Both bounds are asserted below.
 ;
 ; It stays at 60 anyway, because freeing the hardware earlier buys nothing on its
-; own: what actually gates the world sprites is SPR_MUX_START, the soft scroll
+; own: what actually gates the world sprites is SPRITE_MULTIPLEX_START, the soft scroll
 ; release, and that cannot move -- see the note in scroll.acme.
-SPRITES_TOP_Y       = 60 ; panel row, inside the FLD/crunch band
-AGSP_END            = 75 ; last line of the 25 line AGSP region; measured, see CLAUDE.md
-SPR_FLOOR           = SPRITES_TOP_Y + SPRITE_HEIGHT + 1 ; first line a world sprite can use
+SPRITES_TOP_Y = 60 ; panel row, inside the FLD/crunch band
+AGSP_END      = 75 ; last line of the 25 line AGSP region; measured, see CLAUDE.md
+SPRITE_FLOOR  = SPRITES_TOP_Y + SPRITE_HEIGHT + 1 ; first line a world sprite can use
 
 ; A sprite must still be placeable at the very bottom of the window or it pops
 ; into view instead of sliding out of the border.  Two separate lines matter:
 ; SPRITES_MAX_Y is where the multiplexer stops trying to reuse a slot, and
 ; LAST_IRQ_LINE is where last_irq takes the hardware back for the panel row --
 ; a sprite whose raster line has not been reached by then never gets latched.
-DISPLAY_BOTTOM      = V_BORDER_BOTTOM - 1 ; last line before the bottom border
-LAST_IRQ_LINE       = 242 ; last_irq takes the hardware back here for the panel row
-SPRITES_MAX_Y       = 229 ; multiplexer gives up past this line
-TILES               = 185 ; TODO: calculate this with pixels.bin size / 8 / TILE_COLS / TILE_ROWS
+DISPLAY_BOT      = VERTICAL_BORDER_BOT - 1 ; last line before the bottom border
+LAST_IRQ_LINE    = 242 ; last_irq takes the hardware back here for the panel row
+SPRITES_MAX_Y    = 229 ; multiplexer gives up past this line
+TILES            = 185 ; TODO: calculate this with pixels.bin size / 8 / TILE_COLS / TILE_ROWS
 ; must split SCROLL_ROWS/SCROLL_COLS exactly and fit in the 4/SCROLL_SPEED frames
 ; a soft scroll leaves before the hard step; both asserted in tiles.acme
-; The multiplexer degrades in powers of two: SPR_ZONES_MAX sprites per slot when
+; The multiplexer degrades in powers of two: SPRITE_ZONES_MAX sprites per slot when
 ; nothing clusters, then half of them on alternate frames, then a quarter on
 ; every fourth frame.  See "sprite scheduling" in raster.acme.
-SPR_ZONES_MAX       = SPRITES / SPRITE_SLOTS
+SPRITE_ZONES_MAX = SPRITES / SPRITE_SLOTS
 
-; The SCR_ROWS rows of screen matrix have to end exactly where the border comes
+; The SCREEN_ROWS rows of screen matrix have to end exactly where the border comes
 ; on, or the bottom row is either cut off or scrolled in under the border.  That
-; the two agree is a coincidence of FIRST_BADLINE and SCR_ROWS and not a
+; the two agree is a coincidence of FIRST_BADLINE and SCREEN_ROWS and not a
 ; derivation, so say so out loud.  The debug build runs RSEL set and a taller
 ; window, and does not have to line up.
-!if (CONTROL_Y_INVALID & VIC_RSEL) = 0 {
-  !if DISPLAY_BOTTOM != FIRST_BADLINE + 8*SCR_ROWS - 2 {
-    !error "the ", SCR_ROWS, " rows from FIRST_BADLINE (", FIRST_BADLINE, ") end at ", FIRST_BADLINE + 8*SCR_ROWS - 2, ", but the bottom border starts at ", V_BORDER_BOTTOM
+!if (CTRL_Y_INVALID & VIC_RSEL) = 0 {
+  !if DISPLAY_BOT != FIRST_BADLINE + 8*SCREEN_ROWS - 2 {
+    !error "the ", SCREEN_ROWS, " rows from FIRST_BADLINE (", FIRST_BADLINE, ") end at ", FIRST_BADLINE + 8*SCREEN_ROWS - 2, ", but the bottom border starts at ", VERTICAL_BORDER_BOT
   }
 }
 
 !if SPRITES != 0 {
   ; a sprite at y displays y+1 .. y+21, so it is the *first displayed* line that
   ; has to clear the border, not y itself
-  !if SPRITES_TOP_Y + 1 < V_BORDER_TOP {
-    !error "SPRITES_TOP_Y (", SPRITES_TOP_Y, ") puts the panel's first line above the first visible line (", V_BORDER_TOP, ")"
+  !if SPRITES_TOP_Y + 1 < VERTICAL_BORDER_TOP {
+    !error "SPRITES_TOP_Y (", SPRITES_TOP_Y, ") puts the panel's first line above the first visible line (", VERTICAL_BORDER_TOP, ")"
   }
   ; A world sprite going DMA-active inside the band would make the per-line steal
   ; vary and mistime the whole AGSP, so the floor has to sit below the band ...
-  !if SPR_FLOOR <= AGSP_END {
-    !error "SPR_FLOOR (", SPR_FLOOR, ") is inside the AGSP band, which ends at ", AGSP_END
+  !if SPRITE_FLOOR <= AGSP_END {
+    !error "SPRITE_FLOOR (", SPRITE_FLOOR, ") is inside the AGSP band, which ends at ", AGSP_END
   }
   ; ... and the panel has to stay DMA-active all the way to the band's last line
   !if SPRITES_TOP_Y + SPRITE_HEIGHT < AGSP_END {
@@ -150,40 +150,40 @@ SPR_ZONES_MAX       = SPRITES / SPRITE_SLOTS
   !if SPRITES % SPRITE_SLOTS != 0 {
     !error "SPRITES (", SPRITES, ") must be a multiple of SPRITE_SLOTS (", SPRITE_SLOTS, ")"
   }
-  !if SPR_ZONES_MAX != 4 {
-    !error "SPR_ZONES_MAX is ", SPR_ZONES_MAX, "; the 4/2/1 fallback chain assumes 4"
+  !if SPRITE_ZONES_MAX != 4 {
+    !error "SPRITE_ZONES_MAX is ", SPRITE_ZONES_MAX, "; the 4/2/1 fallback chain assumes 4"
   }
   !if PANEL_SPRITES != 2 * SPRITE_SLOTS {
     !error "PANEL_SPRITES (", PANEL_SPRITES, ") must cover all ", 2*SPRITE_SLOTS, " hardware sprites"
   }
 }
 
-COPY_ROW_FRAMES     = 2 ; use 2 frames to copy all rows, vertically
+COPY_ROW_FRAMES = 2 ; use 2 frames to copy all rows, vertically
 !if SCROLL_SPEED = 2 {
-COPY_COL_FRAMES     = 2 ; use 2 frames to copy all cols, horizontally
+COPY_COL_FRAMES = 2 ; use 2 frames to copy all cols, horizontally
 } else {
-COPY_COL_FRAMES     = 4 ; use 4 frames to copy all cols, horizontally
+COPY_COL_FRAMES = 4 ; use 4 frames to copy all cols, horizontally
 }
 
-*=SPR_DATA
+*=SPRITE_DATA
 
 ; ---- world sprites, SPRITES entries each -------------------------------------
-; _spr_y seeds SPR_Y in zero page; the rest are read in place.
-; SPR_X is half resolution -- the multiplexer does an asl and takes the msb from
+; sprite_y_init seeds SPRITE_Y in zero page; the rest are read in place.
+; SPRITE_X is half resolution -- the multiplexer does an asl and takes the msb from
 ; the carry -- so one unit is two pixels.
-_spr_y
+sprite_y_init
     !by $64, $6c, $74, $7c, $88, $90, $98, $a0, $a8, $b0, $b8, $c0, $c8, $d0, $d8, $e0
-SPR_X
+SPRITE_X
     !by $50, $60, $70, $80, $10, $20, $30, $40, $50, $60, $70, $80, $10, $20, $30, $40
-SPR_A
+SPRITE_COLOR_A
     !by $04, $05, $06, $07, $08, $09, $0a, $0a, $0a, $0d, $0e, $0f, $00, $01, $02, $03
-SPR_B
+SPRITE_COLOR_B
     !by $0b, $0a, $09, $08, $07, $06, $05, $00, $00, $02, $01, $00, $0f, $0e, $0d, $0c
-SPR_F
-    !by SPR_FR_BASE+$08, SPR_FR_BASE+$0a, SPR_FR_BASE+$0c, SPR_FR_BASE+$0e
-    !by SPR_FR_BASE+$10, SPR_FR_BASE+$12, SPR_FR_BASE+$14, SPR_FR_BASE+$00
-    !by SPR_FR_BASE+$02, SPR_FR_BASE+$1a, SPR_FR_BASE+$1c, SPR_FR_BASE+$1e
-    !by SPR_FR_BASE+$04, SPR_FR_BASE+$04, SPR_FR_BASE+$04, SPR_FR_BASE+$06
+SPRITE_FRAME
+    !by SPRITE_FRAMES_BASE+$08, SPRITE_FRAMES_BASE+$0a, SPRITE_FRAMES_BASE+$0c, SPRITE_FRAMES_BASE+$0e
+    !by SPRITE_FRAMES_BASE+$10, SPRITE_FRAMES_BASE+$12, SPRITE_FRAMES_BASE+$14, SPRITE_FRAMES_BASE+$00
+    !by SPRITE_FRAMES_BASE+$02, SPRITE_FRAMES_BASE+$1a, SPRITE_FRAMES_BASE+$1c, SPRITE_FRAMES_BASE+$1e
+    !by SPRITE_FRAMES_BASE+$04, SPRITE_FRAMES_BASE+$04, SPRITE_FRAMES_BASE+$04, SPRITE_FRAMES_BASE+$06
 
 ; ---- panel row, PANEL_SPRITES entries each -----------------------------------
 ; One hardware sprite each, all on PANEL_Y, so they are written straight out by
@@ -196,11 +196,11 @@ PANEL_X
     !by 24, 48, 72, 96, 180, 204, 228, 252
 PANEL_X_MSB
     !by %00000000
-PANEL_C
+PANEL_COLOR
     !by $02, $02, $02, $07, $01, $01, $0d, $0d
-PANEL_F
-    !by SPR_FR_BASE+$00, SPR_FR_BASE+$00, SPR_FR_BASE+$00, SPR_FR_BASE+$02
-    !by SPR_FR_BASE+$04, SPR_FR_BASE+$04, SPR_FR_BASE+$06, SPR_FR_BASE+$06
+PANEL_FRAME
+    !by SPRITE_FRAMES_BASE+$00, SPRITE_FRAMES_BASE+$00, SPRITE_FRAMES_BASE+$00, SPRITE_FRAMES_BASE+$02
+    !by SPRITE_FRAMES_BASE+$04, SPRITE_FRAMES_BASE+$04, SPRITE_FRAMES_BASE+$06, SPRITE_FRAMES_BASE+$06
 
 +create_basic_starter CODE_START
 *=CODE_START
@@ -226,14 +226,14 @@ PANEL_F
 
     lda #0
     ; no IRQs
-    sta VIC_IRQ_CONTROL
+    sta VIC_IRQ_CTRL
     ; set timer A to 0
     sta CIA2_TIMER_A_LO
     sta CIA2_TIMER_A_HI
 
     ; trigger timer A interrupt
-    +set %10000001, CIA2_INTERRUPT_CONTROL
-    +set %00000001, CIA2_CONTROL_TIMER_A
+    +set %10000001, CIA2_INTERRUPT_CTRL
+    +set %00000001, CIA2_TIMER_A_CTRL
 
     ; reset stack
     ldx #$ff
@@ -255,49 +255,49 @@ PANEL_F
 
     ; select screen bank 8, hires-bank 0
     lda #%10000000
-    sta VIC_ADDR_SELECT
+    sta VIC_ADDRESS_SELECT
 
-    +set %10101010, VIC_SPR_MULTI
-    +set BROWN, VIC_SPR_COLOR_01
-    +set GREY,  VIC_SPR_COLOR_11
-    +set $ff, VIC_SPR_ENABLE
+    +set %10101010, VIC_SPRITE_MULTICOLOR
+    +set BROWN, VIC_SPRITE_MULTICOLOR_01
+    +set GREY,  VIC_SPRITE_MULTICOLOR_11
+    +set $ff, VIC_SPRITE_ENABLE
 
 ;-------------------------------------------------------------------------------
 ;   setup test stuff
 ;-------------------------------------------------------------------------------
 
     !if SPRITES > 0 {
-        ; _spr_y is already in ascending order, so SPR_I starts out sorted
+        ; sprite_y_init is already in ascending order, so SPRITE_ORDER starts out sorted
         !for .i, 0, SPRITES-1 {
-            lda _spr_y + .i
-            sta SPR_Y + .i
+            lda sprite_y_init + .i
+            sta SPRITE_Y + .i
             lda #.i
-            sta SPR_I + .i
+            sta SPRITE_ORDER + .i
         }
         lda #0
-        sta SPR_FRAME
+        sta SPRITE_PHASE
 !ifdef AUTOPILOT {
-        sta AP_FROZEN
+        sta AUTOPILOT_FROZEN
 }
         ; until the first last_irq has scheduled a frame, show nothing
-        sta SPR_SHOWN
+        sta SPRITES_SHOWN
         ldx #$ff
     } else {
         ldx #0
     }
-    stx VIC_SPR_ENABLE
+    stx VIC_SPRITE_ENABLE
 
     ;---can be done at compile time?---
-    ldx #CONTROL_Y_INVALID
-    stx CTRL_Y_INVALID
+    ldx #CTRL_Y_INVALID
+    stx CTRL_Y_INVALID_COPY
 
     ldx #0
-    stx C_COPY
-    stx R_COPY
-    stx SCROLL_U_D
-    stx SCROLL_L_R
+    stx COL_COPY
+    stx ROW_COPY
+    stx SCROLL_LAST_VERTICAL
+    stx SCROLL_LAST_HORIZONTAL
 
-    ldx #COLOR_BLACK
+    ldx #BLACK
     stx VIC_BACKGROUND_0
     stx VIC_BORDER
 
@@ -309,23 +309,23 @@ PANEL_F
 ;    ldx #<TILE_MAP
 ;    ldx #$80
     ldx #$7b
-    stx C_MAP_POS_LO
-    stx R_MAP_POS_LO
+    stx COL_MAP_POS_LO
+    stx ROW_MAP_POS_LO
 ;    ldx #>TILE_MAP
 ;    ldx #$40
     ldx #$22
-    stx C_MAP_POS_HI
-    stx R_MAP_POS_HI
+    stx COL_MAP_POS_HI
+    stx ROW_MAP_POS_HI
 
     ldx #0
-    stx C_SCR_POS_LO
-    stx C_SCR_POS_HI
-    stx R_SCR_POS_LO
-    stx R_SCR_POS_HI
-    stx C_PIX_POS_LO
-    stx C_PIX_POS_HI
-    stx R_PIX_POS_LO
-    stx R_PIX_POS_HI
+    stx COL_SCREEN_POS_LO
+    stx COL_SCREEN_POS_HI
+    stx ROW_SCREEN_POS_LO
+    stx ROW_SCREEN_POS_HI
+    stx COL_PIXEL_POS_LO
+    stx COL_PIXEL_POS_HI
+    stx ROW_PIXEL_POS_LO
+    stx ROW_PIXEL_POS_HI
     ;----------------------------------
 
 ;-------------------------------------------------------------------------------
@@ -345,11 +345,11 @@ PANEL_F
     jsr init_screen
 
     ; init_screen is what establishes where the camera ends up: it scrolls left by
-    ; a full screen while filling it, so the window lands CAM_*_INIT into the area.
+    ; a full screen while filling it, so the window lands CAMERA_*_INIT into the area.
     ; Measured by walking to each bound and checking the area's edge is reached
     ; exactly -- see "Camera bounds" in CLAUDE.md.
-    +set16 CAM_X_INIT, CAM_X_LO
-    +set16 CAM_Y_INIT, CAM_Y_LO
+    +set16 CAMERA_X_INIT, CAMERA_X_LO
+    +set16 CAMERA_Y_INIT, CAMERA_Y_LO
 
 ;-------------------------------------------------------------------------------
 ;   setup raster irq
@@ -360,7 +360,7 @@ PANEL_F
 
     +set16 IRQ, VECTOR_IRQ
     +set_raster_line_9 LINE_0
-    +set 1, VIC_IRQ_CONTROL
+    +set 1, VIC_IRQ_CTRL
     ; enable IRQs
     cli
 -
@@ -381,9 +381,9 @@ PANEL_F
 !source "tiles.acme"
 
 init_screen !zone {
-    lda #(8*SCR_COLS/SCROLL_SPEED % 256)
+    lda #(8*SCREEN_COLS/SCROLL_SPEED % 256)
     sta INIT_SCREEN_LO
-    lda #1+(8*SCR_COLS/SCROLL_SPEED / 256)
+    lda #1+(8*SCREEN_COLS/SCROLL_SPEED / 256)
     sta INIT_SCREEN_HI
 -
     jsr SCROLL_L
@@ -416,16 +416,16 @@ init_screen !zone {
 *=TILE_MAP
 !bin "map.bin"
 
-*=TILE_CLR
+*=TILE_COLOR
 !bin "colors.bin"
 
-*=TILE_SCR
+*=TILE_SCREEN
 !bin "screen.bin"
 
-*=TILE_PIX
+*=TILE_PIXELS
 !bin "pixels.bin"
 
-*=SPR_FR
+*=SPRITE_FRAMES
 !bin "spr/hero.raw", 64*4
 
 !for .i, 0, 15 {

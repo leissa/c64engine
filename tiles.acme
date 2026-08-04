@@ -1,17 +1,17 @@
 !macro copy_tile_char .char {
     ldy #0
-    lda TILE_CLR+(.char*TILES), x
-    sta (CLR_POS_LO_T), y
+    lda TILE_COLOR+(.char*TILES), x
+    sta (COLOR_POS_LO_TMP), y
 
-    lda TILE_SCR+(.char*TILES), x
-    sta (SCR_POS_LO_T), y
+    lda TILE_SCREEN+(.char*TILES), x
+    sta (SCREEN_POS_LO_TMP), y
 
     lda #ALL_RAM
     sta RAM_ROM_SELECTION
 
     !for .row, 0, 7 {
-        lda TILE_PIX+(.char*8*TILES)+(.row*TILES), x
-        sta (PIX_POS_LO_T), y
+        lda TILE_PIXELS+(.char*8*TILES)+(.row*TILES), x
+        sta (PIXEL_POS_LO_TMP), y
         !if .row != 7 {
             iny
         }
@@ -34,11 +34,11 @@ copy_tile_char5 !zone { +copy_tile_char 5 }
 ; length and the routine for char N can be addressed arithmetically.  That is
 ; what lets the unrolled loop below call one directly instead of running a char
 ; index down a cmp/bne chain.
-COPY_TILE_CHARS_N   = TILE_COLS * TILE_ROWS
+TILE_CHARS          = TILE_COLS * TILE_ROWS
 COPY_TILE_CHAR_SIZE = copy_tile_char1 - copy_tile_char0
 
-!if COPY_TILE_CHARS_N != 6 {
-    !error "TILE_COLS*TILE_ROWS = ", COPY_TILE_CHARS_N, " but only copy_tile_char0..5 are defined"
+!if TILE_CHARS != 6 {
+    !error "TILE_COLS*TILE_ROWS = ", TILE_CHARS, " but only copy_tile_char0..5 are defined"
 }
 
 !if copy_tile_char5 - copy_tile_char0 != 5 * COPY_TILE_CHAR_SIZE {
@@ -49,33 +49,33 @@ COPY_TILE_CHAR_SIZE = copy_tile_char1 - copy_tile_char0
     jsr copy_tile_char0 + .char * COPY_TILE_CHAR_SIZE
 }
 
-!macro iterate_destination_pointers .cols {
+!macro iterate_dst_ptrs .stride {
     ; pixel pointer
-    lda PIX_POS_LO_T
-    adc #(8*.cols % 256) ; + 64
-    sta PIX_POS_LO_T
-!if .cols = 1 {
+    lda PIXEL_POS_LO_TMP
+    adc #(8*.stride % 256) ; + 64
+    sta PIXEL_POS_LO_TMP
+!if .stride = 1 {
     bcc+
 }
-    lda PIX_POS_HI_T
-    adc #(8*.cols / 256) ; + 256
+    lda PIXEL_POS_HI_TMP
+    adc #(8*.stride / 256) ; + 256
     and #%11011111 ; modulo 8192 (but keep upper bits)
-    sta PIX_POS_HI_T ; next pixel position to start from
+    sta PIXEL_POS_HI_TMP ; next pixel position to start from
 +
     ; color pointers
-    lda SCR_POS_LO_T
-    adc #.cols
-    sta SCR_POS_LO_T ; next screen position to start from
-    sta CLR_POS_LO_T
+    lda SCREEN_POS_LO_TMP
+    adc #.stride
+    sta SCREEN_POS_LO_TMP ; next screen position to start from
+    sta COLOR_POS_LO_TMP
     bcc +
 
-    lda CLR_POS_HI_T
+    lda COLOR_POS_HI_TMP
     adc #0
     and #%11111011 ; modulo 1024 (but keep upper bits)
-    sta CLR_POS_HI_T
+    sta COLOR_POS_HI_TMP
 
     adc #%00001000
-    sta SCR_POS_HI_T
+    sta SCREEN_POS_HI_TMP
 +
 }
 
@@ -99,39 +99,39 @@ COPY_TILE_CHAR_SIZE = copy_tile_char1 - copy_tile_char0
 ;    }
 ;}
 
-!macro init_pointers .cols {
-!if .cols = 1 {
-    !set .tile_col = C_TILE_COL
-    !set .tile_row = C_TILE_ROW
-    !set .map_pos_lo = C_MAP_POS_LO
-    !set .map_pos_hi = C_MAP_POS_HI
-    !set .pix_pos_lo = C_PIX_POS_LO
-    !set .pix_pos_hi = C_PIX_POS_HI
-    !set .scr_pos_lo = C_SCR_POS_LO
-    !set .scr_pos_hi = C_SCR_POS_HI
-    !set .map_pos_lo_t = C_MAP_POS_LO_T
-    !set .map_pos_hi_t = C_MAP_POS_HI_T
-    !set .pix_pos_lo_t = C_PIX_POS_LO_T
-    !set .pix_pos_hi_t = C_PIX_POS_HI_T
-    !set .scr_pos_lo_t = C_SCR_POS_LO_T
-    !set .scr_pos_hi_t = C_SCR_POS_HI_T
-    !set .clr_pos_hi_t = C_CLR_POS_HI_T
+!macro init_ptrs .stride {
+!if .stride = 1 {
+    !set .tile_col = COL_TILE_COL
+    !set .tile_row = COL_TILE_ROW
+    !set .map_pos_lo = COL_MAP_POS_LO
+    !set .map_pos_hi = COL_MAP_POS_HI
+    !set .pixel_pos_lo = COL_PIXEL_POS_LO
+    !set .pixel_pos_hi = COL_PIXEL_POS_HI
+    !set .screen_pos_lo = COL_SCREEN_POS_LO
+    !set .screen_pos_hi = COL_SCREEN_POS_HI
+    !set .map_pos_lo_tmp = COL_MAP_POS_LO_TMP
+    !set .map_pos_hi_tmp = COL_MAP_POS_HI_TMP
+    !set .pixel_pos_lo_tmp = COL_PIXEL_POS_LO_TMP
+    !set .pixel_pos_hi_tmp = COL_PIXEL_POS_HI_TMP
+    !set .screen_pos_lo_tmp = COL_SCREEN_POS_LO_TMP
+    !set .screen_pos_hi_tmp = COL_SCREEN_POS_HI_TMP
+    !set .color_pos_hi_tmp = COL_COLOR_POS_HI_TMP
 } else {
-    !set .tile_col = R_TILE_COL
-    !set .tile_row = R_TILE_ROW
-    !set .map_pos_lo = R_MAP_POS_LO
-    !set .map_pos_hi = R_MAP_POS_HI
-    !set .pix_pos_lo = R_PIX_POS_LO
-    !set .pix_pos_hi = R_PIX_POS_HI
-    !set .scr_pos_lo = R_SCR_POS_LO
-    !set .scr_pos_hi = R_SCR_POS_HI
-    !set .map_pos_lo_t = R_MAP_POS_LO_T
-    !set .map_pos_hi_t = R_MAP_POS_HI_T
-    !set .pix_pos_lo_t = R_PIX_POS_LO_T
-    !set .pix_pos_hi_t = R_PIX_POS_HI_T
-    !set .scr_pos_lo_t = R_SCR_POS_LO_T
-    !set .scr_pos_hi_t = R_SCR_POS_HI_T
-    !set .clr_pos_hi_t = R_CLR_POS_HI_T
+    !set .tile_col = ROW_TILE_COL
+    !set .tile_row = ROW_TILE_ROW
+    !set .map_pos_lo = ROW_MAP_POS_LO
+    !set .map_pos_hi = ROW_MAP_POS_HI
+    !set .pixel_pos_lo = ROW_PIXEL_POS_LO
+    !set .pixel_pos_hi = ROW_PIXEL_POS_HI
+    !set .screen_pos_lo = ROW_SCREEN_POS_LO
+    !set .screen_pos_hi = ROW_SCREEN_POS_HI
+    !set .map_pos_lo_tmp = ROW_MAP_POS_LO_TMP
+    !set .map_pos_hi_tmp = ROW_MAP_POS_HI_TMP
+    !set .pixel_pos_lo_tmp = ROW_PIXEL_POS_LO_TMP
+    !set .pixel_pos_hi_tmp = ROW_PIXEL_POS_HI_TMP
+    !set .screen_pos_lo_tmp = ROW_SCREEN_POS_LO_TMP
+    !set .screen_pos_hi_tmp = ROW_SCREEN_POS_HI_TMP
+    !set .color_pos_hi_tmp = ROW_COLOR_POS_HI_TMP
 }
     lda TILE_COL
     sta .tile_col
@@ -140,32 +140,32 @@ COPY_TILE_CHAR_SIZE = copy_tile_char1 - copy_tile_char0
     sta .tile_row
 
     lda .map_pos_lo
-    sta .map_pos_lo_t
+    sta .map_pos_lo_tmp
 
     clc
 
     lda .map_pos_hi
     adc #>TILE_MAP
     clc
-    sta .map_pos_hi_t
+    sta .map_pos_hi_tmp
 
-    lda .pix_pos_hi
-    adc #>HIRES
-    sta .pix_pos_hi_t
+    lda .pixel_pos_hi
+    adc #>BITMAP
+    sta .pixel_pos_hi_tmp
 
-    lda .pix_pos_lo
-    sta .pix_pos_lo_t
+    lda .pixel_pos_lo
+    sta .pixel_pos_lo_tmp
 
-    lda .scr_pos_hi
+    lda .screen_pos_hi
     adc #>SCREEN
-    sta .scr_pos_hi_t
+    sta .screen_pos_hi_tmp
 
-    lda .scr_pos_hi
+    lda .screen_pos_hi
     adc #>COLOR_RAM
-    sta .clr_pos_hi_t
+    sta .color_pos_hi_tmp
 
-    lda .scr_pos_lo
-    sta .scr_pos_lo_t
+    lda .screen_pos_lo
+    sta .screen_pos_lo_tmp
 }
 
 ;-------------------------------------------------------------------------------
@@ -182,7 +182,7 @@ COPY_TILE_CHAR_SIZE = copy_tile_char1 - copy_tile_char0
 ;   coordinate, the sub char -- and so which copy_tile_charN to call -- is a
 ;   compile time constant per slot.  That removes, per char, the recomputation of
 ;   tile_row*TILE_COLS + tile_col, the cmp/bne chain that turned it into a call,
-;   and all of the sub char bookkeeping in the old iterate_source_pointers.  The
+;   and all of the sub char bookkeeping in the old iterate_src_ptrs.  The
 ;   map byte is shared by every slot of a tile, so it is now fetched once per
 ;   tile rather than once per char.
 ;
@@ -197,28 +197,28 @@ COPY_TILE_CHAR_SIZE = copy_tile_char1 - copy_tile_char0
 ;-------------------------------------------------------------------------------
 
 ; one unrolled slot of a tile
-!macro tile_slot .cols, .char, .next_exit {
+!macro tile_slot .stride, .char, .next_exit {
     +jsr_copy_tile_char .char
     clc
-    +iterate_destination_pointers .cols
+    +iterate_dst_ptrs .stride
     dec ITERATIONS
     +jeq .next_exit
 }
 
 ; the loop specialised on one value of the copy's fixed tile coordinate
-!macro tile_variant .cols, .fixed, .epilogue {
-!if .cols = 1 {
+!macro tile_variant .stride, .fixed, .epilogue {
+!if .stride = 1 {
     !set .period = TILE_COLS
-    !set .phase  = C_TILE_COL       ; sub column, cycles
+    !set .phase  = COL_TILE_COL       ; sub column, cycles
 } else {
     !set .period = TILE_ROWS
-    !set .phase  = R_TILE_ROW       ; sub row, cycles
+    !set .phase  = ROW_TILE_ROW       ; sub row, cycles
 }
     ; aim both map reads at the tile the prologue staged
-    lda MAP_POS_LO_T
+    lda MAP_POS_LO_TMP
     sta .map_entry+1
     sta .map_loop+1
-    lda MAP_POS_HI_T
+    lda MAP_POS_HI_TMP
     sta .map_entry+2
     sta .map_loop+2
 
@@ -243,16 +243,16 @@ COPY_TILE_CHAR_SIZE = copy_tile_char1 - copy_tile_char0
         !if .s = 1 {
 .slot1
         }
-        !if .cols = 1 {
+        !if .stride = 1 {
             !set .char = .fixed * TILE_COLS + .s
         } else {
             !set .char = .s * TILE_COLS + .fixed
         }
-        +tile_slot .cols, .char, .exits + ((.s+1) % .period) * (.exit1 - .exits)
+        +tile_slot .stride, .char, .exits + ((.s+1) % .period) * (.exit1 - .exits)
     }
 .slots_end
     ; tile done, step to the next map byte
-!if .cols = 1 { inc .map_loop+1 } else { inc .map_loop+2 }
+!if .stride = 1 { inc .map_loop+1 } else { inc .map_loop+2 }
     jmp .tile_loop
 
 .exits
@@ -268,12 +268,12 @@ COPY_TILE_CHAR_SIZE = copy_tile_char1 - copy_tile_char0
 
 .finish_tile
     ; the tile was completed, so the next frame starts on the following one
-!if .cols = 1 { inc .map_loop+1 } else { inc .map_loop+2 }
+!if .stride = 1 { inc .map_loop+1 } else { inc .map_loop+2 }
 .finish
     lda .map_loop+1
-    sta MAP_POS_LO_T
+    sta MAP_POS_LO_TMP
     lda .map_loop+2
-    sta MAP_POS_HI_T
+    sta MAP_POS_HI_TMP
     jmp .epilogue
 
 !if .slots_end - .slots != .period * (.slot1 - .slots) {
@@ -287,108 +287,108 @@ COPY_TILE_CHAR_SIZE = copy_tile_char1 - copy_tile_char0
 ; Expects the char count for this frame already in ITERATIONS -- copy_*_tiles1
 ; and copy_*_tiles2 differ only in that count, and expanding the unrolled loop
 ; once per entry point costs about 900 bytes of the code segment for nothing.
-!macro copy_tile_chars .cols {
-!if .cols = 1 {
-    !set .tile_col_t = C_TILE_COL
-    !set .tile_row_t = C_TILE_ROW
-    !set .map_pos_lo_t = C_MAP_POS_LO_T
-    !set .map_pos_hi_t = C_MAP_POS_HI_T
-    !set .pix_pos_lo_t = C_PIX_POS_LO_T
-    !set .pix_pos_hi_t = C_PIX_POS_HI_T
-    !set .scr_pos_lo_t = C_SCR_POS_LO_T
-    !set .scr_pos_hi_t = C_SCR_POS_HI_T
-    !set .clr_pos_hi_t = C_CLR_POS_HI_T
+!macro copy_tile_chars .stride {
+!if .stride = 1 {
+    !set .tile_col_tmp = COL_TILE_COL
+    !set .tile_row_tmp = COL_TILE_ROW
+    !set .map_pos_lo_tmp = COL_MAP_POS_LO_TMP
+    !set .map_pos_hi_tmp = COL_MAP_POS_HI_TMP
+    !set .pixel_pos_lo_tmp = COL_PIXEL_POS_LO_TMP
+    !set .pixel_pos_hi_tmp = COL_PIXEL_POS_HI_TMP
+    !set .screen_pos_lo_tmp = COL_SCREEN_POS_LO_TMP
+    !set .screen_pos_hi_tmp = COL_SCREEN_POS_HI_TMP
+    !set .color_pos_hi_tmp = COL_COLOR_POS_HI_TMP
 } else {
-    !set .tile_col_t = R_TILE_COL
-    !set .tile_row_t = R_TILE_ROW
-    !set .map_pos_lo_t = R_MAP_POS_LO_T
-    !set .map_pos_hi_t = R_MAP_POS_HI_T
-    !set .pix_pos_lo_t = R_PIX_POS_LO_T
-    !set .pix_pos_hi_t = R_PIX_POS_HI_T
-    !set .scr_pos_lo_t = R_SCR_POS_LO_T
-    !set .scr_pos_hi_t = R_SCR_POS_HI_T
-    !set .clr_pos_hi_t = R_CLR_POS_HI_T
+    !set .tile_col_tmp = ROW_TILE_COL
+    !set .tile_row_tmp = ROW_TILE_ROW
+    !set .map_pos_lo_tmp = ROW_MAP_POS_LO_TMP
+    !set .map_pos_hi_tmp = ROW_MAP_POS_HI_TMP
+    !set .pixel_pos_lo_tmp = ROW_PIXEL_POS_LO_TMP
+    !set .pixel_pos_hi_tmp = ROW_PIXEL_POS_HI_TMP
+    !set .screen_pos_lo_tmp = ROW_SCREEN_POS_LO_TMP
+    !set .screen_pos_hi_tmp = ROW_SCREEN_POS_HI_TMP
+    !set .color_pos_hi_tmp = ROW_COLOR_POS_HI_TMP
 }
-!if .cols = 1 {
-    !set .fixed_var  = .tile_row_t  ; tile row is fixed along a column copy
-    !set .n_variants = TILE_ROWS
+!if .stride = 1 {
+    !set .fixed_coordinate  = .tile_row_tmp  ; tile row is fixed along a column copy
+    !set .variant_count = TILE_ROWS
 } else {
-    !set .fixed_var  = .tile_col_t  ; tile column is fixed along a row copy
-    !set .n_variants = TILE_COLS
+    !set .fixed_coordinate  = .tile_col_tmp  ; tile column is fixed along a row copy
+    !set .variant_count = TILE_COLS
 }
-    lda .map_pos_lo_t
-    sta MAP_POS_LO_T
+    lda .map_pos_lo_tmp
+    sta MAP_POS_LO_TMP
 
-    lda .map_pos_hi_t
-    sta MAP_POS_HI_T
+    lda .map_pos_hi_tmp
+    sta MAP_POS_HI_TMP
 
-    lda .scr_pos_lo_t
-    sta SCR_POS_LO_T
-    sta CLR_POS_LO_T
+    lda .screen_pos_lo_tmp
+    sta SCREEN_POS_LO_TMP
+    sta COLOR_POS_LO_TMP
 
-    lda .scr_pos_hi_t
-    sta SCR_POS_HI_T
+    lda .screen_pos_hi_tmp
+    sta SCREEN_POS_HI_TMP
 
-    lda .clr_pos_hi_t
-    sta CLR_POS_HI_T
+    lda .color_pos_hi_tmp
+    sta COLOR_POS_HI_TMP
 
-    lda .pix_pos_lo_t
-    sta PIX_POS_LO_T
+    lda .pixel_pos_lo_tmp
+    sta PIXEL_POS_LO_TMP
 
-    lda .pix_pos_hi_t
-    sta PIX_POS_HI_T
+    lda .pixel_pos_hi_tmp
+    sta PIXEL_POS_HI_TMP
 
     ; pick the loop specialised on this copy's fixed tile coordinate
-    lda .fixed_var
-    !for .v, 0, .n_variants-1 {
-        !if .v != .n_variants-1 {
-            cmp #.v
+    lda .fixed_coordinate
+    !for .variant, 0, .variant_count-1 {
+        !if .variant != .variant_count-1 {
+            cmp #.variant
             bne +
         }
-        jmp .variants + .v * (.variant1 - .variants)
+        jmp .variants + .variant * (.variant1 - .variants)
 +
     }
 
 .variants
-    !for .v, 0, .n_variants-1 {
-        !if .v = 1 {
+    !for .variant, 0, .variant_count-1 {
+        !if .variant = 1 {
 .variant1
         }
-        +tile_variant .cols, .v, .epilogue
+        +tile_variant .stride, .variant, .epilogue
     }
 .variants_end
 
-!if .variants_end - .variants != .n_variants * (.variant1 - .variants) {
+!if .variants_end - .variants != .variant_count * (.variant1 - .variants) {
     !error "tile loop variants are not uniformly sized"
 }
 
 .epilogue
-    lda MAP_POS_LO_T
-    sta .map_pos_lo_t
+    lda MAP_POS_LO_TMP
+    sta .map_pos_lo_tmp
 
-    lda MAP_POS_HI_T
-    sta .map_pos_hi_t
+    lda MAP_POS_HI_TMP
+    sta .map_pos_hi_tmp
 
-    lda SCR_POS_LO_T
-    sta .scr_pos_lo_t
+    lda SCREEN_POS_LO_TMP
+    sta .screen_pos_lo_tmp
 
-    lda SCR_POS_HI_T
-    sta .scr_pos_hi_t
+    lda SCREEN_POS_HI_TMP
+    sta .screen_pos_hi_tmp
 
-    lda CLR_POS_HI_T
-    sta .clr_pos_hi_t
+    lda COLOR_POS_HI_TMP
+    sta .color_pos_hi_tmp
 
-    lda PIX_POS_LO_T
-    sta .pix_pos_lo_t
+    lda PIXEL_POS_LO_TMP
+    sta .pixel_pos_lo_tmp
 
-    lda PIX_POS_HI_T
-    sta .pix_pos_hi_t
+    lda PIXEL_POS_HI_TMP
+    sta .pixel_pos_hi_tmp
 }
 
 ;-------------------------------------------------------------------------------
 ;   how a copy is split over its frames
 ;
-;   copy_*_tiles1 runs once (it also does init_pointers) and copy_*_tiles2 runs
+;   copy_*_tiles1 runs once (it also does init_ptrs) and copy_*_tiles2 runs
 ;   the remaining COPY_*_FRAMES-1 times, so the per-frame counts have to add up
 ;   to the whole column/row exactly.  The "+ (remainder != 0)" term below is
 ;   added to *every* tiles2 call, not just the last one, so it only balances when
@@ -428,45 +428,45 @@ COPY_FRAMES_BUDGET = 4 / SCROLL_SPEED
 }
 
 copy_col_tiles1 !zone {
-    +init_pointers 1
+    +init_ptrs 1
     lda #COPY_COL_TILES1_COUNT
-    bne copy_col_tiles      ; always, the count is not 0
+    bne copy_col_tiles_body      ; always, the count is not 0
 }
 
 copy_col_tiles2 !zone {
     lda #COPY_COL_TILES2_COUNT
 }
 
-copy_col_tiles !zone {
+copy_col_tiles_body !zone {
     sta ITERATIONS
     +copy_tile_chars 1
     rts
 }
 
 copy_row_tiles1 !zone {
-    +init_pointers SCR_COLS
+    +init_ptrs SCREEN_COLS
     lda #COPY_ROW_TILES1_COUNT
-    bne copy_row_tiles      ; always, the count is not 0
+    bne copy_row_tiles_body      ; always, the count is not 0
 }
 
 copy_row_tiles2 !zone {
     lda #COPY_ROW_TILES2_COUNT
 }
 
-copy_row_tiles !zone {
+copy_row_tiles_body !zone {
     sta ITERATIONS
-    +copy_tile_chars SCR_COLS
+    +copy_tile_chars SCREEN_COLS
     rts
 }
 
 COPY_TILES !zone {
-    ldy C_COPY
+    ldy COL_COPY
     bne .check_copy_col_tiles1
     jsr COPY_ROW_TILES
     rts
 .check_copy_col_tiles1
     dey
-    sty C_COPY
+    sty COL_COPY
     cpy #COPY_COL_FRAMES-1
     bne .check_copy_col_tiles2
     jsr copy_col_tiles1
@@ -477,12 +477,12 @@ COPY_TILES !zone {
 }
 
 COPY_ROW_TILES !zone {
-    ldy R_COPY
+    ldy ROW_COPY
     bne .check_copy_row_tiles1
     rts
 .check_copy_row_tiles1
     dey
-    sty R_COPY
+    sty ROW_COPY
     cpy #COPY_ROW_FRAMES-1
     bne .check_copy_row_tiles2
     jsr copy_row_tiles1

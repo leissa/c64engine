@@ -1,5 +1,5 @@
 ; The camera is clamped to the current area, so a scroll is refused once the window
-; would show what lies outside it.  Only the scroll is skipped -- the CUR_SPR nudge
+; would show what lies outside it.  Only the scroll is skipped -- the CURRENT_SPRITE nudge
 ; below still happens either way, it is a debug aid and not part of the camera.
 ;
 ; init_screen calls SCROLL_L directly rather than going through here, so the
@@ -38,31 +38,31 @@
 
 JOYSTICK !zone {
 !ifdef AUTOPILOT {
-    ; -DAUTOPILOT=1 -DAP_FRAMES=n replaces the stick with the scripted pattern in
-    ; AP_TABLE for n frames and then freezes this routine completely: no scroll,
+    ; -DAUTOPILOT=1 -DAUTOPILOT_FRAMES=n replaces the stick with the scripted pattern in
+    ; AUTOPILOT_TBL for n frames and then freezes this routine completely: no scroll,
     ; no colour cycling.  The screen goes static, which is what makes a headless
     ; VICE run reproducible -- an exit screenshot taken while the engine is still
     ; animating depends on the exact cycle the emulator is stopped on and is not
     ; comparable between runs.  See tools/regress.sh.
-AP_IDX = *+1
+AUTOPILOT_IDX = *+1
     ldx #0
-    cpx #AP_FRAMES
+    cpx #AUTOPILOT_FRAMES
     bcc .autopilot_go
     ; freeze the sprite flicker phase as well, or a clustered layout keeps
     ; changing which sprites are shown and the screenshot stops being repeatable
     lda #1
-    sta AP_FROZEN
+    sta AUTOPILOT_FROZEN
     rts
 .autopilot_go
-    inc AP_IDX
-    lda AP_TABLE, x         ; a = stick state; the ldx/inc below leave it alone
-    ldx CUR_SPR
-    inc SPR_A, x
+    inc AUTOPILOT_IDX
+    lda AUTOPILOT_TBL, x         ; a = stick state; the ldx/inc below leave it alone
+    ldx CURRENT_SPRITE
+    inc SPRITE_COLOR_A, x
 } else {
-    ldx CUR_SPR
-    inc SPR_A, x
+    ldx CURRENT_SPRITE
+    inc SPRITE_COLOR_A, x
 
-    lda CIA1_PORT_2
+    lda CIA1_DATA_PORT_A
 }
     asl
     asl
@@ -71,66 +71,66 @@ AP_IDX = *+1
 .fire
     asl
     pha
-    bcs .right
-    dec CUR_SPR
-    bpl .right
+    bcs .r
+    dec CURRENT_SPRITE
+    bpl .r
     lda #SPRITES-1
-    sta CUR_SPR
+    sta CURRENT_SPRITE
 
-.right
+.r
     pla
     asl
-    bcs .left
+    bcs .l
 
     pha
-    +scroll_towards_max SCROLL_R, CAM_X_LO, CAM_X_HI, CAM_X_MAX
+    +scroll_towards_max SCROLL_R, CAMERA_X_LO, CAMERA_X_HI, CAMERA_X_MAX
     pla
 
-    ldx CUR_SPR
-    inc SPR_X, x
+    ldx CURRENT_SPRITE
+    inc SPRITE_X, x
 
-.left
+.l
     asl
-    bcs .down
+    bcs .d
 
     pha
-    +scroll_towards_zero SCROLL_L, CAM_X_LO, CAM_X_HI
+    +scroll_towards_zero SCROLL_L, CAMERA_X_LO, CAMERA_X_HI
     pla
 
-    ldx CUR_SPR
-    dec SPR_X, x
+    ldx CURRENT_SPRITE
+    dec SPRITE_X, x
 
-.down
+.d
     asl
-    bcs .up
+    bcs .u
 
     pha
-    +scroll_towards_max SCROLL_D, CAM_Y_LO, CAM_Y_HI, CAM_Y_MAX
+    +scroll_towards_max SCROLL_D, CAMERA_Y_LO, CAMERA_Y_HI, CAMERA_Y_MAX
     pla
 
-    ldx CUR_SPR
-    ldy SPR_Y, x
-    cpy #SPR_WRAP_BOTTOM
-    beq .up
-    inc SPR_Y, x
+    ldx CURRENT_SPRITE
+    ldy SPRITE_Y, x
+    cpy #SPRITE_WRAP_BOT
+    beq .u
+    inc SPRITE_Y, x
 
-.up
+.u
     asl
     bcs .exit
 
-    +scroll_towards_zero SCROLL_U, CAM_Y_LO, CAM_Y_HI
+    +scroll_towards_zero SCROLL_U, CAMERA_Y_LO, CAMERA_Y_HI
 
-    ldx CUR_SPR
-    ldy SPR_Y, x
-    cpy #SPR_WRAP_TOP
+    ldx CURRENT_SPRITE
+    ldy SPRITE_Y, x
+    cpy #SPRITE_WRAP_TOP
     beq .exit
-    dec SPR_Y, x
+    dec SPRITE_Y, x
 
 .exit
     rts
 }
 
-CUR_SPR
+CURRENT_SPRITE
     !by SPRITES-1
 
 !ifdef AUTOPILOT {
@@ -142,31 +142,39 @@ CUR_SPR
 ;   counter is re-seeded and the cursor jumps to the opposite edge while a copy
 ;   is still in flight.
 ;
-;   Page aligned so lda AP_TABLE,x never crosses a page and cannot perturb the
+;   Page aligned so lda AUTOPILOT_TBL,x never crosses a page and cannot perturb the
 ;   raster budget depending on where it lands.
 ;-------------------------------------------------------------------------------
 
 ; joystick bits, active low: 0=up 1=down 2=left 3=right 4=fire
-AP_NONE = %11111111
-AP_U    = %11111110
-AP_D    = %11111101
-AP_L    = %11111011
-AP_R    = %11110111
-AP_DR   = %11110101
-AP_UL   = %11111010
+AUTOPILOT_NONE = %11111111
+AUTOPILOT_U    = %11111110
+AUTOPILOT_D    = %11111101
+AUTOPILOT_L    = %11111011
+AUTOPILOT_R    = %11110111
+AUTOPILOT_DR   = %11110101
+AUTOPILOT_UL   = %11111010
 
 !align 255, 0
-AP_TABLE
-    !for .i, 0, 31 { !by AP_R }                       ; 000-031 pure right
-    !for .i, 0, 31 { !by AP_D }                       ; 032-063 pure down
-    !for .i, 0, 31 { !by AP_DR }                      ; 064-095 diagonal, both copies at once
-    !for .i, 0, 15 { !by AP_D, AP_U }                 ; 096-127 reverse every frame
-    !for .i, 0,  7 { !by AP_D, AP_D, AP_U, AP_U }     ; 128-159 reverse every 2 frames
-    !for .i, 0,  7 { !by AP_R, AP_R, AP_L, AP_L }     ; 160-191 same on the other axis
-    !for .i, 0,  7 { !by AP_DR, AP_DR, AP_UL, AP_UL } ; 192-223 diagonal reversal
-    !for .i, 0, 31 { !by AP_NONE }                    ; 224-255 idle
+AUTOPILOT_TBL
+    ; 000-031 pure right
+    !for .i, 0, 31 { !by AUTOPILOT_R }
+    ; 032-063 pure down
+    !for .i, 0, 31 { !by AUTOPILOT_D }
+    ; 064-095 diagonal, both copies at once
+    !for .i, 0, 31 { !by AUTOPILOT_DR }
+    ; 096-127 reverse every frame
+    !for .i, 0, 15 { !by AUTOPILOT_D, AUTOPILOT_U }
+    ; 128-159 reverse every 2 frames
+    !for .i, 0,  7 { !by AUTOPILOT_D, AUTOPILOT_D, AUTOPILOT_U, AUTOPILOT_U }
+    ; 160-191 same on the other axis
+    !for .i, 0,  7 { !by AUTOPILOT_R, AUTOPILOT_R, AUTOPILOT_L, AUTOPILOT_L }
+    ; 192-223 diagonal reversal
+    !for .i, 0,  7 { !by AUTOPILOT_DR, AUTOPILOT_DR, AUTOPILOT_UL, AUTOPILOT_UL }
+    ; 224-255 idle
+    !for .i, 0, 31 { !by AUTOPILOT_NONE }
 
-!if AP_FRAMES > 256 {
-    !error "AP_FRAMES (", AP_FRAMES, ") exceeds the ", 256, " entry AP_TABLE"
+!if AUTOPILOT_FRAMES > 256 {
+    !error "AUTOPILOT_FRAMES (", AUTOPILOT_FRAMES, ") exceeds the ", 256, " entry AUTOPILOT_TBL"
 }
 }

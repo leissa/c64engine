@@ -3,18 +3,20 @@
 CIA1 = $DC00
 CIA2 = $DD00
 
-CIA1_PORT_2 = $DC00
-CIA1_PORT_1 = $DC01
+    ; Data port A also reads control port 2 (the joystick the engine uses),
+    ; data port B also reads control port 1 -- which is what these used to be named after.
+CIA1_DATA_PORT_A = $DC00
+CIA1_DATA_PORT_B = $DC01
 
     ; keyboard: rows are driven on port A, columns are read back on port B
 CIA1_DDR_A = $DC02
 CIA1_DDR_B = $DC03
 
-CIA1_TIMER_A_LO = $DC04
-CIA1_TIMER_A_HI = $DC05
-CIA1_TIMER_B_LO = $DC06
-CIA1_TIMER_B_HI = $DC07
-CIA1_INTERRUPT_CONTROL = $DC0D
+CIA1_TIMER_A_LO     = $DC04
+CIA1_TIMER_A_HI     = $DC05
+CIA1_TIMER_B_LO     = $DC06
+CIA1_TIMER_B_HI     = $DC07
+CIA1_INTERRUPT_CTRL = $DC0D
 
     ;Bit 0..1: Select the position of the VIC-memory
     ;   * %00, 0: Bank 3: $C000-$FFFF, 49152-65535
@@ -36,15 +38,15 @@ CIA2_DATA_PORT_A = $DD00
 CIA2_DDR_A = $DD02
 CIA2_DDR_B = $DD03
 
-CIA2_TIMER_A_LO = $DD04
-CIA2_TIMER_A_HI = $DD05
-CIA2_TIMER_B_LO = $DD06
-CIA2_TIMER_B_HI = $DD07
-CIA2_INTERRUPT_CONTROL = $DD0D
-CIA2_CONTROL_TIMER_A = $DD0E
+CIA2_TIMER_A_LO     = $DD04
+CIA2_TIMER_A_HI     = $DD05
+CIA2_TIMER_B_LO     = $DD06
+CIA2_TIMER_B_HI     = $DD07
+CIA2_INTERRUPT_CTRL = $DD0D
+CIA2_TIMER_A_CTRL   = $DD0E
 
 !macro disable_timer_interrupts {
     lda #%01111111
-    sta CIA1_INTERRUPT_CONTROL
-    sta CIA2_INTERRUPT_CONTROL
+    sta CIA1_INTERRUPT_CTRL
+    sta CIA2_INTERRUPT_CTRL
 }

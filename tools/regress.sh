@@ -32,7 +32,7 @@ REF=$2
 ACME_BIN=${ACME_BIN:-acme}
 X64SC=${X64SC:-x64sc}
 
-# spread over the phases of AP_TABLE: each direction alone, the diagonal, and
+# spread over the phases of AUTOPILOT_TBL: each direction alone, the diagonal, and
 # the three reversal patterns
 STOPS=${STOPS:-"30 60 90 120 150 180 210 240"}
 
@@ -43,7 +43,7 @@ mkdir -p "$OUT"
 fail=0
 
 for n in $STOPS; do
-    $ACME_BIN -DSYSTEM=64 -DDEVELOP=1 -DAUTOPILOT=1 -DAP_FRAMES="$n" \
+    $ACME_BIN -DSYSTEM=64 -DDEVELOP=1 -DAUTOPILOT=1 -DAUTOPILOT_FRAMES="$n" \
           -f cbm -o "$OUT/ap$n.prg" engine.acme > "$OUT/build$n.log" 2>&1 || {
         echo "FAIL build (stop=$n)"; cat "$OUT/build$n.log"; exit 1; }
 

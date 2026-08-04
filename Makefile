@@ -45,7 +45,7 @@ ENGINE_DATA := $(sort $(filter-out $(EFBOOT_BIN),$(wildcard *.bin)) \
                      $(wildcard snd/*.bin) $(wildcard spr/*.raw))
 
 # Memory the engine builds at runtime, so it does not have to travel in the cartridge:
-# HIRES ($c000-$dfff) and SCREEN ($e000-$e3ff), both filled by init_screen.
+# BITMAP ($c000-$dfff) and SCREEN ($e000-$e3ff), both filled by init_screen.
 # Keep in sync with lib/mem.acme.
 CART_SKIP ?= 0xc000:0xe400
 

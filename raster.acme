@@ -3,22 +3,22 @@
 }
 
 !if SPRITES = 0 {
-!macro inc_vic_control_y {
-    lda VIC_CONTROL_Y                       ;  4
+!macro increment_vic_ctrl_y {
+    lda VIC_CTRL_Y                       ;  4
     clc                                     ;  2
     adc #1                                  ;  2
     and #%00000111                          ;  2
-    adc #CONTROL_Y_INVALID                  ;  2
-    sta VIC_CONTROL_Y                       ;  4
+    adc #CTRL_Y_INVALID                  ;  2
+    sta VIC_CTRL_Y                       ;  4
 }                                           ;--> 16
 } else {
-inc_vic_control_y_zone !zone {
-    lda VIC_CONTROL_Y                       ;  4
+increment_vic_ctrl_y !zone {
+    lda VIC_CTRL_Y                       ;  4
     clc                                     ;  2
     adc #1                                  ;  2
     and #%00000111                          ;  2
-    adc #CONTROL_Y_INVALID                  ;  2
-    sta VIC_CONTROL_Y                       ;  4
+    adc #CTRL_Y_INVALID                  ;  2
+    sta VIC_CTRL_Y                       ;  4
 
     rts                                     ;  6
 }                                           ;--> 22
@@ -32,9 +32,9 @@ IRQ !zone {
 
     ; irq event                             ;  7
     ; last instruction                      ;  1 (min)
-    sta restore_regs + 1                    ;  4
-    stx restore_regs + 3                    ;  4
-    sty restore_regs + 5                    ;  4
+    sta restore_registers + 1                    ;  4
+    stx restore_registers + 3                    ;  4
+    sty restore_registers + 5                    ;  4
 
     lda VIC_RASTER                          ;  4
     cmp #LINE_0                             ;  2
@@ -68,7 +68,7 @@ IRQ !zone {
                                             ;--> 10-11
 
     ; calculate the number of nops to skip in VSP
-    lda #SCR_COLS-1                         ;  2
+    lda #SCREEN_COLS-1                         ;  2
     sec                                     ;  2
 HARD_X = *+1
     sbc #0                                  ;  2
@@ -89,11 +89,11 @@ HARD_X = *+1
                                             ;--> 11
 
     ; set up soft scroll
-    lda #CONTROL_X                          ;  2
+    lda #CTRL_X                          ;  2
     clc                                     ;  2
 SOFT_X = *+1
     adc #0                                  ;  2
-    sta VIC_CONTROL_X                       ;  4
+    sta VIC_CTRL_X                       ;  4
                                             ;--> 10
 
     +wait 63-11-12-11-10-6
@@ -113,28 +113,28 @@ SOFT_X = *+1
 
     ; make FIRST_BADLINE a bad line
 !if SPRITES = 0 {
-    lda #CONTROL_Y_INVALID                  ;  2
+    lda #CTRL_Y_INVALID                  ;  2
 } else {
-    lda CTRL_Y_INVALID                      ;  3
+    lda CTRL_Y_INVALID_COPY                      ;  3
 }
-    sta VIC_CONTROL_Y                       ;  4
+    sta VIC_CTRL_Y                       ;  4
                                             ;--> 6/7
 
-    lda #SCR_ROWS                           ;  2
+    lda #SCREEN_ROWS                           ;  2
     sec                                     ;  2
 HARD_Y = *+1
     sbc #0                                  ;  2
     tax                                     ;  2
                                             ;-->  8
 
-    ; pre-compute VIC_CONTROL_Y value for soft-scrolling
-    lda #7 + (SCR_ROWS+1) % 8               ;  2
+    ; pre-compute VIC_CTRL_Y value for soft-scrolling
+    lda #7 + (SCREEN_ROWS+1) % 8               ;  2
     sec                                     ;  2
 SOFT_Y = *+1
     sbc #0                                  ;  2
 
     and #%00000111                          ;  2
-    ora #CONTROL_Y_INVALID                  ;  2
+    ora #CTRL_Y_INVALID                  ;  2
     ; spill pre-computed value
     pha                                     ;  3
                                             ;--> 13/14
@@ -152,10 +152,10 @@ SOFT_Y = *+1
     beq +                                   ;  2 (in this loop)
 
 !if SPRITES = 0 {
-    +inc_vic_control_y                      ; 16
+    +increment_vic_ctrl_y                      ; 16
     +wait_loop 63 - 20 - 2 - 3
 } else {
-    jsr inc_vic_control_y_zone              ; 22 + 6 (jsr)
+    jsr increment_vic_ctrl_y              ; 22 + 6 (jsr)
     lda VIC_RASTER                          ;  4
     cmp #SPRITES_TOP_Y                      ;  2
     bcs .sprite_rows_fld_wait               ;  2/3
@@ -173,10 +173,10 @@ SOFT_Y = *+1
     beq +                                   ;  2 (in this loop)
 
 !if SPRITES = 0 {
-    +inc_vic_control_y                      ; 16
+    +increment_vic_ctrl_y                      ; 16
     +wait_loop 63 - 20 - 2 - 3
 } else {
-    jsr inc_vic_control_y_zone              ; 22 + 6 (jsr)
+    jsr increment_vic_ctrl_y              ; 22 + 6 (jsr)
     lda VIC_RASTER                          ;  4
     cmp #SPRITES_TOP_Y                      ;  2
     bcs .sprite_rows_crunch_wait            ;  2/3
@@ -191,7 +191,7 @@ SOFT_Y = *+1
 .sprite_rows_fld_loop
     cpx #0                                  ;  2
     beq +                                   ;  2 (in this loop)
-    jsr inc_vic_control_y_zone              ; 22 + 6 (jsr)
+    jsr increment_vic_ctrl_y              ; 22 + 6 (jsr)
 
 .sprite_rows_fld_wait
     +wait_loop 44 - 32 - 2 - 3
@@ -205,7 +205,7 @@ SOFT_Y = *+1
 .sprite_rows_crunch_loop
     cpx #0                                  ;  2
     beq +                                   ;  2 (in this loop)
-    jsr inc_vic_control_y_zone              ; 22 + 6 (jsr)
+    jsr increment_vic_ctrl_y              ; 22 + 6 (jsr)
 
 .sprite_rows_crunch_wait
     +wait_loop 44 - 32 - 2 - 3
@@ -220,7 +220,7 @@ SOFT_Y = *+1
 ;   VSP
 ;-------------------------------------------------------------------------------
     ; make VSP line not a bad line
-    inc VIC_CONTROL_Y                       ;6
+    inc VIC_CTRL_Y                       ;6
 !if SPRITES = 0 {
     +wait 5                                 ;5
 } else {
@@ -240,17 +240,17 @@ SOFT_Y = *+1
     !error "critical irq code in different pages"
 }
     ; generate bad line
-    dec VIC_CONTROL_Y                       ;6
+    dec VIC_CTRL_Y                       ;6
 
     ; 6 + 4/5 + 2 + 2/3 + 3 + 0/38 + 6 = 23-25/63
 
 ;-------------------------------------------------------------------------------
 ; prepare soft scroll
 ;-------------------------------------------------------------------------------
-    ; reload pre-computed VIC_CONTROL_Y value
+    ; reload pre-computed VIC_CTRL_Y value
     pla
-    sta VIC_CONTROL_Y
-    and #CONTROL_Y_MASK
+    sta VIC_CTRL_Y
+    and #CTRL_Y_MASK
     pha
 
 ;stx VIC_BORDER    ;4
@@ -276,12 +276,12 @@ SOFT_Y = *+1
 
     pla
     ; wait till end of AGSP region
-    ldy #SPR_MUX_START
+    ldy #SPRITE_MULTIPLEX_START
 -
     cpy VIC_RASTER
     bne -
 
-    sta VIC_CONTROL_Y
+    sta VIC_CTRL_Y
 
 ;-------------------------------------------------------------------------------
 ; sprite multiplexing
@@ -299,9 +299,9 @@ SOFT_Y = *+1
     ; multicolour under a hires overlay.
 !if SPRITES != 0 {
     lda #%10101010
-    sta VIC_SPR_MULTI
+    sta VIC_SPRITE_MULTICOLOR
 }
-    ; walk the display list last_irq scheduled, entry 0 up to SPR_SHOWN
+    ; walk the display list last_irq scheduled, entry 0 up to SPRITES_SHOWN
     ldx #0
 
 ;   sprite with y = 28:
@@ -312,12 +312,12 @@ SOFT_Y = *+1
 ;   49------line 21-------|... dma disabled
 ;   50---ready for next---|<-- triggerline = 28+22
 
-rotate
+rotate_sprite_slots
     !for .i, 0, 3 {
         !set r = 3-.i
         !zone {
 .check_done
-            cpx SPR_SHOWN
+            cpx SPRITES_SHOWN
             bne .next_sprite
 .last_irq
 !ifdef DEVELOP {
@@ -330,9 +330,9 @@ rotate
             ldy #LAST_IRQ_LINE
             sty VIC_RASTER
             +set16 last_irq, VECTOR_IRQ
-            jmp out
+            jmp irq_exit
 .next_sprite
-            lda VIC_SPR_0_Y + r*4 ; get y position of physical sprite
+            lda VIC_SPRITE_0_Y + r*4 ; get y position of physical sprite
             ; The slot frees SPRITE_HEIGHT+1 lines on; if that is past the last
             ; line we work on there is nothing left to do.  Test *before* the
             ; add: adding to a sprite low on the screen wraps the byte, and the
@@ -355,29 +355,29 @@ rotate
             bcc .display_sprite ; branch always
 
 .set_interrupt
-            stx SPR_COUNTER
+            stx SPRITE_COUNTER
             sty VIC_RASTER
             +set16 .next_irq, VECTOR_IRQ
-            jmp out
+            jmp irq_exit
 
 .next_irq
-            sta restore_regs + 1
-            stx restore_regs + 3
-            sty restore_regs + 5
+            sta restore_registers + 1
+            stx restore_registers + 3
+            sty restore_registers + 5
 ;            !ifdef DEBUG {
 ;                inc VIC_BORDER
 ;            }
-            ldx SPR_COUNTER
+            ldx SPRITE_COUNTER
             !ifdef DEBUG {
                 stx VIC_BORDER
             }
 
 .display_sprite
-            ldy SPR_Q, x
+            ldy SPRITE_QUEUE, x
             inx
 
             ; y-coord
-            lda SPR_Y, y
+            lda SPRITE_Y, y
 
             ; Are we too late?  Then skip this one and try the next.  Do NOT
             ; abandon the frame here: the list is sorted, so everything after
@@ -387,54 +387,54 @@ rotate
             ; because the other three hold sprites that free up even later.
             cmp VIC_RASTER
             bcs .do_display_sprite
-!ifdef SPR_DROP_LIMIT {
+!ifdef SPRITE_DROP_LIMIT {
             ; remember the lowest sprite (largest y) we were ever too late for.
-            ; -DSPR_DROP_LIMIT only: this costs cycles on a path the budget has
+            ; -DSPRITE_DROP_LIMIT only: this costs cycles on a path the budget has
             ; no room to spare on, see last_irq.
-            cmp SPR_DROPPED
+            cmp SPRITE_DROPPED
             bcc +
-            sta SPR_DROPPED
+            sta SPRITE_DROPPED
 +
 }
             jmp .check_done
 
 .do_display_sprite
-            sta VIC_SPR_0_Y + r*4
-            sta VIC_SPR_0_Y + r*4 + 2
+            sta VIC_SPRITE_0_Y + r*4
+            sta VIC_SPRITE_0_Y + r*4 + 2
 
             ; x-coord
-            lda SPR_X, y
+            lda SPRITE_X, y
             asl
-            sta VIC_SPR_0_X + r*4
-            sta VIC_SPR_0_X + r*4 + 2
+            sta VIC_SPRITE_0_X + r*4
+            sta VIC_SPRITE_0_X + r*4 + 2
 
             ; x-msb
             bcc .clear_x_msb
 .set_x_msb
             lda # %00000011 << 2*r
-            ora VIC_SPR_X_MSB
+            ora VIC_SPRITE_X_MSB
             bne +    ; always true
 .clear_x_msb
             lda # <!(%00000011 << 2*r)
-            and VIC_SPR_X_MSB
+            and VIC_SPRITE_X_MSB
 +
-            sta VIC_SPR_X_MSB
+            sta VIC_SPRITE_X_MSB
 
             ; colors
-            lda SPR_A, y
-            sta VIC_SPR_0_COLOR + r*2 + 1
-            lda SPR_B, y
-            sta VIC_SPR_0_COLOR + r*2
+            lda SPRITE_COLOR_A, y
+            sta VIC_SPRITE_0_COLOR + r*2 + 1
+            lda SPRITE_COLOR_B, y
+            sta VIC_SPRITE_0_COLOR + r*2
 
             ; sprite frames
-            lda SPR_F, y
-            sta SPR_PTR + r*2 + 1
+            lda SPRITE_FRAME, y
+            sta SPRITE_PTR + r*2 + 1
             clc
             adc #1
-            sta SPR_PTR + r*2
+            sta SPRITE_PTR + r*2
 
             !if r = 0 {
-                jmp rotate
+                jmp rotate_sprite_slots
             }
         }
     }
@@ -444,9 +444,9 @@ rotate
 ;-------------------------------------------------------------------------------
 
 last_irq
-    sta restore_regs + 1
-    stx restore_regs + 3
-    sty restore_regs + 5
+    sta restore_registers + 1
+    stx restore_registers + 3
+    sty restore_registers + 5
 !ifdef DEBUG {
     lda #10
     sta VIC_BORDER
@@ -468,27 +468,27 @@ last_irq
 ;
 ; Hand the hardware back to the eight single-colour panel sprites for the top of
 ; the next frame.  They all sit on PANEL_Y, which is what keeps the crunch band's
-; 44 cycle path honest -- see the note at SPRITES in engine.acme.  VIC_SPR_MULTI
+; 44 cycle path honest -- see the note at SPRITES in engine.acme.  VIC_SPRITE_MULTICOLOR
 ; goes to hires here and the multiplexer flips it back when it takes over.
 ;-------------------------------------------------------------------------------
 
 !if SPRITES != 0 {
     lda PANEL_Y
     !for .i, 0, PANEL_SPRITES-1 {
-        sta VIC_SPR_0_Y + 2*.i
+        sta VIC_SPRITE_0_Y + 2*.i
     }
     !for .i, 0, PANEL_SPRITES-1 {
         lda PANEL_X + .i
-        sta VIC_SPR_0_X + 2*.i
-        lda PANEL_C + .i
-        sta VIC_SPR_0_COLOR + .i
-        lda PANEL_F + .i
-        sta SPR_PTR + .i
+        sta VIC_SPRITE_0_X + 2*.i
+        lda PANEL_COLOR + .i
+        sta VIC_SPRITE_0_COLOR + .i
+        lda PANEL_FRAME + .i
+        sta SPRITE_PTR + .i
     }
     lda PANEL_X_MSB
-    sta VIC_SPR_X_MSB
+    sta VIC_SPRITE_X_MSB
     lda #0
-    sta VIC_SPR_MULTI
+    sta VIC_SPRITE_MULTICOLOR
 }
 
 ;-------------------------------------------------------------------------------
@@ -503,20 +503,20 @@ last_irq
 
     !if SPRITES > 1 {
         !for .i, 0, SPRITES-2 {
-            ldy SPR_I + .i + 1
+            ldy SPRITE_ORDER + .i + 1
             !if .i % 2 = 0 {
                 !set .back_0 = *
             } else {
                 !set .back_1 = *
             }
-            ldx SPR_I + .i
-            lda SPR_Y, y            ; A: r-elem
-            cmp SPR_Y, x            ; M: l-elem
+            ldx SPRITE_ORDER + .i
+            lda SPRITE_Y, y            ; A: r-elem
+            cmp SPRITE_Y, x            ; M: l-elem
             ; swap if A < M
             ; skip if A >= M
             bcs +
-            stx SPR_I + .i + 1
-            sty SPR_I + .i
+            stx SPRITE_ORDER + .i + 1
+            sty SPRITE_ORDER + .i
             !if .i != 0 {
                 !if .i % 2 = 0 {
                     bcc .back_1   ; always true
@@ -554,26 +554,26 @@ last_irq
 
 !if SPRITES != 0 {
 !ifdef AUTOPILOT {
-    lda AP_FROZEN
+    lda AUTOPILOT_FROZEN
     bne +
 }
-    inc SPR_FRAME
+    inc SPRITE_PHASE
 +
 
-    ; SPR_YQ = the sorted y values, contiguous, so the checks below are plain
-    ; strided compares instead of another trip through SPR_I
+    ; SPRITE_Y_SORTED = the sorted y values, contiguous, so the checks below are plain
+    ; strided compares instead of another trip through SPRITE_ORDER
     !for .i, 0, SPRITES-1 {
-        ldy SPR_I + .i
-        lda SPR_Y, y
-        sta SPR_YQ + .i
+        ldy SPRITE_ORDER + .i
+        lda SPRITE_Y, y
+        sta SPRITE_Y_SORTED + .i
     }
 
     ; 4 zones: slot n and slot n+SPRITE_SLOTS must not overlap, over the whole list
     ldx #0
 -
-    lda SPR_YQ + SPRITE_SLOTS, x
+    lda SPRITE_Y_SORTED + SPRITE_SLOTS, x
     sec
-    sbc SPR_YQ, x
+    sbc SPRITE_Y_SORTED, x
     cmp #SPRITE_HEIGHT+1   ; the multiplexer frees a slot SPRITE_HEIGHT+1 lines on
     bcc .try_two_zones
     inx
@@ -584,7 +584,7 @@ last_irq
     ; still has a successor in its slot has to stay above that line.  Without
     ; this the pair q[i]=SPRITES_MAX_Y-22, q[i+4]=SPRITES_MAX_Y passes the test
     ; above and then gets abandoned mid-frame.
-    lda SPR_YQ + SPRITES - SPRITE_SLOTS - 1
+    lda SPRITE_Y_SORTED + SPRITES - SPRITE_SLOTS - 1
     cmp #SPRITES_MAX_Y-(SPRITE_HEIGHT+1)
     bcs .try_two_zones
 
@@ -594,14 +594,14 @@ last_irq
 
 .try_two_zones
     ; every 2nd sprite, so the pair that shares a slot is 2*SPRITE_SLOTS apart
-    lda SPR_FRAME
+    lda SPRITE_PHASE
     and #1
     tax                             ; phase
     ldy #0
 -
-    lda SPR_YQ + 2*SPRITE_SLOTS, x
+    lda SPRITE_Y_SORTED + 2*SPRITE_SLOTS, x
     sec
-    sbc SPR_YQ, x
+    sbc SPRITE_Y_SORTED, x
     cmp #SPRITE_HEIGHT+1   ; the multiplexer frees a slot SPRITE_HEIGHT+1 lines on
     bcc .one_zone
     inx
@@ -610,14 +610,14 @@ last_irq
     cpy #SPRITE_SLOTS
     bne -
     ; same bound as above, for the 8 entry list
-    lda SPR_FRAME
+    lda SPRITE_PHASE
     and #1
     tax
-    lda SPR_YQ + 2*(SPRITES/2 - SPRITE_SLOTS - 1), x
+    lda SPRITE_Y_SORTED + 2*(SPRITES/2 - SPRITE_SLOTS - 1), x
     cmp #SPRITES_MAX_Y-(SPRITE_HEIGHT+1)
     bcs .one_zone
 
-    lda SPR_FRAME
+    lda SPRITE_PHASE
     and #1
     tax                             ; stride 2, phase
     ldy #SPRITES / 2
@@ -625,14 +625,14 @@ last_irq
 
 .one_zone
     ; SPRITE_SLOTS sprites over SPRITE_SLOTS slots always fits
-    lda SPR_FRAME
+    lda SPRITE_PHASE
     and #3
     tax                             ; stride 4, phase
     ldy #SPRITE_SLOTS
 
 .schedule
     ; y = how many to show, x = phase; the stride follows from the count
-    sty SPR_SHOWN
+    sty SPRITES_SHOWN
     cpy #SPRITES
     beq .stride_one
     cpy #SPRITES / 2
@@ -641,8 +641,8 @@ last_irq
     ; stride 4
     ldy #0
 -
-    lda SPR_I, x
-    sta SPR_Q, y
+    lda SPRITE_ORDER, x
+    sta SPRITE_QUEUE, y
     inx
     inx
     inx
@@ -655,8 +655,8 @@ last_irq
 .stride_two
     ldy #0
 -
-    lda SPR_I, x
-    sta SPR_Q, y
+    lda SPRITE_ORDER, x
+    sta SPRITE_QUEUE, y
     inx
     inx
     iny
@@ -666,8 +666,8 @@ last_irq
 
 .stride_one
     !for .i, 0, SPRITES-1 {
-        lda SPR_I + .i
-        sta SPR_Q + .i
+        lda SPRITE_ORDER + .i
+        sta SPRITE_QUEUE + .i
     }
 .scheduled
 }
@@ -691,13 +691,13 @@ last_irq
 
 }
 
-; How far down the screen does the multiplexer still miss sprites?  SPR_DROPPED
-; holds the largest y it was ever too late for; bisect SPR_DROP_LIMIT and the
+; How far down the screen does the multiplexer still miss sprites?  SPRITE_DROPPED
+; holds the largest y it was ever too late for; bisect SPRITE_DROP_LIMIT and the
 ; lowest limit that does not jam is that y, plus one.  Opt-in rather than part of
 ; -DDEVELOP because the tracking itself costs enough to blow the budget.
-!ifdef SPR_DROP_LIMIT {
-    lda SPR_DROPPED
-    cmp #SPR_DROP_LIMIT
+!ifdef SPRITE_DROP_LIMIT {
+    lda SPRITE_DROPPED
+    cmp #SPRITE_DROP_LIMIT
     bcc +
     jam
 +
@@ -717,7 +717,7 @@ last_irq
     +set_raster_line_8 LINE_0
     +set16 IRQ, VECTOR_IRQ
 
-out
+irq_exit
     !ifdef DEBUG {
         ldx #0
         stx VIC_BORDER
@@ -726,7 +726,7 @@ out
 
     inc VIC_IRQ_STATUS
 
-restore_regs
+restore_registers
     lda #0
     ldx #0
     ldy #0

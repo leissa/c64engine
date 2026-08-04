@@ -1,5 +1,5 @@
-SCROLL_COLS = SCR_COLS
-SCROLL_ROWS = SCR_ROWS-2
+SCROLL_COLS = SCREEN_COLS
+SCROLL_ROWS = SCREEN_ROWS-2
 
 ;-------------------------------------------------------------------------------
 ;   tunable sanity checks
@@ -24,7 +24,7 @@ SCROLL_ROWS = SCR_ROWS-2
 ;-------------------------------------------------------------------------------
 ;   world-fixed sprites
 ;
-;   SPR_X/SPR_Y hold *screen* coordinates -- last_irq and the multiplexer copy
+;   SPRITE_X/SPRITE_Y hold *screen* coordinates -- last_irq and the multiplexer copy
 ;   them straight into the VIC registers -- so pinning a sprite to the map means
 ;   stepping every sprite the opposite way whenever the camera moves.
 ;
@@ -32,30 +32,30 @@ SCROLL_ROWS = SCR_ROWS-2
 ;   last_irq, so nothing here has to keep clear of it -- all SPRITES world
 ;   sprites scroll.  What they must not do is come up past the line the
 ;   multiplexer can first reach: it only starts once the soft scroll has been
-;   issued, so a sprite above SPR_WRAP_TOP could never be placed in time.
+;   issued, so a sprite above SPRITE_WRAP_TOP could never be placed in time.
 ;
-;   **Recycling a sprite has to fix SPR_I itself.**  Shifting every sprite by the
-;   same amount leaves the SPR_I order intact, but a sprite that wraps travels
+;   **Recycling a sprite has to fix SPRITE_ORDER itself.**  Shifting every sprite by the
+;   same amount leaves the SPRITE_ORDER order intact, but a sprite that wraps travels
 ;   from one end of the range to the other and so has to travel the whole length
 ;   of the order with it.  Left to the insertion sort in last_irq that is its
 ;   O(n^2) case -- measured at ~26 raster lines of the off-screen budget for a
 ;   single wrap, against a total budget of 47 lines.  So the wrap moves the
-;   sprite in SPR_I directly, which keeps the order sorted and leaves the sort
+;   sprite in SPRITE_ORDER directly, which keeps the order sorted and leaves the sort
 ;   with nothing to do.  Do not "simplify" this back into a plain bounds check.
 ;
 ;   The order is the one last_irq sorted at the end of the previous frame, so the
 ;   sprite examined here can be off by a position or two (the joystick nudges one
 ;   sprite independently).  A missed wrap is picked up on the next frame, which
-;   is what SPR_WRAP_MARGIN covers.
+;   is what SPRITE_WRAP_MARGIN covers.
 ;-------------------------------------------------------------------------------
 
-; The soft scroll is issued at SPR_MUX_START and the multiplexer runs after it,
-; so SPR_WRAP_TOP is as high as a sprite can be and still be placed in time.  A
+; The soft scroll is issued at SPRITE_MULTIPLEX_START and the multiplexer runs after it,
+; so SPRITE_WRAP_TOP is as high as a sprite can be and still be placed in time.  A
 ; sprite cannot slide out from *behind* the panel row -- the hardware is busy
 ; with it until SPRITES_TOP_Y+SPRITE_HEIGHT -- so this edge always pops.
 ;
 ; **The release must stay a whole text row past the band.**  It looks like slack
-; -- the band ends at AGSP_END = 75 and the panel frees the hardware at SPR_FLOOR
+; -- the band ends at AGSP_END = 75 and the panel frees the hardware at SPRITE_FLOOR
 ; = 82, so releasing at 76 would win six lines of sprite travel -- and it does not
 ; work: the release writes YSCROLL, and a write landing inside the row that is
 ; still being fetched can assert the bad line condition a second time in that row,
@@ -67,138 +67,138 @@ SCROLL_ROWS = SCR_ROWS-2
 ; enough to clear a change here.  Crop the strip under the panel and compare it
 ; across several autopilot stops.
 ;
-; SPR_WRAP_MARGIN is what a sprite is recycled *above* SPR_MUX_START, and the
+; SPRITE_WRAP_MARGIN is what a sprite is recycled *above* SPRITE_MULTIPLEX_START, and the
 ; only thing it has to cover is the wrap being noticed late: the order consulted
 ; is the one sorted at the end of the previous frame, so a wrap can be seen up to
 ; two frames late and the sprite travels SCROLL_SPEED lines in each of them.
 ;
 ; It used to be 4 on the theory that the four slots fill in sequence and the last
 ; one needs room.  Measured, that is not the binding constraint: instrument the
-; "too late" exit in raster.acme (see SPR_DROPPED) and the largest y ever skipped
+; "too late" exit in raster.acme (see SPRITE_DROPPED) and the largest y ever skipped
 ; is 42, thirteen lines above the first visible line, unchanged from margin 4 all
 ; the way down to margin 2 -- over the autopilot and over 5000 frames of constant
 ; down+right.  The multiplexer places everything that can be seen.
 ;
 ; What stops it going lower still is raster time, not placement.  2 assembles and
 ; runs, but it puts the frozen autopilot frames at stops 60 and 90 right on the
-; budget: with the SPR_DROPPED tracking compiled in they jam in the LINE_0
+; budget: with the SPRITE_DROPPED tracking compiled in they jam in the LINE_0
 ; stabilisation check, without it they pass.  Sitting that close to the edge buys
 ; one raster line and costs the room to instrument anything, so this stays at 3,
 ; which is clean over the whole autopilot and over 5000 frames of constant
 ; down+right, tracking on or off.  Below 3, budget first, then this constant.
 ;
-; SPR_WRAP_BOTTOM is one line *past* the display window, so a recycled sprite
+; SPRITE_WRAP_BOT is one line *past* the display window, so a recycled sprite
 ; starts out completely hidden in the bottom border and slides into view a line
 ; at a time.  It may sit below SPRITES_MAX_Y: that bound is tested against the
 ; sprite a slot *already holds*, not the one arriving, and the arriving sprite is
 ; written long before the raster reaches it.
-SPR_MUX_START   = FIRST_BADLINE+SCR_ROWS+8+1
-!ifndef SPR_WRAP_MARGIN {       ; -D-overridable so it can be swept, see above
-SPR_WRAP_MARGIN = 3 * SCROLL_SPEED
+SPRITE_MULTIPLEX_START = FIRST_BADLINE+SCREEN_ROWS+8+1
+!ifndef SPRITE_WRAP_MARGIN {       ; -D-overridable so it can be swept, see above
+SPRITE_WRAP_MARGIN = 3 * SCROLL_SPEED
 }
-SPR_WRAP_TOP    = SPR_MUX_START + SPR_WRAP_MARGIN
-SPR_WRAP_BOTTOM = DISPLAY_BOTTOM + 1
+SPRITE_WRAP_TOP = SPRITE_MULTIPLEX_START + SPRITE_WRAP_MARGIN
+SPRITE_WRAP_BOT = DISPLAY_BOT + 1
 
 !if SPRITES != 0 {
-  !if SPR_WRAP_MARGIN < 2 * SCROLL_SPEED {
-    !error "SPR_WRAP_MARGIN (", SPR_WRAP_MARGIN, ") leaves no room at SCROLL_SPEED ", SCROLL_SPEED
+  !if SPRITE_WRAP_MARGIN < 2 * SCROLL_SPEED {
+    !error "SPRITE_WRAP_MARGIN (", SPRITE_WRAP_MARGIN, ") leaves no room at SCROLL_SPEED ", SCROLL_SPEED
   }
-  !if SPR_WRAP_TOP < SPRITES_TOP_Y + SPRITE_HEIGHT {
-    !error "SPR_WRAP_TOP (", SPR_WRAP_TOP, ") would overlap the panel row"
+  !if SPRITE_WRAP_TOP < SPRITES_TOP_Y + SPRITE_HEIGHT {
+    !error "SPRITE_WRAP_TOP (", SPRITE_WRAP_TOP, ") would overlap the panel row"
   }
-  !if SPR_WRAP_BOTTOM > DISPLAY_BOTTOM + 1 {
-    !error "SPR_WRAP_BOTTOM (", SPR_WRAP_BOTTOM, ") is below the display window, so a recycled sprite would stay invisible"
+  !if SPRITE_WRAP_BOT > DISPLAY_BOT + 1 {
+    !error "SPRITE_WRAP_BOT (", SPRITE_WRAP_BOT, ") is below the display window, so a recycled sprite would stay invisible"
   }
 
 ; camera moved towards larger map coordinates, so the world slides up
-SCROLL_SPRITES_UP !zone {
+SCROLL_SPRITES_U !zone {
     ldx #SPRITES-1
 -
     sec
-    lda SPR_Y, x
+    lda SPRITE_Y, x
     sbc #SCROLL_SPEED
-    sta SPR_Y, x
+    sta SPRITE_Y, x
     dex
     bpl -
 
     ; anything that ran off the top is at the front of the order
 .recycle
-    ldy SPR_I
-    lda SPR_Y, y
-    cmp #SPR_WRAP_TOP
+    ldy SPRITE_ORDER
+    lda SPRITE_Y, y
+    cmp #SPRITE_WRAP_TOP
     bcs .done
-    lda #SPR_WRAP_BOTTOM
-    sta SPR_Y, y
+    lda #SPRITE_WRAP_BOT
+    sta SPRITE_Y, y
     ; it is the largest now, so it belongs at the back
     ldx #0
 -
-    lda SPR_I + 1, x
-    sta SPR_I, x
+    lda SPRITE_ORDER + 1, x
+    sta SPRITE_ORDER, x
     inx
     cpx #SPRITES-1
     bne -
-    sty SPR_I + SPRITES-1
+    sty SPRITE_ORDER + SPRITES-1
     jmp .recycle
 .done
     rts
 }
 
-SCROLL_SPRITES_DOWN !zone {
+SCROLL_SPRITES_D !zone {
     ldx #SPRITES-1
 -
     clc
-    lda SPR_Y, x
+    lda SPRITE_Y, x
     adc #SCROLL_SPEED
-    sta SPR_Y, x
+    sta SPRITE_Y, x
     dex
     bpl -
 
     ; mirror image: anything that ran off the bottom is at the back of the order
 .recycle
-    ldy SPR_I + SPRITES-1
-    lda SPR_Y, y
-    cmp #SPR_WRAP_BOTTOM+1
+    ldy SPRITE_ORDER + SPRITES-1
+    lda SPRITE_Y, y
+    cmp #SPRITE_WRAP_BOT+1
     bcc .done
-    lda #SPR_WRAP_TOP
-    sta SPR_Y, y
+    lda #SPRITE_WRAP_TOP
+    sta SPRITE_Y, y
     ; it is the smallest now, so it belongs at the front
     ldx #SPRITES-1
 -
-    lda SPR_I - 1, x
-    sta SPR_I, x
+    lda SPRITE_ORDER - 1, x
+    sta SPRITE_ORDER, x
     dex
     bne -
-    sty SPR_I
+    sty SPRITE_ORDER
     jmp .recycle
 .done
     rts
 }
 
-; SPR_X is half resolution (the multiplexer does an asl before storing it), so
+; SPRITE_X is half resolution (the multiplexer does an asl before storing it), so
 ; one unit is two pixels.  No wrap check: the byte wraps on its own and the
 ; multiplexer already deals with sprites parked off either side.
-SCROLL_SPRITES_LEFT !zone {
+SCROLL_SPRITES_L !zone {
     ldx #SPRITES-1
 -
-    dec SPR_X, x
+    dec SPRITE_X, x
     dex
     bpl -
     rts
 }
 
-SCROLL_SPRITES_RIGHT !zone {
+SCROLL_SPRITES_R !zone {
     ldx #SPRITES-1
 -
-    inc SPR_X, x
+    inc SPRITE_X, x
     dex
     bpl -
     rts
 }
 }
 
-INC_HARD_Y !zone {
+INCREMENT_HARD_Y !zone {
     inc HARD_Y
-    lda #SCR_ROWS+1
+    lda #SCREEN_ROWS+1
     cmp HARD_Y
     bne .return
 
@@ -210,11 +210,11 @@ INC_HARD_Y !zone {
     sec
     sbc #16
     sta HARD_X
-    ; re-add a full row: if that overflows back past SCR_COLS the subtraction
+    ; re-add a full row: if that overflows back past SCREEN_COLS the subtraction
     ; above stayed inside the row and we are done ...
     clc
-    adc #SCR_COLS
-    cmp #SCR_COLS
+    adc #SCREEN_COLS
+    cmp #SCREEN_COLS
     bcs .return
     ; ... otherwise it borrowed from the row above, so keep the wrapped X and
     ; give the row back
@@ -225,21 +225,21 @@ INC_HARD_Y !zone {
     rts
 }
 
-DEC_HARD_Y !zone {
+DECREMENT_HARD_Y !zone {
     dec HARD_Y
     bpl .return
 
-    lda #SCR_ROWS
+    lda #SCREEN_ROWS
     sta HARD_Y
 
-    ; mirror of INC_HARD_Y: shift the AGSP origin the other way and hand a row
+    ; mirror of INCREMENT_HARD_Y: shift the AGSP origin the other way and hand a row
     ; back if X ran past the end of the row
     lda HARD_X
     clc
     adc #16
     sta HARD_X
     sec
-    sbc #SCR_COLS
+    sbc #SCREEN_COLS
     bmi .return
     sta HARD_X
     dec HARD_Y
@@ -248,52 +248,52 @@ DEC_HARD_Y !zone {
     rts
 }
 
-!macro wrap_inc .mem, .inc, .and, .l {
-    lda .mem
+!macro wrap_inc .addr, .increment, .modulus, .no_wrap {
+    lda .addr
     clc
-    adc #.inc
-    and #.and-1 ; assumes 2^x = .and
-    sta .mem
-    bne .l
+    adc #.increment
+    and #.modulus-1 ; assumes 2^x = .modulus
+    sta .addr
+    bne .no_wrap
 }
 
-!macro wrap_dec .mem, .dec, .and, .l {
-    lda .mem
+!macro wrap_dec .addr, .decrement, .modulus, .no_wrap {
+    lda .addr
     sec
-    sbc #.dec
-    and #.and-1 ; assumes 2^x = .and
-    sta .mem
-    bcs .l
+    sbc #.decrement
+    and #.modulus-1 ; assumes 2^x = .modulus
+    sta .addr
+    bcs .no_wrap
 }
 
-!macro wrap_add .lo, .hi, .add, .and {
+!macro wrap_add .lo, .hi, .addend, .modulus {
     clc
 
     lda .lo
-    adc #(.add % 256)
+    adc #(.addend % 256)
     sta .lo
-!if .add < 256 {
+!if .addend < 256 {
     bcc +
 }
     lda .hi
-    adc #(.add / 256)
-    and #.and-1 ; assumes 2^x = .and
+    adc #(.addend / 256)
+    and #.modulus-1 ; assumes 2^x = .modulus
     sta .hi
 +
 }
 
-!macro wrap_sub .lo, .hi, .sub, .and {
+!macro wrap_sub .lo, .hi, .subtrahend, .modulus {
     sec
 
     lda .lo
-    sbc #(.sub % 256)
+    sbc #(.subtrahend % 256)
     sta .lo
-!if .sub < 256 {
+!if .subtrahend < 256 {
     bcs +
 }
     lda .hi
-    sbc #(.sub / 256)
-    and #.and-1 ; assumes 2^x = .and
+    sbc #(.subtrahend / 256)
+    and #.modulus-1 ; assumes 2^x = .modulus
     sta .hi
 +
 }
@@ -306,124 +306,124 @@ DEC_HARD_Y !zone {
 ;
 ;     .vertical  1 -> SOFT_Y / HARD_Y / TILE_ROW  (SCROLL_U, SCROLL_D)
 ;                0 -> SOFT_X / HARD_X / TILE_COL  (SCROLL_L, SCROLL_R)
-;     .dir      +1 -> the direction that advances the map cursor
+;     .direction      +1 -> the direction that advances the map cursor
 ;                     (SCROLL_D, SCROLL_R)
 ;               -1 -> the direction that retreats it (SCROLL_U, SCROLL_L)
 ;
 ;   Beware the one place where the signs do *not* line up: on the horizontal
 ;   axis SOFT_X and HARD_X run opposite to the map cursor, so SCROLL_L
-;   (.dir = -1) *increments* both.  The VSP delay in raster.acme is 39-HARD_X,
-;   which is where that inversion comes from.  .soft_dir below is .dir for the
-;   vertical axis and -.dir for the horizontal one; anything that reads or steps
-;   SOFT_*/HARD_X keys off .soft_dir, everything else off .dir.
+;   (.direction = -1) *increments* both.  The VSP delay in raster.acme is 39-HARD_X,
+;   which is where that inversion comes from.  .soft_direction below is .direction for the
+;   vertical axis and -.direction for the horizontal one; anything that reads or steps
+;   SOFT_*/HARD_X keys off .soft_direction, everything else off .direction.
 ;
 ;   Each call does up to three things:
 ;
 ;   1. Step SOFT_* by SCROLL_SPEED.  On wrap, step the hard scroll and return --
 ;      no tile work happens on a wrap frame.
 ;   2. At the halfway point of the soft scroll, seed the copy counter and step
-;      both the C_ and R_ cursor sets by one char.  The trigger is SOFT == 4
+;      both the COLUMN_ and ROW_ cursor sets by one char.  The trigger is SOFT == 4
 ;      when SOFT counts up and SOFT == 4-SCROLL_SPEED when it counts down, which
 ;      leaves 4/SCROLL_SPEED frames before the wrap either way -- that is the
 ;      budget COPY_COL_FRAMES/COPY_ROW_FRAMES have to fit into.
 ;   3. If the direction reversed since the last tile boundary, jump the cursor
 ;      set that feeds this axis by a whole screen, because the edge being filled
-;      moved to the other side.  SCROLL_U_D/SCROLL_L_R remember the last
+;      moved to the other side.  SCROLL_LAST_VERTICAL/SCROLL_LAST_HORIZONTAL remember the last
 ;      direction per axis.
 ;
 ;   TODO: the sprites do not scroll with the map.  Doing it here by poking
-;   VIC_SPR_*_X/Y is futile -- last_irq in raster.acme rewrites those registers
-;   from SPR_X/SPR_Y every frame -- so it has to move the SPR_X/SPR_Y tables.
+;   VIC_SPRITE_*_X/Y is futile -- last_irq in raster.acme rewrites those registers
+;   from SPRITE_X/SPRITE_Y every frame -- so it has to move the SPRITE_X/SPRITE_Y tables.
 ;-------------------------------------------------------------------------------
 
-!macro scroll_axis .vertical, .dir {
+!macro scroll_axis .vertical, .direction {
 
     ; ---- per-axis symbol selection --------------------------------------
 !if .vertical {
     !set .tile          = TILE_ROW
-    !set .tile_mod      = TILE_ROWS
-    !set .copy_counter  = C_COPY
+    !set .tile_modulus      = TILE_ROWS
+    !set .copy_counter  = COL_COPY
     !set .copy_frames   = COPY_COL_FRAMES
-    !set .c_map         = C_MAP_POS_HI      ; a vertical step is a whole map row
-    !set .r_map         = R_MAP_POS_HI
-    !set .flag          = SCROLL_U_D
+    !set .col_map         = COL_MAP_POS_HI      ; a vertical step is a whole map row
+    !set .row_map         = ROW_MAP_POS_HI
+    !set .last_direction          = SCROLL_LAST_VERTICAL
     ; one char step along this axis, measured in screen chars
     !set .char_delta    = SCROLL_COLS
     ; the whole screen along this axis, measured in chars
-    !set .span          = SCROLL_ROWS-1
+    !set .screen_span          = SCROLL_ROWS-1
     ; the cursor set fed by this axis, jumped wholesale on a direction reversal
-    !set .own_map       = C_MAP_POS_HI
-    !set .own_scr_lo    = C_SCR_POS_LO
-    !set .own_scr_hi    = C_SCR_POS_HI
-    !set .own_pix_lo    = C_PIX_POS_LO
-    !set .own_pix_hi    = C_PIX_POS_HI
+    !set .own_map       = COL_MAP_POS_HI
+    !set .own_screen_lo    = COL_SCREEN_POS_LO
+    !set .own_screen_hi    = COL_SCREEN_POS_HI
+    !set .own_pixel_lo    = COL_PIXEL_POS_LO
+    !set .own_pixel_hi    = COL_PIXEL_POS_HI
     ; SOFT_Y steps the same way the map cursor does
-    !set .soft_dir      = .dir
+    !set .soft_direction      = .direction
 } else {
     !set .tile          = TILE_COL
-    !set .tile_mod      = TILE_COLS
-    !set .copy_counter  = R_COPY
+    !set .tile_modulus      = TILE_COLS
+    !set .copy_counter  = ROW_COPY
     !set .copy_frames   = COPY_ROW_FRAMES
-    !set .c_map         = C_MAP_POS_LO      ; a horizontal step is one map byte
-    !set .r_map         = R_MAP_POS_LO
-    !set .flag          = SCROLL_L_R
+    !set .col_map         = COL_MAP_POS_LO      ; a horizontal step is one map byte
+    !set .row_map         = ROW_MAP_POS_LO
+    !set .last_direction          = SCROLL_LAST_HORIZONTAL
     !set .char_delta    = 1
-    !set .span          = SCROLL_COLS-1
-    !set .own_map       = R_MAP_POS_LO
-    !set .own_scr_lo    = R_SCR_POS_LO
-    !set .own_scr_hi    = R_SCR_POS_HI
-    !set .own_pix_lo    = R_PIX_POS_LO
-    !set .own_pix_hi    = R_PIX_POS_HI
+    !set .screen_span          = SCROLL_COLS-1
+    !set .own_map       = ROW_MAP_POS_LO
+    !set .own_screen_lo    = ROW_SCREEN_POS_LO
+    !set .own_screen_hi    = ROW_SCREEN_POS_HI
+    !set .own_pixel_lo    = ROW_PIXEL_POS_LO
+    !set .own_pixel_hi    = ROW_PIXEL_POS_HI
     ; SOFT_X steps *against* the map cursor, exactly like HARD_X does
-    !set .soft_dir      = -.dir
+    !set .soft_direction      = -.direction
 }
 
     ; ---- 0. drag the world-fixed sprites along with the camera -----------
 !if SPRITES != 0 {
   !if .vertical {
-    ; SPR_Y is full resolution, so it tracks the camera pixel for pixel
-    !if .dir = 1 { jsr SCROLL_SPRITES_UP } else { jsr SCROLL_SPRITES_DOWN }
+    ; SPRITE_Y is full resolution, so it tracks the camera pixel for pixel
+    !if .direction = 1 { jsr SCROLL_SPRITES_U } else { jsr SCROLL_SPRITES_D }
   } else {
-    ; SPR_X is half resolution, so it may only move every second pixel of
+    ; SPRITE_X is half resolution, so it may only move every second pixel of
     ; camera travel.  SOFT_X visits each of 0..7 once per char at SCROLL_SPEED 1
     ; (giving 4 steps per 8 pixels) and only even values at SCROLL_SPEED 2
     ; (giving 4 steps per 8 pixels again), so this one gate serves both.
     lda SOFT_X
     and #1
     bne +
-    !if .dir = 1 { jsr SCROLL_SPRITES_LEFT } else { jsr SCROLL_SPRITES_RIGHT }
+    !if .direction = 1 { jsr SCROLL_SPRITES_L } else { jsr SCROLL_SPRITES_R }
 +
   }
 }
 
     ; ---- 1. soft scroll, and the hard scroll on wrap ---------------------
 !if .vertical {
-  !if .dir = -1 {
+  !if .direction = -1 {
     +wrap_dec SOFT_Y, SCROLL_SPEED, 8, .check_copy_tiles
-    jsr DEC_HARD_Y
+    jsr DECREMENT_HARD_Y
   } else {
     +wrap_inc SOFT_Y, SCROLL_SPEED, 8, .check_copy_tiles
-    jsr INC_HARD_Y
+    jsr INCREMENT_HARD_Y
   }
     rts
 } else {
-  !if .dir = -1 {
+  !if .direction = -1 {
     ; note the inversion: retreating the map cursor advances SOFT_X and HARD_X
     +wrap_inc SOFT_X, SCROLL_SPEED, 8, .check_copy_tiles
     inc HARD_X
-    lda #SCR_COLS
+    lda #SCREEN_COLS
     cmp HARD_X
     bne +
     lda #0
     sta HARD_X
-    jsr DEC_HARD_Y
+    jsr DECREMENT_HARD_Y
   } else {
     +wrap_dec SOFT_X, SCROLL_SPEED, 8, .check_copy_tiles
     dec HARD_X
     bpl +
-    lda #SCR_COLS-1
+    lda #SCREEN_COLS-1
     sta HARD_X
-    jsr INC_HARD_Y
+    jsr INCREMENT_HARD_Y
   }
 +
     rts
@@ -432,8 +432,8 @@ DEC_HARD_Y !zone {
     ; ---- 2. at the halfway point, start a copy and step the cursors ------
 .check_copy_tiles
     ; a holds SOFT_X/SOFT_Y, left there by wrap_inc/wrap_dec.  The trigger
-    ; follows .soft_dir, not .dir: it is a property of how SOFT_* counts.
-!if .soft_dir = -1 {
+    ; follows .soft_direction, not .direction: it is a property of how SOFT_* counts.
+!if .soft_direction = -1 {
     cmp #4-SCROLL_SPEED
 } else {
     cmp #4
@@ -447,49 +447,49 @@ DEC_HARD_Y !zone {
 
     ; step the tile-relative position, carrying into the map cursors
     lda .tile
-!if .dir = -1 {
+!if .direction = -1 {
     sec
     sbc #1
     bcs +
-    adc #.tile_mod  ; carry is clear here, so this is +.tile_mod
-    dec .c_map
-    dec .r_map
+    adc #.tile_modulus  ; carry is clear here, so this is +.tile_modulus
+    dec .col_map
+    dec .row_map
 } else {
     clc
     adc #1
-    cmp #.tile_mod
+    cmp #.tile_modulus
     bcc +
-    sbc #.tile_mod  ; carry is set here, so this is -.tile_mod
-    inc .c_map
-    inc .r_map
+    sbc #.tile_modulus  ; carry is set here, so this is -.tile_modulus
+    inc .col_map
+    inc .row_map
 }
 +
     sta .tile
 
     ; step both destination cursor sets by one char along this axis
-!if .dir = -1 {
-    +wrap_sub C_SCR_POS_LO, C_SCR_POS_HI, .char_delta, 4
-    +wrap_sub R_SCR_POS_LO, R_SCR_POS_HI, .char_delta, 4
-    +wrap_sub C_PIX_POS_LO, C_PIX_POS_HI, 8*.char_delta, 8*4
-    +wrap_sub R_PIX_POS_LO, R_PIX_POS_HI, 8*.char_delta, 8*4
+!if .direction = -1 {
+    +wrap_sub COL_SCREEN_POS_LO, COL_SCREEN_POS_HI, .char_delta, 4
+    +wrap_sub ROW_SCREEN_POS_LO, ROW_SCREEN_POS_HI, .char_delta, 4
+    +wrap_sub COL_PIXEL_POS_LO, COL_PIXEL_POS_HI, 8*.char_delta, 8*4
+    +wrap_sub ROW_PIXEL_POS_LO, ROW_PIXEL_POS_HI, 8*.char_delta, 8*4
 } else {
-    +wrap_add C_SCR_POS_LO, C_SCR_POS_HI, .char_delta, 4
-    +wrap_add R_SCR_POS_LO, R_SCR_POS_HI, .char_delta, 4
-    +wrap_add C_PIX_POS_LO, C_PIX_POS_HI, 8*.char_delta, 8*4
-    +wrap_add R_PIX_POS_LO, R_PIX_POS_HI, 8*.char_delta, 8*4
+    +wrap_add COL_SCREEN_POS_LO, COL_SCREEN_POS_HI, .char_delta, 4
+    +wrap_add ROW_SCREEN_POS_LO, ROW_SCREEN_POS_HI, .char_delta, 4
+    +wrap_add COL_PIXEL_POS_LO, COL_PIXEL_POS_HI, 8*.char_delta, 8*4
+    +wrap_add ROW_PIXEL_POS_LO, ROW_PIXEL_POS_HI, 8*.char_delta, 8*4
 }
 
     ; ---- 3. on a direction reversal, jump this axis' cursor a whole screen
-    lda .flag
-!if .dir = -1 {
+    lda .last_direction
+!if .direction = -1 {
     beq +           ; already going this way
 
     sec
     lda .own_map
-    sbc #.span/.tile_mod
+    sbc #.screen_span/.tile_modulus
     sta .own_map
-    +wrap_sub .own_scr_lo, .own_scr_hi, .span*.char_delta, 4
-    +wrap_sub .own_pix_lo, .own_pix_hi, 8*.span*.char_delta, 8*4
+    +wrap_sub .own_screen_lo, .own_screen_hi, .screen_span*.char_delta, 4
+    +wrap_sub .own_pixel_lo, .own_pixel_hi, 8*.screen_span*.char_delta, 8*4
 
     lda #0
 } else {
@@ -497,14 +497,14 @@ DEC_HARD_Y !zone {
 
     clc
     lda .own_map
-    adc #.span/.tile_mod
+    adc #.screen_span/.tile_modulus
     sta .own_map
-    +wrap_add .own_scr_lo, .own_scr_hi, .span*.char_delta, 4
-    +wrap_add .own_pix_lo, .own_pix_hi, 8*.span*.char_delta, 8*4
+    +wrap_add .own_screen_lo, .own_screen_hi, .screen_span*.char_delta, 4
+    +wrap_add .own_pixel_lo, .own_pixel_hi, 8*.screen_span*.char_delta, 8*4
 
     lda #1
 }
-    sta .flag
+    sta .last_direction
 +
     rts
 }

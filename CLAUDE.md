@@ -73,11 +73,11 @@ Highlights:
   Startup points NMI/IRQ vectors at `EMPTY_INTERRUPT`, kills CIA timer IRQs, and never acks NMI again, so the whole zero
   page except `$00`/`$01` is free.
 - VIC uses bank 3 (`$c000-$ffff`): bitmap at `$c000`, screen at `$e000`, sprite frames at `$e400`.
-  Sprite pointers live at `SPR_PTR = SCREEN+$0400-8`.
-- `TILE_PIX` (`$9c00-$bfff`) is 9k of tile pixel data;
+  Sprite pointers live at `SPRITE_PTR = SCREEN+$0400-8`.
+- `TILE_PIXELS` (`$9c00-$bfff`) is 9k of tile pixel data;
   the 4k of RAM under the I/O area is part of the bitmap, so `tiles.acme` toggles `RAM_ROM_SELECTION` to `ALL_RAM`
   around pixel writes.
-- `$0200-$07ff` belongs to the cartridge boot: `EF_COPIER` (the relocated copier), `EF_TABLE_RAM` (the chunk table,
+- `$0200-$07ff` belongs to the cartridge boot: `EF_COPIER` (the relocated copier), `EF_TBL_RAM` (the chunk table,
   lifted out of bank 1 because the copier switches banks as it walks), `EAPI_RAM` (reserved, see below) and `EF_BUFFER`
   (staging page).
   All of it is below the lowest payload destination `$0801`, so the copy cannot overwrite the code doing the copying.
@@ -96,68 +96,66 @@ Stages, in order:
    `VIC_RASTER` is wrong.
 2. **`LINE_0+1`** — computes the VSP nop-skip count from `HARD_X` and patches `.self_modifying_branch__nops`/`__lsb` in
    place.
-3. **FLD + line crunch** — `HARD_Y` iterations of `inc_vic_control_y`, always totalling 25 raster lines.
+3. **FLD + line crunch** — `HARD_Y` iterations of `increment_vic_ctrl_y`, always totalling 25 raster lines.
    Sprites in the crunch area take a shorter 44-cycle path.
 4. **VSP** — the self-modified nop field lands the badline on the right cycle.
    Guarded by `!if (>IRQ) != (>*) { !error }`:
    the critical code must not cross a page, which is why `IRQ` is `!align 255, 0`.
-5. **Soft scroll**, then **sprite multiplexing** — see _Sprites_ below.
-   The AGSP region is always 25 raster lines and **ends on line `AGSP_END` = 75** — measured, see
-   _Measuring the AGSP band_ under _Testing_; it does not move with `HARD_Y`.
-   The soft scroll is released at `SPR_MUX_START` = `FIRST_BADLINE+SCR_ROWS+8+1` = 82, a **full text row past
-   the band**, and that row of apparent slack is load-bearing: the release writes YSCROLL, and a write landing
-   inside the row still being fetched can assert the bad line condition a second time in that row, so it is
-   re-fetched from a shifted `VC` and the map's first 0-7 lines come out corrupt.
-   Tried releasing at 76 to win six lines of sprite travel; it shows as a ragged partial row under the panel.
-   It is scroll-offset dependent, so **a full-screen screenshot at one scroll position does not clear a change
-   here** — crop the strip under the panel and compare it across several autopilot stops.
+5. **Soft scroll**, then **sprite multiplexing** — see _Sprites_ below. The AGSP region is always 25 raster lines and
+   **ends on line `AGSP_END` = 75** — measured, see _Measuring the AGSP band_ under _Testing_; it does not move with
+   `HARD_Y`. The soft scroll is released at `SPRITE_MULTIPLEX_START` = `FIRST_BADLINE+SCREEN_ROWS+8+1` = 82, a **full
+   text row past the band**, and that row of apparent slack is load-bearing: the release writes YSCROLL, and a write
+   landing inside the row still being fetched can assert the bad line condition a second time in that row, so it is
+   re-fetched from a shifted `VC` and the map's first 0-7 lines come out corrupt. Tried releasing at 76 to win six lines
+   of sprite travel; it shows as a ragged partial row under the panel. It is scroll-offset dependent, so **a full-screen
+   screenshot at one scroll position does not clear a change here** — crop the strip under the panel and compare it
+   across several autopilot stops.
 6. **`last_irq`** — the "off-screen" budget: `JOYSTICK`, `COPY_TILES`, `PLAY_SONG`, the panel row, an insertion-sort
-   pass over `SPR_I` by `SPR_Y`, and the sprite scheduling for the next frame.
+   pass over `SPRITE_ORDER` by `SPRITE_Y`, and the sprite scheduling for the next frame.
 
 `HARD_X`/`HARD_Y`/`SOFT_X`/`SOFT_Y` are not variables but `*+1` labels pointing at immediate operands inside the IRQ —
 self-modifying code is the norm here, not an exception.
 
 ### Scrolling — `scroll.acme`
 
-All four of `SCROLL_U/D/L/R` are generated from one `+scroll_axis .vertical, .dir` macro; they differ only in which
-axis they walk and in the sign of every step.
+All four of `SCROLL_U`/`SCROLL_D`/`SCROLL_L`/`SCROLL_R` are generated from one
+`+scroll_axis .vertical, .direction` macro; they differ only in which axis they walk and in the sign of every step.
 They advance `SOFT_*` by `SCROLL_SPEED` and, on wrap, `HARD_*`.
-`INC_HARD_Y`/`DEC_HARD_Y` handle the AGSP coupling where a Y wrap shifts `HARD_X` by 16.
-At the halfway point of a soft scroll they seed `C_COPY`/`R_COPY` and step the `{C,R}_{MAP,SCR,PIX,CLR}_POS_*` pointer
-sets, which are the source (map) and destination (screen/bitmap/color) cursors for tile copying.
+`INCREMENT_HARD_Y`/`DECREMENT_HARD_Y` handle the AGSP coupling where a Y wrap shifts `HARD_X` by 16.
+At the halfway point of a soft scroll they seed `COL_COPY`/`ROW_COPY` and step the
+`{COL,ROW}_{MAP,SCREEN,PIXEL,COLOR}_POS_*` pointer sets,
+which are the source (map) and destination (screen/bitmap/color) cursors for tile copying.
 
 **The horizontal axis runs backwards.** `SOFT_X` and `HARD_X` step _against_ the map cursor, so `SCROLL_L`
-(`.dir = -1`) increments both — the VSP delay in `raster.acme` is `39-HARD_X`, which is where the inversion comes
-from. The macro carries `.soft_dir` (`= .dir` vertically, `= -.dir` horizontally) for exactly this: anything reading
-or stepping `SOFT_*`/`HARD_X` keys off `.soft_dir`, everything else off `.dir`. Getting that wrong swaps the copy
-trigger between the two horizontal directions and is invisible in a screenshot.
+(`.direction = -1`) increments both — the VSP delay in `raster.acme` is `39-HARD_X`, which is where the inversion comes
+from. The macro carries `.soft_direction` (`= .direction` vertically, `= -.direction` horizontally) for exactly this:
+anything reading or stepping `SOFT_*`/`HARD_X` keys off `.soft_direction`, everything else off `.direction`. Getting
+that wrong swaps the copy trigger between the two horizontal directions and is invisible in a screenshot.
 
-`SCROLL_SPRITES_UP/DOWN/LEFT/RIGHT` keep the sprites pinned to the map: `SPR_X`/`SPR_Y` are screen coordinates, so a
-camera step has to move every sprite the other way. Sprite ids `0..CRUNCH_SPRITES-1` are excluded — they are the ones
-`_spr_y` parks in the FLD/crunch area, and they must keep the smallest `SPR_Y` or `last_irq` hands the multiplexer a
-sprite starting before `SPRITES_TOP_Y` and the 44-cycle crunch path mistimes. That is what the `SPR_WRAP_TOP` bound
-enforces. `SPR_X` is half resolution (`last_irq` does an `asl`), so it only steps on every second pixel of camera
-travel.
+`SCROLL_SPRITES_U`/`_D`/`_L`/`_R` keep the sprites pinned to the map: `SPRITE_X`/`SPRITE_Y` are screen
+coordinates, so a camera step has to move every sprite the other way. Sprite ids `0..CRUNCH_SPRITES-1` are excluded —
+they are the ones `sprite_y_init` parks in the FLD/crunch area, and they must keep the smallest `SPRITE_Y` or
+`last_irq` hands the multiplexer a sprite starting before `SPRITES_TOP_Y` and the 44-cycle crunch path mistimes. That is
+what the `SPRITE_WRAP_TOP` bound enforces. `SPRITE_X` is half resolution (`last_irq` does an `asl`), so it only steps on
+every second pixel of camera travel.
 
-**Recycling a sprite must reposition it in `SPR_I` by hand.** Shifting every sprite by the same amount leaves the
+**Recycling a sprite must reposition it in `SPRITE_ORDER` by hand.** Shifting every sprite by the same amount leaves the
 sorted order intact, but a sprite that wraps travels from one end of the Y range to the other and has to travel the
-whole length of `SPR_I` with it. Left to the insertion sort in `last_irq` that is its O(n²) case, and it cost **~26 of
-the 47 raster lines** of off-screen budget for a single wrap — measured, not estimated. So the wrap moves the entry in
-`SPR_I` directly and the sort then finds nothing to do. `SPR_WRAP_MARGIN` exists because the order read there is the
-one sorted at the end of the _previous_ frame, so a wrap can be noticed a frame or two late.
+whole length of `SPRITE_ORDER` with it. Left to the insertion sort in `last_irq` that is its O(n²) case, and it cost
+**~26 of the 47 raster lines** of off-screen budget for a single wrap — measured, not estimated. So the wrap moves the
+entry in `SPRITE_ORDER` directly and the sort then finds nothing to do. `SPRITE_WRAP_MARGIN` exists because the order
+read there is the one sorted at the end of the _previous_ frame, so a wrap can be noticed a frame or two late.
 
-`SPR_WRAP_MARGIN` is what sets the top edge: a sprite is recycled at `SPR_MUX_START + SPR_WRAP_MARGIN`, so the margin
-is exactly the band below the panel row where a sprite is gone instead of sliding out of view.
-It was 4 on the theory that the four slots fill in sequence and the last one needs room;
-that turns out not to be the binding constraint (see the sprite-placement measurement under _Testing_), and it is now
-`3 * SCROLL_SPEED`.
-What stops it going lower is the off-screen budget, not placement:
-at 2 the frozen autopilot frames at stops 60 and 90 sit right on the limit — they jam with the `SPR_DROPPED` tracking
-compiled in and pass without it.
-One raster line is not worth being unable to instrument the frame, so 3 it is.
-So `SPR_WRAP_TOP` is 85, one line better than the 86 it was. It is a pop, not a slide, and it stays one: the sprite
-is 21 rows tall, so its body covers the top of the map whatever its top row is doing. Hiding it needs the mask
-below, and lowering it further needs `SPR_MUX_START` to move, which it cannot — see stage 5 of the IRQ chain.
+`SPRITE_WRAP_MARGIN` is what sets the top edge: a sprite is recycled at `SPRITE_MULTIPLEX_START + SPRITE_WRAP_MARGIN`,
+so the margin is exactly the band below the panel row where a sprite is gone instead of sliding out of view. It was 4 on
+the theory that the four slots fill in sequence and the last one needs room; that turns out not to be the binding
+constraint (see the sprite-placement measurement under _Testing_), and it is now `3 * SCROLL_SPEED`. What stops it going
+lower is the off-screen budget, not placement: at 2 the frozen autopilot frames at stops 60 and 90 sit right on the
+limit — they jam with the `SPRITE_DROPPED` tracking compiled in and pass without it. One raster line is not worth being
+unable to instrument the frame, so 3 it is. So `SPRITE_WRAP_TOP` is 85, one line better than the 86 it was. It is a pop,
+not a slide, and it stays one: the sprite is 21 rows tall, so its body covers the top of the map whatever its top row is
+doing. Hiding it needs the mask below, and lowering it further needs `SPRITE_MULTIPLEX_START` to move, which it cannot —
+see stage 5 of the IRQ chain.
 
 The tunable constraints that used to be comments are now `!error` assertions at the top of the file:
 `(SCROLL_ROWS-1) % TILE_ROWS` and `(SCROLL_COLS-1) % TILE_COLS` must be zero, because the direction-reversal cursor
@@ -170,10 +168,11 @@ The world is built from **areas of `AREA_COLS`×`AREA_ROWS` = 32×32 tiles**, wh
 
 The map cursor packs the map **row in its high byte and the column in its low byte**, and the address is
 `TILE_MAP + row*256 + col` — so **the row stride is 256 whatever the area size is**, and that is what
-`MAP_WIDTH = 256 ; assumed by the code` means. Do not try to make the map 32 bytes wide; an area is a 32×32 _window_
-into that address space instead. The upside is that the same 24k holds an **8×3 grid of areas** for free, with
-`AREA_ORG_C`/`AREA_ORG_R` selecting which one the demo uses; adding neighbours later is a matter of filling more of
-the grid and moving the origin.
+`MAP_WIDTH = 256 ; assumed by the code` means.
+Do not try to make the map 32 bytes wide; an area is a 32×32 _window_ into that address space instead.
+The upside is that the same 24k holds an **8×3 grid of areas** for free, with `AREA_ORIGIN_COL`/`AREA_ORIGIN_ROW`
+selecting which one the demo uses; adding neighbours later is a matter of filling more of the grid and moving the
+origin.
 
 `map.bin` is generated, not authored: `map-world.bin` is the original 256×96 world and `tools/mkarea.py` cuts an area
 out of it, places it at the origin, and fills everything else with tile 0 (dense undergrowth), so the camera running
@@ -183,17 +182,18 @@ past its bounds would show impassable growth rather than stray tiles.
 tools/mkarea.py --src map-world.bin -o map.bin --cut 40,2 --at 96,32   # the village
 ```
 
-**The camera is real state now**: `CAM_X`/`CAM_Y` in `lib/mem.acme`, 16-bit, in pixels into the area. It only exists
-to clamp the scroll — `JOYSTICK` guards each of its four `SCROLL_*` calls with `+scroll_towards_max` /
-`+scroll_towards_zero`, which skip the scroll at the bound and otherwise step the camera by `SCROLL_SPEED`. Three
-things about it that are not obvious:
+**The camera is real state now**: `CAMERA_X_*`/`CAMERA_Y_*` in `lib/mem.acme`, 16-bit, in pixels into the area. It only
+exists to clamp the scroll — `JOYSTICK` guards each of its four `SCROLL_*` calls with `+scroll_towards_max` /
+`+scroll_towards_zero`, which skip the scroll at the bound and otherwise step the camera by `SCROLL_SPEED`. Three things
+about it that are not obvious:
 
-- **`init_screen` deliberately bypasses it**, calling `SCROLL_L` directly. The startup fill scrolls a whole screen
-  width and must not be clamped; `CAM_*_INIT` is then written after the fill to match where it left the camera.
+- **`init_screen` deliberately bypasses it**, calling `SCROLL_L` directly. The startup fill scrolls a whole
+  screen width and must not be clamped; `CAMERA_*_INIT` is then written after the fill to match where it left the
+  camera.
 - **The bounds deduct a whole tile** beyond the screen size, because `COPY_TILES` works one tile ahead of the window.
   Without that the trailing edge shows the first tile outside the area — a sliver a few pixels wide at the very edge
   of the screen, easy to miss.
-- **`CAM_*_INIT` is measured, not derived.** Rebuild with `tools/mkarea.py --pad 136` (solid blue instead of
+- **`CAMERA_*_INIT` is measured, not derived.** Rebuild with `tools/mkarea.py --pad 136` (solid blue instead of
   undergrowth), force one stick direction the way _Measuring the off-screen budget_ describes, run to the bound and
   screenshot: blue anywhere means the bound is too generous, an early stop means it is too tight. All four
   directions, since the horizontal and vertical read-ahead differ.
@@ -203,24 +203,24 @@ things about it that are not obvious:
 Two disjoint sets share the eight hardware sprites, and the split is what keeps the crunch band's timing honest.
 
 `PANEL_SPRITES` (8) sit on one raster row inside the black FLD/crunch band, one hardware sprite each, single colour —
-meant for hitpoints, weapons, text. `last_irq` writes them straight out from `PANEL_X`/`PANEL_C`/`PANEL_F` (X is full
-9-bit, with `PANEL_X_MSB`); they take no part in the sort or the multiplexer.
-**They must share one Y**: the 44-cycle crunch path is `63-19`, i.e. all eight sprites DMA-active across the whole
-band, so staggering them would need the FLD/crunch loop to carry a per-line cycle count.
+meant for hitpoints, weapons, text. `last_irq` writes them straight out from `PANEL_X`/`PANEL_COLOR`/`PANEL_FRAME` (X is
+full 9-bit, with `PANEL_X_MSB`); they take no part in the sort or the multiplexer. **They must share one Y**: the
+44-cycle crunch path is `63-19`, i.e. all eight sprites DMA-active across the whole band, so staggering them would need
+the FLD/crunch loop to carry a per-line cycle count.
 
-**`SPRITES_TOP_Y` cannot go below 54, and there is no point going below 60.** A sprite at `y` displays `y+1 .. y+21`,
-so below 54 the panel's first row falls inside the top border (`V_BORDER_TOP` = 55) while its last row stops short of
-`AGSP_END` = 75 — leaving band lines that the 44-cycle path believes have eight sprites on them. Both bounds are
-`!error` assertions now. But lowering it frees the sprite hardware earlier only in theory: what actually gates the
-world sprites is the soft-scroll release at 82, which cannot move, so 54 buys nothing and 60 is where it stays.
+**`SPRITES_TOP_Y` cannot go below 54, and there is no point going below 60.** A sprite at `y` displays `y+1 .. y+21`, so
+below 54 the panel's first row falls inside the top border (`VERTICAL_BORDER_TOP` = 55) while its last row stops short
+of `AGSP_END` = 75 — leaving band lines that the 44-cycle path believes have eight sprites on them. Both bounds are
+`!error` assertions now. But lowering it frees the sprite hardware earlier only in theory: what actually gates the world
+sprites is the soft-scroll release at 82, which cannot move, so 54 buys nothing and 60 is where it stays.
 
-`SPR_FLOOR` = `SPRITES_TOP_Y + SPRITE_HEIGHT + 1` = 76 is the first line a world sprite can use, and the assertion
-that matters is `SPR_FLOOR > AGSP_END`: a world sprite going DMA-active _inside_ the band would make the per-line
+`SPRITE_FLOOR` = `SPRITES_TOP_Y + SPRITE_HEIGHT + 1` = 76 is the first line a world sprite can use, and the assertion
+that matters is `SPRITE_FLOOR > AGSP_END`: a world sprite going DMA-active _inside_ the band would make the per-line
 steal vary and mistime the whole AGSP. That, not the panel's hardware claim, is what caps how high sprites may go.
 
 `SPRITES` (16) are the world sprites below that, two hardware sprites each — a hires overlay over a multicolour one —
-multiplexed over `SPRITE_SLOTS` (4) pairs. `VIC_SPR_MULTI` is flipped between the two: `last_irq` clears it for the
-panel row, the multiplexer sets `%10101010` when it takes over (safe, because the panel row ends at
+multiplexed over `SPRITE_SLOTS` (4) pairs. `VIC_SPRITE_MULTICOLOR` is flipped between the two: `last_irq` clears it for
+the panel row, the multiplexer sets `%10101010` when it takes over (safe, because the panel row ends at
 `SPRITES_TOP_Y + SPRITE_HEIGHT`, just above the soft-scroll release line).
 
 **Scheduling is decided in `last_irq`, before the frame is drawn.** A slot is busy for `SPRITE_HEIGHT` lines, so
@@ -236,12 +236,12 @@ whenever they clustered in Y. Now the list is thinned until it fits:
 
 Thinning **in Y order, not by sprite id**, is the point: it halves the density of a cluster instead of leaving its
 members to collide. One zone is always feasible — `SPRITE_SLOTS` sprites over `SPRITE_SLOTS` slots — so the chain
-terminates and nothing ever vanishes; it just degrades to a steady, controlled flicker. `SPR_SHOWN` is how many
-entries of `SPR_Q` the multiplexer walks, `SPR_FRAME` picks the phase.
+terminates and nothing ever vanishes; it just degrades to a steady, controlled flicker. `SPRITES_SHOWN` is how many
+entries of `SPRITE_QUEUE` the multiplexer walks, `SPRITE_PHASE` picks the phase.
 
 The invariant worth re-checking after any change here is that the multiplexer places _every_ scheduled sprite, i.e.
 the `.last_irq` "too late" path is now unreachable. Verified by stashing X at that exit and comparing it against
-`SPR_SHOWN` in `last_irq`, over Y spacings from 8 down to 0.
+`SPRITES_SHOWN` in `last_irq`, over Y spacings from 8 down to 0.
 
 The _other_ "too late" exit — the one in `.display_sprite`, which skips a single sprite and carries on — is reachable
 by design, and how far down the screen it reaches is what decides the top edge. Measured: nowhere that shows.
@@ -255,8 +255,8 @@ A sprite cannot be started mid-image (`Cr(MCBASE)` reaches only non-row-multiple
 line), so partial visibility needs either pre-shifted frame data or a mask. **The band is already a usable mask.**
 
 - `vic-ii.txt` §3.7.3.9: in **idle state** the g-access reads `$3fff`, or **`$39ff` when ECM is set**, and repeats
-  that byte across the line. Bank 3 → **`$f9ff`**, currently the unused 64th byte of `SPR_FR` block 87.
-- §3.7.3.8: in **invalid bitmap mode 2** (`ECM/BMM/MCM = 1/1/1`, which `CONTROL_Y_INVALID` + `CONTROL_X` already
+  that byte across the line. Bank 3 → **`$f9ff`**, currently the unused 64th byte of `SPRITE_FRAMES` block 87.
+- §3.7.3.8: in **invalid bitmap mode 2** (`ECM/BMM/MCM = 1/1/1`, which `CTRL_Y_INVALID` + `CTRL_X` already
   select for the band) every bit pair renders black, but `10` and `11` count as **foreground**.
 - §3.8.2 spells the trick out: "by setting the sprites to appear behind the foreground graphics, the foreground
   graphics will actually become visible as black pixels overlaying the sprite pixels." Foreground/background is
@@ -277,26 +277,25 @@ Two caveats before building on it:
 - **Crunch lines are not idle.** §3.14.4: a crunched line stays in display state, so there the mask comes from real
   bitmap data and leaks wherever the art has `00`/`01` pairs. The band's bottom `HARD_Y` lines are the crunch ones.
 - **Inside a closed border there is no mask at all** — §3.8.2, last paragraph: when the vertical border flag is set
-  the graphics sequencer output is turned off entirely. So the mask spans `V_BORDER_TOP` down, and opening the border
-  _extends_ it upward rather than destroying it.
+  the graphics sequencer output is turned off entirely. So the mask spans `VERTICAL_BORDER_TOP` down, and opening the
+  border _extends_ it upward rather than destroying it.
 
 The remaining blocker for using it is not the mask but the hardware: sprites still cannot be displayed above
-`SPR_FLOOR`, so the panel would have to move up into the border region, which means opening the vertical border and
+`SPRITE_FLOOR`, so the panel would have to move up into the border region, which means opening the vertical border and
 teaching the band loop to tolerate a varying number of active sprites.
 
 Because the phase advances in `last_irq`, a clustered layout would keep the screen changing after the autopilot has
-frozen `JOYSTICK`, which would break the reproducibility `make regress` depends on — hence `AP_FROZEN`, which stops
-the phase too.
+frozen `JOYSTICK`, which would break the reproducibility `make regress` depends on — hence `AUTOPILOT_FROZEN`, which
+stops the phase too.
 
 ### Tile copying — `tiles.acme`
 
 Copying a whole column or row of tiles doesn't fit in one frame's raster budget, so it's split across
-`COPY_COL_FRAMES`/`COPY_ROW_FRAMES` frames.
-`COPY_TILES` (called once per frame from `last_irq`) dispatches on the `C_COPY`/`R_COPY` counters into
-`copy_col_tiles1/2` and `copy_row_tiles1/2`, which set `ITERATIONS` and fall into one shared `copy_*_tiles` body.
-The `copy_tile_charN` routines are macro-generated, one per position within a tile (`TILE_COLS`×`TILE_ROWS` = 3×2);
-because they all come from the same macro they are equal-sized, and `+jsr_copy_tile_char` addresses one arithmetically
-instead of running a char index down a `cmp`/`bne` chain.
+`COPY_COL_FRAMES`/`COPY_ROW_FRAMES` frames. `COPY_TILES` (called once per frame from `last_irq`) dispatches on the
+`COL_COPY`/`ROW_COPY` counters into `copy_col_tiles1/2` and `copy_row_tiles1/2`, which set `ITERATIONS` and fall into
+one shared `copy_*_tiles` body. The `copy_tile_charN` routines are macro-generated, one per position within a tile
+(`TILE_COLS`×`TILE_ROWS` = 3×2); because they all come from the same macro they are equal-sized, and
+`+jsr_copy_tile_char` addresses one arithmetically instead of running a char index down a `cmp`/`bne` chain.
 
 The per-frame loop is **unrolled by the tile cycle and specialised on the fixed coordinate**: along a column copy the
 tile row is fixed and the sub-column cycles, along a row copy the reverse. That makes the sub-char a compile-time
@@ -311,8 +310,8 @@ margin fast: expanding the loop per entry point instead of sharing it cost ~900 
 next segment starts inside this one, so an overflow silently gets the tail of the code overwritten by the song binary
 and shows up as a dead engine, not a build failure — `engine.acme` now turns that into an `!error`.
 
-`init_screen` in `engine.acme` fills the initial screen by calling `SCROLL_L` + `COPY_TILES` in a loop rather than
-duplicating the copy logic. It only exercises the _row_ path, which makes it a good first check after touching
+`init_screen` in `engine.acme` fills the initial screen by calling `SCROLL_L` + `COPY_TILES` in a loop rather
+than duplicating the copy logic. It only exercises the _row_ path, which makes it a good first check after touching
 `tiles.acme`: if the row copy is broken the screen comes up empty.
 
 ### Cartridge boot — `easyflash.acme` + `tools/mkcart.py`
@@ -344,7 +343,7 @@ Two that already bit:
 - **CIA2 `DDRA` must be `$3f`.**
   Otherwise the engine's `sta CIA2_DATA_PORT_A` hits an all-inputs port, the VIC keeps
   reading bank 0, and you get a screen of structured garbage that looks like a corrupt copy but isn't.
-- **`VIC_CONTROL_Y` must be left with RSEL set**, the way the KERNAL leaves `$1b`.
+- **`VIC_CTRL_Y` must be left with RSEL set**, the way the KERNAL leaves `$1b`.
   The engine rewrites `$d011` several times per frame and always with RSEL clear, so this looks like it cannot
   matter — and under `x64sc` it does not. Under `x64` booting with RSEL clear produces a **25-row display window**:
   four extra raster lines top and bottom, showing the FLD band above and one row too much map below, which reads as
@@ -354,7 +353,7 @@ Two that already bit:
   DEN is sampled **only in cycle 1 of raster line `$30`**, and what it sets there — the D-flag — is the condition on
   clearing the vertical border flag at the top of the window.
   Boot with DEN clear and the border never opens for that whole frame, whatever else touches `$d011` later.
-- **The whole VIC register file must be initialised, `VIC_CONTROL_X` above all.**
+- **The whole VIC register file must be initialised, `VIC_CTRL_X` above all.**
   The engine writes `$d016` exactly once
   per frame from the raster IRQ (`raster.acme:96` is the only write in the tree) and never touches the registers it does
   not use.
@@ -373,10 +372,9 @@ Its `petscii()` reproduces the `EF-Name:` magic from section 6 as a plain case s
 ### Tunables — top of `engine.acme`
 
 `SCROLL_SPEED` (1 or 2), `SPRITES` (0, or ≥4), `TILE_COLS`/`TILE_ROWS`, `SPRITES_TOP_Y`/`SPRITES_MAX_Y`, `TILES`,
-`COPY_*_FRAMES`.
-These feed `!if`/`!for` conditionals throughout `raster.acme` and `tiles.acme` that generate structurally different code
-— e.g. `SPRITES = 0` inlines `inc_vic_control_y` as a macro, otherwise it becomes a `jsr`-able routine with different
-cycle budgets.
+`COPY_*_FRAMES`. These feed `!if`/`!for` conditionals throughout `raster.acme` and `tiles.acme` that generate
+structurally different code — e.g. `SPRITES = 0` inlines `increment_vic_ctrl_y` as a macro, otherwise it becomes a
+`jsr`-able routine with different cycle budgets.
 
 ## Conventions
 
@@ -397,37 +395,36 @@ cp -r regress regress-before              # capture a baseline before a refactor
 make regress REGRESS_REF=regress-before   # ... and diff rendering against it
 ```
 
-`tools/regress.sh` builds `engine.acme` with `-DAUTOPILOT=1 -DAP_FRAMES=n` at eight stop frames, runs each headless
-with `-jamaction 5` so a `jam` quits the emulator, and reports failures.
-`AP_TABLE` in `joystick.acme` is the scripted stick: each direction alone, both diagonals, and three direction-reversal
-patterns — reversals matter because they re-seed the copy counter and jump the cursor to the opposite edge while a copy
-is still in flight.
+`tools/regress.sh` builds `engine.acme` with `-DAUTOPILOT=1 -DAUTOPILOT_FRAMES=n` at eight stop frames, runs each
+headless with `-jamaction 5` so a `jam` quits the emulator, and reports failures. `AUTOPILOT_TBL` in `joystick.acme`
+is the scripted stick: each direction alone, both diagonals, and three direction-reversal patterns — reversals matter
+because they re-seed the copy counter and jump the cursor to the opposite edge while a copy is still in flight.
 
-**The autopilot freezes `JOYSTICK` completely once it has replayed `AP_FRAMES` frames** — no scroll, no colour cycling.
-That is not cosmetic: with the engine still animating, the exit screenshot depends on which cycle the emulator happens
-to be stopped on and the same binary produces different images run to run. Don't remove the freeze.
+**The autopilot freezes `JOYSTICK` completely once it has replayed `AUTOPILOT_FRAMES` frames** — no scroll, no colour
+cycling. That is not cosmetic: with the engine still animating, the exit screenshot depends on which cycle the emulator
+happens to be stopped on and the same binary produces different images run to run. Don't remove the freeze.
 
 Two things this has already established, so don't re-derive them: rapid direction reversal and diagonal scrolling are
 clean at both `SCROLL_SPEED` values, and the copies overrunning their nominal frame budget on a diagonal (they
-serialise — `COPY_TILES` finishes `C_COPY` before touching `R_COPY`) is absorbed by the spare rows/columns
-`SCROLL_ROWS = SCR_ROWS-2` leaves.
+serialise — `COPY_TILES` finishes `COL_COPY` before touching `ROW_COPY`) is absorbed by the spare rows/columns
+`SCROLL_ROWS = SCREEN_ROWS-2` leaves.
 
 ### Measuring the off-screen budget
 
 `make regress` only tells you whether the budget was blown. To measure how much is left, temporarily parameterise the
-`-DDEVELOP` overrun check's `cmp #LINE_0-1`, force a constant stick direction (`sed` the `lda CIA1_PORT_2` in
+`-DDEVELOP` overrun check's `cmp #LINE_0-1`, force a constant stick direction (`sed` the `lda CIA1_DATA_PORT_A` in
 `joystick.acme` to `lda #$f5` for down+right), and bisect the threshold over a long run: the lowest value that does
 _not_ jam is the raster line `last_irq` finishes on. `LINE_0-1 = 47` is the limit.
 
 Do this over **thousands** of frames with a constant direction, not over the autopilot — the worst case is rare.
-Measuring the diagonal phase of one `AP_TABLE` pass reported line 18 for a build whose true worst case was 36.
+Measuring the diagonal phase of one `AUTOPILOT_TBL` pass reported line 18 for a build whose true worst case was 36.
 Reference points, all diagonal:
 
 | build                               | frame ends on |
 | ----------------------------------- | ------------- |
 | before world-fixed sprites          | < line 6      |
 | sprites, wrap left to the sort      | line 36       |
-| sprites, wrap fixing `SPR_I` itself | line 20       |
+| sprites, wrap fixing `SPRITE_ORDER` itself | line 20       |
 | 16 world + 8 panel, scheduled       | line 12       |
 
 Beware a **spurious jam**: one sweep of this reported line 40 for a build whose real worst case is 12, and a rerun of
@@ -435,7 +432,7 @@ the identical tree gave 10. Confirm any surprising reading with a repeat before 
 
 The same technique works for any other invariant that should hold every frame — stash the value in a spare zero-page
 byte inside the cycle-exact code (there is documented slack before the soft-scroll wait), then compare and `jam` in
-`last_irq` where timing is free. That is how the AGSP end line, the soft-scroll wait target, RSEL and `SPR_I`'s
+`last_irq` where timing is free. That is how the AGSP end line, the soft-scroll wait target, RSEL and `SPRITE_ORDER`'s
 permutation invariant were all checked.
 
 ### Measuring the AGSP band
@@ -449,30 +446,30 @@ acme -DSYSTEM=64 -DDEVELOP=1 -DAGSP_LIMIT=76 -f cbm -o ap.prg engine.acme
 ```
 
 The answer is **75**, constant over a long vertical-scrolling run, as "always 25 raster lines" requires. Everything
-about the panel row's position, `SPR_FLOOR` and the soft-scroll release derives from it, so it should not need
+about the panel row's position, `SPRITE_FLOOR` and the soft-scroll release derives from it, so it should not need
 measuring again — but the recipe is here if the band's line count ever changes.
 
 ### Measuring sprite placement
 
-`SPR_DROPPED` (`lib/mem.acme`) plus `-DSPR_DROP_LIMIT=n` is the same bisect applied to the multiplexer's
+`SPRITE_DROPPED` (`lib/mem.acme`) plus `-DSPRITE_DROP_LIMIT=n` is the same bisect applied to the multiplexer's
 `.display_sprite` "too late" exit, which skips one sprite and continues.
 The skip path keeps the largest Y it ever skipped;
-`last_irq` jams once that reaches `SPR_DROP_LIMIT`, so the lowest limit that does _not_ jam is the largest Y ever
+`last_irq` jams once that reaches `SPRITE_DROP_LIMIT`, so the lowest limit that does _not_ jam is the largest Y ever
 skipped, plus one.
 
 ```bash
-acme -DSYSTEM=64 -DDEVELOP=1 -DAUTOPILOT=1 -DAP_FRAMES=240 -DSPR_DROP_LIMIT=43 -f cbm -o ap.prg engine.acme
+acme -DSYSTEM=64 -DDEVELOP=1 -DAUTOPILOT=1 -DAUTOPILOT_FRAMES=240 -DSPRITE_DROP_LIMIT=43 -f cbm -o ap.prg engine.acme
 ```
 
 The answer, over the whole autopilot and over 5000 frames of constant down+right, is **42** — thirteen lines above
 the first visible line, and forty above the top of the map.
-Unchanged from `SPR_WRAP_MARGIN` 4 down to 2.
+Unchanged from `SPRITE_WRAP_MARGIN` 4 down to 2.
 So the multiplexer places every sprite that could be seen, and the top edge is set by the wrap threshold alone;
-`SPR_WRAP_MARGIN` is the knob, not the placement code.
+`SPRITE_WRAP_MARGIN` is the knob, not the placement code.
 
 It is opt-in rather than part of `-DDEVELOP` for a reason worth remembering:
 the tracking costs a handful of cycles on a path the budget has no room for, and compiling it in is by itself enough
-to push `SPR_WRAP_MARGIN = 2` from passing to jamming.
+to push `SPRITE_WRAP_MARGIN = 2` from passing to jamming.
 Which is also the warning — **this harness perturbs what it measures.**
 Confirm any budget-adjacent result with the tracking compiled out.
 
@@ -488,11 +485,11 @@ measured from inside the program with a `jam`, not from images.
 
 **Test the cartridge under `x64`, not just the `.prg` under `x64sc`.** The cartridge payload is byte-identical to the
 `.prg`, so anything that reproduces on one and not the other is boot state, not engine code — that is exactly how the
-`VIC_CONTROL_Y` RSEL bug above was found, after a long detour chasing it in the scroll code. The four combinations
+`VIC_CTRL_Y` RSEL bug above was found, after a long detour chasing it in the scroll code. The four combinations
 are cheap to run and disagreeing pairs localise the fault immediately:
 
 ```bash
-acme -DSYSTEM=64 -DAUTOPILOT=1 -DAP_FRAMES=n -f cbm -o ap.obj engine.acme   # same payload both ways
+acme -DSYSTEM=64 -DAUTOPILOT=1 -DAUTOPILOT_FRAMES=n -f cbm -o ap.obj engine.acme   # same payload both ways
 x64   -warp -sounddev dummy +easyflashcrtwrite -limitcycles 22000000 -exitscreenshot a.png -cartcrt ap.crt
 x64sc -warp -sounddev dummy -autostartprgmode 1 -limitcycles 22000000 -exitscreenshot b.png -autostart ap.prg
 ```
