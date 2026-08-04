@@ -12,7 +12,10 @@ running past the bounds shows impassable undergrowth rather than stray tiles.
 """
 import argparse
 
-MAP_W, MAP_H = 256, 96          # the address space, not the area
+# Shape of map-world.bin, and of the map.bin written out: one page per row, filling
+# the 24k the engine reserves for TILE_MAP.  The engine itself has no such constant
+# -- the area is the only world dimension it knows about -- so this pair lives here.
+MAP_W, MAP_H = 256, 96
 AREA = 32                       # area edge, in tiles
 PAD = 0                         # tile 0: dense undergrowth, see the atlas
 

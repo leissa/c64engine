@@ -167,12 +167,14 @@ The world is built from **areas of `AREA_COLS`×`AREA_ROWS` = 32×32 tiles**, wh
 2.4 by 2.6 screens.
 
 The map cursor packs the map **row in its high byte and the column in its low byte**, and the address is
-`TILE_MAP + row*256 + col` — so **the row stride is 256 whatever the area size is**, and that is what
-`MAP_WIDTH = 256 ; assumed by the code` means.
+`TILE_MAP + row*256 + col` — so **a map row is exactly one page, whatever the area size is**.
 Do not try to make the map 32 bytes wide; an area is a 32×32 _window_ into that address space instead.
 The upside is that the same 24k holds an **8×3 grid of areas** for free, with `AREA_ORIGIN_COL`/`AREA_ORIGIN_ROW`
 selecting which one the demo uses; adding neighbours later is a matter of filling more of the grid and moving the
 origin.
+There is deliberately **no `MAP_WIDTH`/`MAP_HEIGHT`** — the area is the only world dimension the engine has.
+The two `!error` bounds in `engine.acme` derive the map's extent from `TILE_MAP`/`TILE_COLOR` in `lib/mem.acme`, so a
+segment move cannot leave a stale copy of it behind.
 
 `map.bin` is generated, not authored: `map-world.bin` is the original 256×96 world and `tools/mkarea.py` cuts an area
 out of it, places it at the origin, and fills everything else with tile 0 (dense undergrowth), so the camera running

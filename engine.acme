@@ -36,20 +36,20 @@ TILE_COLS    = 3 ; must divide SCROLL_COLS-1 = 39 exactly (-> 13); asserted in s
 TILE_ROWS    = 2 ; must divide SCROLL_ROWS-1 = 22 exactly (-> 11); asserted in scroll.acme
 SCREEN_COLS  = 40 ; horizontal screen chars in memory. the screen is in 38x24 mode
 SCREEN_ROWS  = 25 ; vertical screen chars in memory. the screen is in 38x24 mode
-; The map cursor packs the map row in its high byte and the map column in its low
-; byte, and the address is TILE_MAP + row*256 + col -- so the row stride is 256
-; whatever else changes.  These are the dimensions of that address space, not of
-; the playable world.
-MAP_WIDTH    = 256 ; the row stride; assumed by the code, no other widths supported
-MAP_HEIGHT   = 96 ; rows of address space available for areas
 
 ; The world is built from Zelda-style areas of AREA_COLS x AREA_ROWS tiles, and a
-; 32x32 area is about 2.4 by 2.6 screens.  An area is a window into the map's
-; address space, so the 24k holds an 8x3 grid of them; only one is filled today.
-; tools/mkarea.py cuts an area out of map-world.bin and places it at AREA_ORIGIN_*.
+; 32x32 area is about 2.4 by 2.6 screens.
+;
+; An area is a *window* into TILE_MAP, not a map of its own.  The map cursor packs
+; the tile row in its high byte and the tile column in its low byte, so the address
+; is TILE_MAP + row*256 + col: a map row is exactly one page, whatever the area
+; size, and TILE_MAP's 24k therefore holds an 8x3 grid of areas for free.
+; AREA_ORIGIN_* picks the one the demo uses; tools/mkarea.py cuts it out of
+; map-world.bin and places it there.  Adding neighbours later means filling more of
+; the grid and moving the origin, not resizing anything.
 AREA_COLS       = 32
 AREA_ROWS       = 32
-AREA_ORIGIN_COL = 96 ; where the demo area sits in the map, in tiles
+AREA_ORIGIN_COL = 96 ; where the demo area sits in TILE_MAP, in tiles
 AREA_ORIGIN_ROW = 32
 
 ; How far the camera may travel before the window would show what is outside the
@@ -72,11 +72,15 @@ CAMERA_Y_INIT = 32
 !if CAMERA_Y_INIT > CAMERA_Y_MAX {
     !error "CAMERA_Y_INIT (", CAMERA_Y_INIT, ") starts outside CAMERA_Y_MAX (", CAMERA_Y_MAX, ")"
 }
-!if AREA_ORIGIN_COL + AREA_COLS > MAP_WIDTH {
-    !error "area at column ", AREA_ORIGIN_COL, " does not fit in ", MAP_WIDTH, " columns"
+; The area has to stay inside TILE_MAP: one page per map row across, and TILE_COLOR
+; is where the map stops.  Both bounds come from lib/mem.acme rather than from a
+; second, hand-kept copy of the map's dimensions, so moving a segment cannot leave
+; this check behind.
+!if AREA_ORIGIN_COL + AREA_COLS > 256 {
+    !error "the area at column ", AREA_ORIGIN_COL, " runs past the end of a map row"
 }
-!if AREA_ORIGIN_ROW + AREA_ROWS > MAP_HEIGHT {
-    !error "area at row ", AREA_ORIGIN_ROW, " does not fit in ", MAP_HEIGHT, " rows"
+!if (AREA_ORIGIN_ROW + AREA_ROWS) * 256 > TILE_COLOR - TILE_MAP {
+    !error "the area at row ", AREA_ORIGIN_ROW, " runs past TILE_MAP, which holds ", (TILE_COLOR-TILE_MAP)/256, " rows"
 }
 ; Two disjoint sets share the eight hardware sprites.
 ;
