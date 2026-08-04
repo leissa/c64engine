@@ -31,7 +31,7 @@ VERTICAL_BORDER_BOT = VIC_VERTICAL_BORDER_BOT_24
 }
 
 LINE_0       = FIRST_BADLINE-3
-SCROLL_SPEED = 1 ; supported are 1 or 2
+SCROLL_SPEED = 2 ; supported are 1 or 2
 TILE_COLS    = 3 ; must divide SCROLL_COLS-1 = 39 exactly (-> 13); asserted in scroll.acme
 TILE_ROWS    = 2 ; must divide SCROLL_ROWS-1 = 22 exactly (-> 11); asserted in scroll.acme
 SCREEN_COLS  = 40 ; horizontal screen chars in memory. the screen is in 38x24 mode
