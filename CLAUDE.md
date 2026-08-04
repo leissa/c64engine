@@ -5,9 +5,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## What this is
 
 A Commodore 64 game engine written entirely in 6510 assembly for the **ACME** cross-assembler.
-It scrolls a full multicolor bitmap in all 8 directions using AGSP (FLD + line crunch + VSP), multiplexes 24×2 sprites,
-streams tiles from a Zelda-style 32×32-tile area, and plays music — all inside one cycle-exact raster interrupt
-chain.
+It scrolls a full multicolor bitmap in all 8 directions using AGSP (FLD + line crunch + VSP), multiplexes 16 world
+sprites (two hardware sprites each, over 4 pairs) plus an 8-sprite panel row, streams tiles from a Zelda-style
+32×32-tile area, and plays music — all inside one cycle-exact raster interrupt chain.
 It ships as a 1 MiB EasyFlash cartridge.
 
 There is no linter and no unit-test framework.
@@ -133,11 +133,11 @@ anything reading or stepping `SOFT_*`/`HARD_X` keys off `.soft_direction`, every
 that wrong swaps the copy trigger between the two horizontal directions and is invisible in a screenshot.
 
 `SCROLL_SPRITES_U`/`_D`/`_L`/`_R` keep the sprites pinned to the map: `SPRITE_X`/`SPRITE_Y` are screen
-coordinates, so a camera step has to move every sprite the other way. Sprite ids `0..CRUNCH_SPRITES-1` are excluded —
-they are the ones `sprite_y_init` parks in the FLD/crunch area, and they must keep the smallest `SPRITE_Y` or
-`last_irq` hands the multiplexer a sprite starting before `SPRITES_TOP_Y` and the 44-cycle crunch path mistimes. That is
-what the `SPRITE_WRAP_TOP` bound enforces. `SPRITE_X` is half resolution (`last_irq` does an `asl`), so it only steps on
-every second pixel of camera travel.
+coordinates, so a camera step has to move every sprite the other way. **All `SPRITES` world sprites scroll, with no
+exclusions** — the panel row is a disjoint set that `last_irq` writes straight into the hardware, so nothing here has to
+keep clear of it. What the world sprites must not do is come up past the line the multiplexer can first reach, and that
+is what the `SPRITE_WRAP_TOP` bound enforces. `SPRITE_X` is half resolution (`last_irq` does an `asl`), so it only steps
+on every second pixel of camera travel.
 
 **Recycling a sprite must reposition it in `SPRITE_ORDER` by hand.** Shifting every sprite by the same amount leaves the
 sorted order intact, but a sprite that wraps travels from one end of the Y range to the other and has to travel the
@@ -204,26 +204,47 @@ about it that are not obvious:
 
 Two disjoint sets share the eight hardware sprites, and the split is what keeps the crunch band's timing honest.
 
-`PANEL_SPRITES` (8) sit on one raster row inside the black FLD/crunch band, one hardware sprite each, single colour —
-meant for hitpoints, weapons, text. `last_irq` writes them straight out from `PANEL_X`/`PANEL_COLOR`/`PANEL_FRAME` (X is
-full 9-bit, with `PANEL_X_MSB`); they take no part in the sort or the multiplexer. **They must share one Y**: the
+`PANEL_SPRITES` (8) all share one Y — `PANEL_Y` = `SPRITES_TOP_Y` = 60 — one hardware sprite each, single colour, meant
+for hitpoints, weapons, text. `last_irq` writes them straight out from `PANEL_X`/`PANEL_COLOR`/`PANEL_FRAME` (X is full
+9-bit, with `PANEL_X_MSB`); they take no part in the sort or the multiplexer. **Sharing one Y is mandatory**: the
 44-cycle crunch path is `63-19`, i.e. all eight sprites DMA-active across the whole band, so staggering them would need
 the FLD/crunch loop to carry a per-line cycle count.
 
-**`SPRITES_TOP_Y` cannot go below 54, and there is no point going below 60.** A sprite at `y` displays `y+1 .. y+21`, so
-below 54 the panel's first row falls inside the top border (`VERTICAL_BORDER_TOP` = 55) while its last row stops short
-of `AGSP_END` = 75 — leaving band lines that the 44-cycle path believes have eight sprites on them. Both bounds are
-`!error` assertions now. But lowering it frees the sprite hardware earlier only in theory: what actually gates the world
-sprites is the soft-scroll release at 82, which cannot move, so 54 buys nothing and 60 is where it stays.
+They are not confined to the band. A sprite at `y` displays `y+1 .. y+21`, so the panel row occupies raster lines
+**61-81**: it starts inside the band, and its bottom six rows overlap the first lines of the map. Ending at 81 is what
+matters — one line above the soft-scroll release at 82, so the hardware is free exactly when the multiplexer wants it.
 
-`SPRITE_FLOOR` = `SPRITES_TOP_Y + SPRITE_HEIGHT + 1` = 76 is the first line a world sprite can use, and the assertion
-that matters is `SPRITE_FLOOR > AGSP_END`: a world sprite going DMA-active _inside_ the band would make the per-line
-steal vary and mistime the whole AGSP. That, not the panel's hardware claim, is what caps how high sprites may go.
+**`SPRITES_TOP_Y` cannot go below 54, and 60 is the value that costs nothing.** Two `!error` assertions bracket it from
+below: at 53 the panel's first displayed line (54) falls inside the top border (`VERTICAL_BORDER_TOP` = 55), and its
+last (74) stops short of `AGSP_END` = 75, leaving band lines that the 44-cycle path believes have eight sprites on them.
+The bound from above is `SPRITE_FLOOR > AGSP_END` — but the _useful_ limit is tighter than that assertion, and it is
+where 60 comes from:
+
+`SPRITE_FLOOR` = `SPRITES_TOP_Y + SPRITE_HEIGHT + 1` = **82** is the first line a world sprite can use, because that is
+where the panel gives the hardware back. At `SPRITES_TOP_Y` = 60 it lands exactly on `SPRITE_MULTIPLEX_START` = 82, the
+soft-scroll release — which cannot move, see stage 5 of the IRQ chain. So the panel is free for nothing: any higher and
+`SPRITE_FLOOR` would push past the release and cost world-sprite travel; any lower and the release still gates at 82, so
+the freed lines are unusable. That is why 54 buys nothing even though it assembles.
+
+The assertion `SPRITE_FLOOR > AGSP_END` is still the one that guards correctness rather than screen area: a world sprite
+going DMA-active _inside_ the band would make the per-line steal vary and mistime the whole AGSP.
 
 `SPRITES` (16) are the world sprites below that, two hardware sprites each — a hires overlay over a multicolour one —
 multiplexed over `SPRITE_SLOTS` (4) pairs. `VIC_SPRITE_MULTICOLOR` is flipped between the two: `last_irq` clears it for
 the panel row, the multiplexer sets `%10101010` when it takes over (safe, because the panel row ends at
 `SPRITES_TOP_Y + SPRITE_HEIGHT`, just above the soft-scroll release line).
+
+Which half of a pair is which follows from that `%10101010` and from sprite priority, and it is what the otherwise
+opaque `SPRITE_COLOR_A`/`SPRITE_COLOR_B` naming rests on. Pair _r_ owns hardware sprites `2r` and `2r+1`:
+
+|       | hardware sprite | mode        | frame              | colour                       |
+| ----- | --------------- | ----------- | ------------------ | ---------------------------- |
+| back  | `2r+1` (odd)    | multicolour | `SPRITE_FRAME`     | `SPRITE_COLOR_A` → its `%10` |
+| front | `2r` (even)     | hires       | `SPRITE_FRAME + 1` | `SPRITE_COLOR_B`             |
+
+The even sprite is in front because lower sprite numbers win priority, so the hires half overlays the multicolour one.
+The multicolour `%01` and `%11` colours are not per sprite — they are `VIC_SPRITE_MULTICOLOR_01`/`_11`, written once at
+startup (brown and grey).
 
 **Scheduling is decided in `last_irq`, before the frame is drawn.** A slot is busy for `SPRITE_HEIGHT` lines, so
 sprite _n_ of the display list can only use slot `n % SPRITE_SLOTS` if it is that far below sprite `n-SPRITE_SLOTS`.
@@ -240,6 +261,10 @@ Thinning **in Y order, not by sprite id**, is the point: it halves the density o
 members to collide. One zone is always feasible — `SPRITE_SLOTS` sprites over `SPRITE_SLOTS` slots — so the chain
 terminates and nothing ever vanishes; it just degrades to a steady, controlled flicker. `SPRITES_SHOWN` is how many
 entries of `SPRITE_QUEUE` the multiplexer walks, `SPRITE_PHASE` picks the phase.
+
+Because the phase advances in `last_irq`, a clustered layout would keep the screen changing after the autopilot has
+frozen `JOYSTICK`, which would break the reproducibility `make regress` depends on — hence `AUTOPILOT_FROZEN`, which
+stops the phase too.
 
 The invariant worth re-checking after any change here is that the multiplexer places _every_ scheduled sprite, i.e.
 the `.last_irq` "too late" path is now unreachable. Verified by stashing X at that exit and comparing it against
@@ -286,10 +311,6 @@ The remaining blocker for using it is not the mask but the hardware: sprites sti
 `SPRITE_FLOOR`, so the panel would have to move up into the border region, which means opening the vertical border and
 teaching the band loop to tolerate a varying number of active sprites.
 
-Because the phase advances in `last_irq`, a clustered layout would keep the screen changing after the autopilot has
-frozen `JOYSTICK`, which would break the reproducibility `make regress` depends on — hence `AUTOPILOT_FROZEN`, which
-stops the phase too.
-
 ### Tile copying — `tiles.acme`
 
 Copying a whole column or row of tiles doesn't fit in one frame's raster budget, so it's split across
@@ -307,10 +328,11 @@ recording where to resume; the invariant is that the saved map pointer addresses
 which is why the slot-0 exit (meaning "tile finished") steps it on. Slot, exit and variant bodies must stay
 equal-sized so they can be reached by `base + n*SIZE` — all three are asserted.
 
-Keep an eye on the code segment. It ends around `$1ae0` against `SONG_DATA` at `$2000`, and unrolling here eats that
-margin fast: expanding the loop per entry point instead of sharing it cost ~900 bytes. ACME only _warns_ when the
-next segment starts inside this one, so an overflow silently gets the tail of the code overwritten by the song binary
-and shows up as a dead engine, not a build failure — `engine.acme` now turns that into an `!error`.
+Keep an eye on the code segment. It runs `$0885-$1bf5` against `SONG_DATA` at `$2000` — about 1k of headroom — and
+unrolling here eats that margin fast: expanding the loop per entry point instead of sharing it cost ~900 bytes. ACME
+only _warns_ when the next segment starts inside this one, so an overflow silently gets the tail of the code overwritten
+by the song binary and shows up as a dead engine, not a build failure — `engine.acme` now turns that into an `!error`.
+`acme -v2` prints every segment's extent, which is the quickest way to re-check the margin.
 
 `init_screen` in `engine.acme` fills the initial screen by calling `SCROLL_L` + `COPY_TILES` in a loop rather
 than duplicating the copy logic. It only exercises the _row_ path, which makes it a good first check after touching
@@ -373,10 +395,15 @@ Its `petscii()` reproduces the `EF-Name:` magic from section 6 as a plain case s
 
 ### Tunables — top of `engine.acme`
 
-`SCROLL_SPEED` (1 or 2), `SPRITES` (0, or ≥4), `TILE_COLS`/`TILE_ROWS`, `SPRITES_TOP_Y`/`SPRITES_MAX_Y`, `TILES`,
-`COPY_*_FRAMES`. These feed `!if`/`!for` conditionals throughout `raster.acme` and `tiles.acme` that generate
-structurally different code — e.g. `SPRITES = 0` inlines `increment_vic_ctrl_y` as a macro, otherwise it becomes a
-`jsr`-able routine with different cycle budgets.
+`SCROLL_SPEED` (1 or 2), `SPRITES`, `PANEL_SPRITES`, `SPRITE_SLOTS`, `TILE_COLS`/`TILE_ROWS`,
+`SPRITES_TOP_Y`/`SPRITES_MAX_Y`, `TILES`, `COPY_*_FRAMES`. These feed `!if`/`!for` conditionals throughout
+`raster.acme` and `tiles.acme` that generate structurally different code — e.g. `SPRITES = 0` inlines
+`increment_vic_ctrl_y` as a macro, otherwise it becomes a `jsr`-able routine with different cycle budgets.
+
+The sprite three are less free than they look, and the assertions in `engine.acme` say so: `SPRITES` must be **0 or
+exactly `4 * SPRITE_SLOTS`** (so 16 today) because the 4/2/1 thinning chain assumes `SPRITE_ZONES_MAX` is 4, and
+`PANEL_SPRITES` must be exactly `2 * SPRITE_SLOTS`, i.e. cover all eight hardware sprites. `SPRITES = 4` assembles as
+far as the `SPRITE_ZONES_MAX` check and then fails there — that is the assertion doing its job, not a bug.
 
 ## Conventions
 
@@ -422,12 +449,12 @@ Do this over **thousands** of frames with a constant direction, not over the aut
 Measuring the diagonal phase of one `AUTOPILOT_TBL` pass reported line 18 for a build whose true worst case was 36.
 Reference points, all diagonal:
 
-| build                               | frame ends on |
-| ----------------------------------- | ------------- |
-| before world-fixed sprites          | < line 6      |
-| sprites, wrap left to the sort      | line 36       |
+| build                                      | frame ends on |
+| ------------------------------------------ | ------------- |
+| before world-fixed sprites                 | < line 6      |
+| sprites, wrap left to the sort             | line 36       |
 | sprites, wrap fixing `SPRITE_ORDER` itself | line 20       |
-| 16 world + 8 panel, scheduled       | line 12       |
+| 16 world + 8 panel, scheduled              | line 12       |
 
 Beware a **spurious jam**: one sweep of this reported line 40 for a build whose real worst case is 12, and a rerun of
 the identical tree gave 10. Confirm any surprising reading with a repeat before acting on it.
@@ -532,17 +559,17 @@ installed binary, so it describes the assembler that actually builds this tree.
 `QuickRef.txt` is the entry point and `Help.txt` indexes the rest;
 `Help.txt` also advertises a `cputypes/` directory, which this package does not ship.
 
-| file                              | content                                                                                                     |
-| --------------------------------- | ------------------------------------------------------------------------------------------------------------- |
-| `QuickRef.txt`                    | syntax, the four kinds of symbol, the complete CLI switch list, and the operator/precedence table            |
-| `AllPOs.txt`                      | every pseudo opcode with call syntax, aliases and examples — grep this before writing any new `!` directive |
-| `AddrModes.txt`                   | how ACME picks zp vs absolute, and the two ways to override it                                               |
-| `Illegals.txt`                    | the illegal opcodes `!cpu 6510` unlocks, with opcode bytes, semantics and which ones are unstable            |
-| `Errors.txt`                      | every warning and error message spelled out — look the message up here instead of guessing                  |
-| `Floats.txt`                      | when arithmetic goes floating point and when it stays integer                                                |
-| `Upgrade.txt`, `Changes.txt`      | behaviour changes between releases and which `--dialect` restores the old one                                |
-| `Lib.txt`                         | the `<...>` include library and how its path is resolved                                                     |
-| `65816.txt`, `Example.txt`, `Source.txt`, `joe.txt` | irrelevant here: other CPU, shipped samples, building ACME, JOE syntax file                |
+| file                                                | content                                                                                                     |
+| --------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| `QuickRef.txt`                                      | syntax, the four kinds of symbol, the complete CLI switch list, and the operator/precedence table           |
+| `AllPOs.txt`                                        | every pseudo opcode with call syntax, aliases and examples — grep this before writing any new `!` directive |
+| `AddrModes.txt`                                     | how ACME picks zp vs absolute, and the two ways to override it                                              |
+| `Illegals.txt`                                      | the illegal opcodes `!cpu 6510` unlocks, with opcode bytes, semantics and which ones are unstable           |
+| `Errors.txt`                                        | every warning and error message spelled out — look the message up here instead of guessing                  |
+| `Floats.txt`                                        | when arithmetic goes floating point and when it stays integer                                               |
+| `Upgrade.txt`, `Changes.txt`                        | behaviour changes between releases and which `--dialect` restores the old one                               |
+| `Lib.txt`                                           | the `<...>` include library and how its path is resolved                                                    |
+| `65816.txt`, `Example.txt`, `Source.txt`, `joe.txt` | irrelevant here: other CPU, shipped samples, building ACME, JOE syntax file                                 |
 
 What in there actually bears on this engine:
 
@@ -618,15 +645,15 @@ section 3.14 describes every technique the engine is built on, by name and in te
 It is UTF-8 with Unix line endings, so it reads and greps directly.
 (It was converted from the shipped Latin-1/CRLF original, which `grep` classified as binary and returned no hits for.)
 
-| section              | content                                                                                                                                                                        |
-| -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| 3.5                  | the Bad Line Condition, stated literally — the rule every stage of the IRQ chain plays against                                                                                 |
+| section              | content                                                                                                                                                                          |
+| -------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 3.5                  | the Bad Line Condition, stated literally — the rule every stage of the IRQ chain plays against                                                                                   |
 | 3.6.3                | cycle-by-cycle timing of a raster line: `BA`/`AEC`, VIC vs 6510 access per clock phase, X coordinate per cycle. The 6569 diagrams are the sprite-less ones; sprites are in 3.8.1 |
-| 3.7.2                | `VC`/`RC` — the counters that make linecrunch and DMA delay shift the display at all                                                                                           |
-| 3.8.1                | sprite DMA: p-/s-accesses in statically assigned cycles, `BA` low three cycles ahead, the Y-expansion flip flop. The cycle numbers here _are_ 6569                              |
-| 3.9                  | the border unit's comparators, i.e. how the borders are opened                                                                                                                 |
-| 3.14.2/3.14.4/3.14.6 | FLD, Linecrunch, and DMA delay — the last is what this repo calls VSP                                                                                                          |
-| 3.14.1/3/5/7         | Hyperscreen, FLI, doubled text lines, sprite stretching — the neighbouring tricks                                                                                              |
+| 3.7.2                | `VC`/`RC` — the counters that make linecrunch and DMA delay shift the display at all                                                                                             |
+| 3.8.1                | sprite DMA: p-/s-accesses in statically assigned cycles, `BA` low three cycles ahead, the Y-expansion flip flop. The cycle numbers here _are_ 6569                               |
+| 3.9                  | the border unit's comparators, i.e. how the borders are opened                                                                                                                   |
+| 3.14.2/3.14.4/3.14.6 | FLD, Linecrunch, and DMA delay — the last is what this repo calls VSP                                                                                                            |
+| 3.14.1/3/5/7         | Hyperscreen, FLI, doubled text lines, sprite stretching — the neighbouring tricks                                                                                                |
 
 3.14.6 closes by naming the combination the engine _is_:
 DMA delay plus FLD plus Linecrunch scrolls a whole graphics screen in all directions without moving bytes — AGSP.

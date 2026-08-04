@@ -7,11 +7,13 @@ A game engine for the c64.
 The engine builds as a 1 MiB [EasyFlash](http://skoe.de/easyflash/) cartridge.
 
 Dependencies:
-* [acme](https://sourceforge.net/projects/acme-crossass/)
-* python3 and wget
+
+- [acme](https://sourceforge.net/projects/acme-crossass/)
+- python3 and wget
 
 The following is fetched automatically by the `Makefile`:
-* [EAPI](http://skoe.de/easyflash/files/devdocs/EasyFlash-ProgRef.pdf), the EasyFlash flash driver, from a pinned
+
+- [EAPI](http://skoe.de/easyflash/files/devdocs/EasyFlash-ProgRef.pdf), the EasyFlash flash driver, from a pinned
   revision of the [EasySDK](https://github.com/luigidifraia/easyflash) and assembled with `acme`
 
 ```bash
@@ -42,49 +44,99 @@ VICE otherwise writes the cartridge image back on exit, which rewrites the name 
 
 ## Features
 
-* Bitmap scrolling using [AGSP](https://codebase64.net/doku.php?id=base:agsp_any_given_screen_position)
+- Bitmap scrolling using [AGSP](https://codebase64.net/doku.php?id=base:agsp_any_given_screen_position)
 
-    This technique only requires 36 raster lines CPU time and 33 raster lines of screen space.
-    All other screen space - including screen memory (used for colors ```%01``` and ```%10```) and color ram (color
-    ```%11```) is moved around as well.
+  A full multicolor bitmap scrolls in all 8 directions without any pixel data being moved: FLD plus line crunch for
+  the vertical offset, VSP (DMA delay) for the horizontal one.
+  Screen memory (colors `%01` and `%10`) and color RAM (`%11`) move with it.
 
-* Sprite-Multiplexer
+  The AGSP band costs a fixed **25 raster lines** of screen space at the top of the frame, and the hand-timed part of
+  the frame runs from raster line 45 to the soft-scroll release at line 82.
+  Everything else — joystick, tile copying, music, sprite bookkeeping — runs in the off-screen budget below line 47.
 
-    Multiplixing 24 x 2 sprites.
-    This means 24 virtual multi-color sprites where each sprite is overlayed with a single-color sprite for more colors
-    and better resolution.
+- Sprite multiplexer
 
-* Tile-Copying
+  **16 world sprites**, each built from two hardware sprites: a multicolor sprite with a single-color hires sprite
+  overlaid on top, for more colors and better resolution.
+  They are multiplexed over **4 hardware pairs** and pinned to the map, so they scroll with the world.
 
-    The binary format of the files is as follows:
+  When sprites cluster in Y and 4 pairs cannot cover them all, the display list is thinned in Y order — all 16 every
+  frame, else every 2nd on alternate frames, else every 4th over four frames — instead of dropping whichever sprite
+  happens not to fit.
+  Nothing ever blinks out; the density degrades evenly.
 
-    * `map.bin`: `map width` * `map height` bytes (here 256 * 96).
+  **8 panel sprites** on top of that, all sharing one raster line inside the black AGSP band: one hardware sprite
+  each, single color, meant for hitpoints, weapons or text.
+  They are written straight out every frame and take no part in the multiplexer.
 
-        Each byte is a tile index into the tile data: pixels, screen, colors
+  The two sets share the same 8 hardware sprites — the panel owns them across the band, the multiplexer takes over
+  below it.
 
-    * `pixels.bin`: `tile width` * `tile height` * 8 bytes per tile (here 3 * 2 * 8).
+- Tile-Copying
 
-        Each bit pair in a byte is a color number: 0-3 (multicolor)
+  A tile is `TILE_COLS` x `TILE_ROWS` = 3 x 2 chars, i.e. 24 x 16 pixels, and there are `TILES` = 185 of them.
+  Tiles are streamed into the bitmap a column or a row at a time as the camera moves, spread over several frames
+  because a whole column or row does not fit in one frame's raster budget.
+  - `map.bin`: one byte per map position, each a tile index into the three files below.
 
-    * `screen.bin`: `tile width` * `tile height` bytes per tile.
+    The map cursor packs the tile row in its high byte and the tile column in its low byte, so the address is
+    `TILE_MAP + row*256 + col` and a map row is exactly one page.
+    `map.bin` is therefore 24k, covering all of `TILE_MAP`.
 
-        For each byte, the upper 4 bits are color 1 and the lower 4 bits are color 2
+    The playable world is an **area** of `AREA_COLS` x `AREA_ROWS` = 32 x 32 tiles inside that — about 2.4 by 2.6
+    screens — which leaves room for an 8x3 grid of areas in the same 24k.
+    This file is generated rather than authored: `tools/mkarea.py` cuts one area out of `map-world.bin`, places it
+    at `AREA_ORIGIN_COL`/`AREA_ORIGIN_ROW` and fills the rest with tile 0, so the camera running past the area
+    bounds shows impassable undergrowth rather than stray tiles.
 
-    * `colors.bin`: `tile width` * `tile height` bytes per tile.
+    ```bash
+    tools/mkarea.py --src map-world.bin -o map.bin --cut 40,2 --at 96,32
+    ```
 
-        For each byte, the upper 4 bits are ignored and the lower 4 bits are color 3
+  The other three files are indexed **by char position first and by tile second**, not tile by tile.
+  The copy loop reads `TILE_<what> + char*TILES + tile`, so all 185 bytes for char 0 come first, then all of char 1,
+  and so on up to char 5.
+  - `pixels.bin`: `char*8*TILES + row*TILES + tile`, so 8 rows per char and 48 bytes per tile.
 
-    Color `%00` (the shared background color) is black, but this can of course be changed to any of the 16 colors.
-    If you are generating your own tile data, it is adviced to give priority to color number `%11`.
-    In this way it is possible to reduce the problem of the sprite pointers overwriting the screen colors if certain
-    tiles use only color `%00` & color `%11`.
+    Each bit pair in a byte is a color number `%00`-`%11` (multicolor bitmap mode).
 
-    These four files are linked into the image by `engine.acme` at the addresses given in `lib/mem.acme`, and travel in
-    the cartridge from there.
+  - `screen.bin`: 6 bytes per tile, one per char.
+
+    Upper 4 bits are the color for bit pair `%01`, lower 4 bits the color for `%10`.
+
+  - `colors.bin`: 6 bytes per tile, one per char, and goes to color RAM.
+
+    Upper 4 bits are ignored, lower 4 bits are the color for `%11`.
+
+  Color `%00` (the shared background color) is black, but this can of course be changed to any of the 16 colors.
+  If you are generating your own tile data, it is advised to give priority to color number `%11`.
+  In this way it is possible to reduce the problem of the sprite pointers overwriting the screen colors if certain
+  tiles use only color `%00` & color `%11`.
+
+  All four files are linked into the image by `engine.acme` at the addresses given in `lib/mem.acme`, and travel in
+  the cartridge from there — there is no separate asset pipeline.
+
+## Development
+
+```bash
+make dev        # engine.prg with -DDEVELOP=1 -DDEBUG=1: border timing bands, raster-overrun check
+make prg        # engine.prg with -DDEVELOP=1 only
+make regress    # headless VICE run of a scripted joystick pattern; fails on a blown raster budget
+```
+
+`engine.prg` is the same payload as the cartridge, just entered from a BASIC starter instead of the boot stub, which
+makes the two a useful A/B pair when the cartridge misbehaves.
+
+`make regress` can also diff rendering against a captured baseline:
+
+```bash
+cp -r regress regress-before
+make regress REGRESS_REF=regress-before
+```
 
 ## Useful Links
 
-* [Spritemate](http://spritemate.com/)
-* [Secret colours of the Commodore 64](http://www.aaronbell.com/secret-colours-of-the-commodore-64/)
-* [Commodore VIC-II Color Analysis](http://unusedino.de/ec64/technical/misc/vic656x/colors/)
-* [Commodore 64 memory map](http://sta.c64.org/cbm64mem.html)
+- [Spritemate](http://spritemate.com/)
+- [Secret colours of the Commodore 64](http://www.aaronbell.com/secret-colours-of-the-commodore-64/)
+- [Commodore VIC-II Color Analysis](http://unusedino.de/ec64/technical/misc/vic656x/colors/)
+- [Commodore 64 memory map](http://sta.c64.org/cbm64mem.html)
