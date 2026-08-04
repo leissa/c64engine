@@ -1,6 +1,5 @@
-!ifdef DEVELOP {
-!to "engine.prg", cbm   ; output program
-}
+; No !to here: every build names its output with -o, and a !to as well only earns an
+; "Output file name already chosen" warning.
 !sl "labels.l"          ; acme symbol list; the vice one is the Makefile's --vicelabels
 !convtab scr            ; for conversion to c64 screen codes
 
@@ -206,36 +205,36 @@ SPRITE_ZONES_MAX = SPRITES / SPRITE_SLOTS
 }
 
 !if SPRITES != 0 {
-  ; a sprite at y displays y+1 .. y+21, so it is the *first displayed* line that
-  ; has to clear the border, not y itself
-  !if SPRITES_TOP_Y + 1 < VERTICAL_BORDER_TOP {
-    !error "SPRITES_TOP_Y (", SPRITES_TOP_Y, ") puts the panel's first line above the first visible line (", VERTICAL_BORDER_TOP, ")"
-  }
-  ; A world sprite going DMA-active inside the band would make the per-line steal
-  ; vary and mistime the whole AGSP, so the floor has to sit below the band ...
-  !if SPRITE_FLOOR <= AGSP_END {
-    !error "SPRITE_FLOOR (", SPRITE_FLOOR, ") is inside the AGSP band, which ends at ", AGSP_END
-  }
-  ; ... and the panel has to stay DMA-active all the way to the band's last line
-  !if SPRITES_TOP_Y + SPRITE_HEIGHT < AGSP_END {
-    !error "the panel row ends at ", SPRITES_TOP_Y + SPRITE_HEIGHT, ", above the band's last line ", AGSP_END
-  }
-  !if SPRITES % SPRITE_SLOTS != 0 {
-    !error "SPRITES (", SPRITES, ") must be a multiple of SPRITE_SLOTS (", SPRITE_SLOTS, ")"
-  }
-  !if SPRITE_ZONES_MAX != 4 {
-    !error "SPRITE_ZONES_MAX is ", SPRITE_ZONES_MAX, "; the 4/2/1 fallback chain assumes 4"
-  }
-  !if PANEL_SPRITES != 2 * SPRITE_SLOTS {
-    !error "PANEL_SPRITES (", PANEL_SPRITES, ") must cover all ", 2*SPRITE_SLOTS, " hardware sprites"
-  }
+    ; a sprite at y displays y+1 .. y+21, so it is the *first displayed* line that
+    ; has to clear the border, not y itself
+    !if SPRITES_TOP_Y + 1 < VERTICAL_BORDER_TOP {
+        !error "SPRITES_TOP_Y (", SPRITES_TOP_Y, ") puts the panel's first line above the first visible line (", VERTICAL_BORDER_TOP, ")"
+    }
+    ; A world sprite going DMA-active inside the band would make the per-line steal
+    ; vary and mistime the whole AGSP, so the floor has to sit below the band ...
+    !if SPRITE_FLOOR <= AGSP_END {
+        !error "SPRITE_FLOOR (", SPRITE_FLOOR, ") is inside the AGSP band, which ends at ", AGSP_END
+    }
+    ; ... and the panel has to stay DMA-active all the way to the band's last line
+    !if SPRITES_TOP_Y + SPRITE_HEIGHT < AGSP_END {
+        !error "the panel row ends at ", SPRITES_TOP_Y + SPRITE_HEIGHT, ", above the band's last line ", AGSP_END
+    }
+    !if SPRITES % SPRITE_SLOTS != 0 {
+        !error "SPRITES (", SPRITES, ") must be a multiple of SPRITE_SLOTS (", SPRITE_SLOTS, ")"
+    }
+    !if SPRITE_ZONES_MAX != 4 {
+        !error "SPRITE_ZONES_MAX is ", SPRITE_ZONES_MAX, "; the 4/2/1 fallback chain assumes 4"
+    }
+    !if PANEL_SPRITES != 2 * SPRITE_SLOTS {
+        !error "PANEL_SPRITES (", PANEL_SPRITES, ") must cover all ", 2*SPRITE_SLOTS, " hardware sprites"
+    }
 }
 
 COPY_ROW_FRAMES = 2 ; use 2 frames to copy all rows, vertically
 !if SCROLL_SPEED = 2 {
-COPY_COL_FRAMES = 2 ; use 2 frames to copy all cols, horizontally
+    COPY_COL_FRAMES = 2 ; use 2 frames to copy all cols, horizontally
 } else {
-COPY_COL_FRAMES = 4 ; use 4 frames to copy all cols, horizontally
+    COPY_COL_FRAMES = 4 ; use 4 frames to copy all cols, horizontally
 }
 
 *=SPRITE_DATA

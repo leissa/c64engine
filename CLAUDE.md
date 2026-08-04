@@ -22,7 +22,9 @@ and fails on a blown raster budget or, against a saved reference, on any renderi
 cp config.default.template config.default   # then edit tool paths
 make                                        # -> engine.crt
 make run                                    # x64 +easyflashcrtwrite -cartcrt engine.crt
-make clean                                  # crt/obj/efboot/prg/labels
+make dev                                    # -> engine-dev.crt, with the debug switches
+make run-dev                                # ... and run it
+make clean                                  # crt/obj/efboot/labels
 make distclean                              # also removes the fetched ./eapi
 ```
 
@@ -30,12 +32,22 @@ The first `make` fetches the EAPI sources into `./eapi` (git-ignored) and assemb
 after that the build needs no network.
 Use `make Q=` to echo every command and to pass `-v` to `mkcart.py`.
 
-`make dev` / `make prg` are the fast iteration path: `-DDEVELOP=1` (plus `-DDEBUG=1` for `dev`) makes `engine.acme` emit
-`engine.prg` via its own `!to`, which you can load in VICE directly.
-That `.prg` _is_ the cartridge payload — same image, just entered from the BASIC starter instead of from the boot stub,
-which makes it a good A/B reference when the cartridge misbehaves.
-Both targets are deliberately phony and rebuild unconditionally: they write the same `engine.prg` with different flags,
-so timestamp tracking would wrongly skip a rebuild when you switch between them.
+`make dev` is the fast iteration path.
+It assembles with `DEV_FLAGS` — `-DDEVELOP=1 -DDEBUG=1` by default — and packs the result with the same `mkcart.py` and
+boot stub as the release build, into its own `engine-dev.crt`; `make run-dev` runs it.
+Going through the cartridge path means the thing you debug boots the way the shipped one does, which is worth having
+given how many of the bugs below turned out to be boot state rather than engine code.
+Override the switches to get one without the other, e.g. `make dev DEV_FLAGS=-DDEVELOP=1` for the raster overrun check
+without the debug display.
+The target is deliberately phony and rebuilds unconditionally, because make cannot see `DEV_FLAGS` change between runs.
+
+**There is no `make prg`, and `engine.acme` has no `!to`.**
+The engine object already _is_ a `.prg`: `+create_basic_starter` is unconditional, so a `-f cbm` build starts at `$0801`
+with a BASIC starter, and VICE autostarts `engine.obj` as it stands — verified, it comes up with the engine's black
+border.
+So the A/B comparison against the cartridge costs a `cp engine.obj x.prg` rather than a build target.
+Dropping the `!to` also removes the "Output file name already chosen" warning that every `-DDEVELOP` build with `-o`
+used to print, including each of `make regress`'s eight.
 
 **`make run` must keep `+easyflashcrtwrite`.**
 VICE writes the cartridge image back on exit by default, which rewrites
@@ -682,14 +694,16 @@ measured from inside the program with a `jam`, not from images.
 are cheap to run and disagreeing pairs localise the fault immediately:
 
 ```bash
-acme -DSYSTEM=64 -DAUTOPILOT=1 -DAUTOPILOT_FRAMES=n -f cbm -o ap.obj engine.acme   # same payload both ways
+acme -DSYSTEM=64 -DAUTOPILOT=1 -DAUTOPILOT_FRAMES=n -f cbm -o ap.prg engine.acme  # the object is the .prg
+tools/mkcart.py --engine ap.prg --boot efboot.bin --eapi eapi/eapi-am29f040-14 \
+                --name c64engine --skip 0xc000:0xe400 -o ap.crt                   # same payload, boxed
 x64   -warp -sounddev dummy +easyflashcrtwrite -limitcycles 22000000 -exitscreenshot a.png -cartcrt ap.crt
 x64sc -warp -sounddev dummy -autostartprgmode 1 -limitcycles 22000000 -exitscreenshot b.png -autostart ap.prg
 ```
 
 ## Debugging
 
-`-DDEBUG=1` (i.e. `make dev`) turns on:
+`-DDEBUG=1` (part of `make dev`'s default `DEV_FLAGS`) turns on:
 
 - `VIC_BORDER` colour bands marking where `JOYSTICK`, `COPY_TILES`, sprite sorting, and multiplexing run — this is how
   you see the raster budget.
@@ -713,8 +727,9 @@ x64sc -warp -sounddev dummy +easyflashcrtwrite -limitcycles 12000000 \
       -exitscreenshot /tmp/out.png -cartcrt engine.crt
 ```
 
-Comparing that against the same run on `engine.prg` (`-autostartprgmode 1 +drive8truedrive -autostart engine.prg`)
-isolates cartridge-boot bugs from engine bugs: the two should render the same frame apart from sprite animation phase.
+Comparing that against the same run on the bare payload (`cp engine.obj x.prg`, then `-autostartprgmode 1
++drive8truedrive -autostart x.prg`) isolates cartridge-boot bugs from engine bugs: the two should render the same frame
+apart from sprite animation phase.
 
 ## The assembler's own manual — `/usr/share/doc/acme/`
 

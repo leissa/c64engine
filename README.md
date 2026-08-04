@@ -157,13 +157,17 @@ VICE otherwise writes the cartridge image back on exit, which rewrites the name 
 ## Development
 
 ```bash
-make dev        # engine.prg with -DDEVELOP=1 -DDEBUG=1: border timing bands, raster-overrun check
-make prg        # engine.prg with -DDEVELOP=1 only
+make dev        # engine-dev.crt with -DDEVELOP=1 -DDEBUG=1: border timing bands, raster-overrun check
+make run-dev    # ... and run it
 make regress    # headless VICE run of a scripted joystick pattern; fails on a blown raster budget
 ```
 
-`engine.prg` is the same payload as the cartridge, just entered from a BASIC starter instead of the boot stub, which
-makes the two a useful A/B pair when the cartridge misbehaves.
+The development cartridge is built and booted exactly like the release one, so it exercises the boot stub too.
+`make dev DEV_FLAGS=-DDEVELOP=1` gives the raster-overrun check without the debug display.
+
+`engine.obj` is the same payload as a plain program: the BASIC starter at `$0801` is always assembled in, so
+`cp engine.obj x.prg` gives VICE something to autostart, which makes the cartridge and the bare payload a useful A/B
+pair when the cartridge misbehaves.
 
 `make regress` can also diff rendering against a captured baseline:
 

@@ -12,6 +12,14 @@ OUT       ?= engine
 CRT       ?= $(OUT).crt
 CART_NAME ?= c64engine
 
+# The development cartridge, built from the same sources with the debug switches on.
+# -DDEVELOP=1 is the raster overrun check on its own; -DDEBUG=1 adds the border timing bands and a
+# text mode display, which is useful for the raster budget but useless for judging rendering -- so
+# override to get one without the other, e.g. make dev DEV_FLAGS=-DDEVELOP=1.
+DEV_CRT   := $(OUT)-dev.crt
+DEV_OBJ   := $(OUT)-dev.obj
+DEV_FLAGS ?= -DDEVELOP=1 -DDEBUG=1
+
 MKCART    ?= tools/mkcart.py
 REGRESS   ?= tools/regress.sh
 X64SC     ?= x64sc
@@ -56,7 +64,7 @@ Q ?= @
 # make would treat it as up to date
 .DELETE_ON_ERROR:
 
-.PHONY: all clean distclean run dev prg regress
+.PHONY: all clean distclean run run-dev dev regress
 
 all: $(CRT)
 
@@ -80,11 +88,14 @@ $(EFBOOT_BIN): $(EFBOOT_ACME) $(LIB_SRC)
 	@echo '===> ACME $<'
 	$(Q)$(ACME) -f plain -o $@ $<
 
+# Both cartridges are packed the same way: $1 is the engine object, $2 the .crt to write.
+mkcart = $(PYTHON) $(MKCART) --engine $(1) --boot $(EFBOOT_BIN) \
+             --eapi $(EAPI) --name "$(CART_NAME)" $(if $(Q),,-v) \
+             $(foreach r,$(CART_SKIP),--skip $(r)) -o $(2)
+
 $(CRT): $(ENGINE_OBJ) $(EFBOOT_BIN) $(EAPI) $(MKCART)
 	@echo '===> MKCART $@'
-	$(Q)$(PYTHON) $(MKCART) --engine $(ENGINE_OBJ) --boot $(EFBOOT_BIN) \
-	    --eapi $(EAPI) --name "$(CART_NAME)" $(if $(Q),,-v) \
-	    $(foreach r,$(CART_SKIP),--skip $(r)) -o $@
+	$(Q)$(call mkcart,$(ENGINE_OBJ),$@)
 
 # Headless autopilot run; see tools/regress.sh and the AUTOPILOT block in
 # joystick.acme.  Pass a previously captured directory to also diff rendering:
@@ -95,7 +106,7 @@ regress:
 
 clean:
 	@echo '===> CLEAN'
-	$(Q)rm -f $(CRT) $(ENGINE_OBJ) $(EFBOOT_BIN) $(OUT).prg labels.l $(VICE_LABELS)
+	$(Q)rm -f $(CRT) $(ENGINE_OBJ) $(DEV_CRT) $(DEV_OBJ) $(EFBOOT_BIN) $(OUT).prg labels.l $(VICE_LABELS)
 	$(Q)rm -rf $(REGRESS_OUT)
 
 distclean: clean
@@ -109,13 +120,15 @@ run: $(CRT)
 	@echo '===> RUN $<'
 	$(Q)$(X64) +easyflashcrtwrite -cartcrt $(CRT)
 
-# dev and prg write the same engine.prg with different flags, so they always rebuild instead of tracking dependencies
-dev:
-	@echo '===> DEV'
-	$(Q)rm -f $(OUT).prg
-	$(Q)$(ACME) -DSYSTEM=64 -DDEVELOP=1 -DDEBUG=1 --vicelabels $(VICE_LABELS) $(ENGINE_ACME)
+# The development cartridge goes through the same boot stub and mkcart as the release one, so what
+# it exercises is what ships.  Its own .crt, so it cannot be mistaken for the release artifact, and
+# phony because make cannot see DEV_FLAGS change between runs.
+dev: $(EFBOOT_BIN) $(EAPI) $(MKCART)
+	@echo '===> ACME $(ENGINE_ACME) $(DEV_FLAGS)'
+	$(Q)$(ACME) -f cbm -DSYSTEM=64 $(DEV_FLAGS) --vicelabels $(VICE_LABELS) -o $(DEV_OBJ) $(ENGINE_ACME)
+	@echo '===> MKCART $(DEV_CRT)'
+	$(Q)$(call mkcart,$(DEV_OBJ),$(DEV_CRT))
 
-prg:
-	@echo '===> PRG'
-	$(Q)rm -f $(OUT).prg
-	$(Q)$(ACME) -DSYSTEM=64 -DDEVELOP=1 --vicelabels $(VICE_LABELS) $(ENGINE_ACME)
+run-dev: dev
+	@echo '===> RUN $(DEV_CRT)'
+	$(Q)$(X64) +easyflashcrtwrite -cartcrt $(DEV_CRT)

@@ -4,21 +4,21 @@
 
 !if SPRITES = 0 {
 !macro increment_vic_ctrl_y {
-    lda VIC_CTRL_Y                       ;  4
+    lda VIC_CTRL_Y                          ;  4
     clc                                     ;  2
     adc #1                                  ;  2
     and #%00000111                          ;  2
-    adc #CTRL_Y_INVALID                  ;  2
-    sta VIC_CTRL_Y                       ;  4
+    adc #CTRL_Y_INVALID                     ;  2
+    sta VIC_CTRL_Y                          ;  4
 }                                           ;--> 16
 } else {
 increment_vic_ctrl_y !zone {
-    lda VIC_CTRL_Y                       ;  4
+    lda VIC_CTRL_Y                          ;  4
     clc                                     ;  2
     adc #1                                  ;  2
     and #%00000111                          ;  2
-    adc #CTRL_Y_INVALID                  ;  2
-    sta VIC_CTRL_Y                       ;  4
+    adc #CTRL_Y_INVALID                     ;  2
+    sta VIC_CTRL_Y                          ;  4
 
     rts                                     ;  6
 }                                           ;--> 22
@@ -32,9 +32,9 @@ IRQ !zone {
 
     ; irq event                             ;  7
     ; last instruction                      ;  1 (min)
-    sta restore_registers + 1                    ;  4
-    stx restore_registers + 3                    ;  4
-    sty restore_registers + 5                    ;  4
+    sta restore_registers + 1               ;  4
+    stx restore_registers + 3               ;  4
+    sty restore_registers + 5               ;  4
 
     lda VIC_RASTER                          ;  4
     cmp #LINE_0                             ;  2
@@ -253,8 +253,6 @@ SOFT_Y = *+1
     and #CTRL_Y_MASK
     pha
 
-;stx VIC_BORDER    ;4
-
 ;-------------------------------------------------------------------------------
 ; use wait time to setup sprites
 ;-------------------------------------------------------------------------------
@@ -290,7 +288,6 @@ SOFT_Y = *+1
     !ifdef DEBUG {
         ldx #3
         stx VIC_BORDER
-;        inc VIC_BORDER
     }
 
     ; The panel row is finished by now (PANEL_Y + SPRITE_HEIGHT is above the soft
@@ -364,9 +361,6 @@ rotate_sprite_slots
             sta restore_registers + 1
             stx restore_registers + 3
             sty restore_registers + 5
-;            !ifdef DEBUG {
-;                inc VIC_BORDER
-;            }
             ldx SPRITE_COUNTER
             !ifdef DEBUG {
                 stx VIC_BORDER
