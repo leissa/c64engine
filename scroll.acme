@@ -344,15 +344,15 @@ DECREMENT_HARD_Y !zone {
     !set .tile_modulus      = TILE_ROWS
     !set .copy_counter  = COL_COPY
     !set .copy_frames   = COPY_COL_FRAMES
-    !set .col_map         = COL_MAP_POS_HI      ; a vertical step is a whole map row
-    !set .row_map         = ROW_MAP_POS_HI
+    !set .map_step        = AREA_COLS           ; a vertical step is a whole map row
     !set .last_direction          = SCROLL_LAST_VERTICAL
     ; one char step along this axis, measured in screen chars
     !set .char_delta    = SCROLL_COLS
     ; the whole screen along this axis, measured in chars
     !set .screen_span          = SCROLL_ROWS-1
     ; the cursor set fed by this axis, jumped wholesale on a direction reversal
-    !set .own_map       = COL_MAP_POS_HI
+    !set .own_map_lo    = COL_MAP_POS_LO
+    !set .own_map_hi    = COL_MAP_POS_HI
     !set .own_screen_lo    = COL_SCREEN_POS_LO
     !set .own_screen_hi    = COL_SCREEN_POS_HI
     !set .own_pixel_lo    = COL_PIXEL_POS_LO
@@ -364,12 +364,12 @@ DECREMENT_HARD_Y !zone {
     !set .tile_modulus      = TILE_COLS
     !set .copy_counter  = ROW_COPY
     !set .copy_frames   = COPY_ROW_FRAMES
-    !set .col_map         = COL_MAP_POS_LO      ; a horizontal step is one map byte
-    !set .row_map         = ROW_MAP_POS_LO
+    !set .map_step        = 1                   ; a horizontal step is one map byte
     !set .last_direction          = SCROLL_LAST_HORIZONTAL
     !set .char_delta    = 1
     !set .screen_span          = SCROLL_COLS-1
-    !set .own_map       = ROW_MAP_POS_LO
+    !set .own_map_lo    = ROW_MAP_POS_LO
+    !set .own_map_hi    = ROW_MAP_POS_HI
     !set .own_screen_lo    = ROW_SCREEN_POS_LO
     !set .own_screen_hi    = ROW_SCREEN_POS_HI
     !set .own_pixel_lo    = ROW_PIXEL_POS_LO
@@ -445,26 +445,40 @@ DECREMENT_HARD_Y !zone {
     lda #.copy_frames
     sta .copy_counter
 
-    ; step the tile-relative position, carrying into the map cursors
+    ; Step the tile-relative position, carrying into the map cursors.  Those are
+    ; 16 bit offsets into an AREA_COLS x AREA_ROWS map, so a tile step is .map_step
+    ; bytes with a carry, not an inc/dec of a separate row or column byte -- hence
+    ; x as a "crossed a tile boundary" flag, because wrap_* needs a.  The mask
+    ; keeps the result inside the map, so a cursor can never address past TILE_MAP.
+    ldx #0
     lda .tile
 !if .direction = -1 {
     sec
     sbc #1
     bcs +
     adc #.tile_modulus  ; carry is clear here, so this is +.tile_modulus
-    dec .col_map
-    dec .row_map
+    inx
 } else {
     clc
     adc #1
     cmp #.tile_modulus
     bcc +
     sbc #.tile_modulus  ; carry is set here, so this is -.tile_modulus
-    inc .col_map
-    inc .row_map
+    inx
 }
 +
     sta .tile
+
+    cpx #0
+    beq +
+!if .direction = -1 {
+    +wrap_sub COL_MAP_POS_LO, COL_MAP_POS_HI, .map_step, MAP_PAGES
+    +wrap_sub ROW_MAP_POS_LO, ROW_MAP_POS_HI, .map_step, MAP_PAGES
+} else {
+    +wrap_add COL_MAP_POS_LO, COL_MAP_POS_HI, .map_step, MAP_PAGES
+    +wrap_add ROW_MAP_POS_LO, ROW_MAP_POS_HI, .map_step, MAP_PAGES
+}
++
 
     ; step both destination cursor sets by one char along this axis
 !if .direction = -1 {
@@ -484,10 +498,7 @@ DECREMENT_HARD_Y !zone {
 !if .direction = -1 {
     beq +           ; already going this way
 
-    sec
-    lda .own_map
-    sbc #.screen_span/.tile_modulus
-    sta .own_map
+    +wrap_sub .own_map_lo, .own_map_hi, (.screen_span/.tile_modulus)*.map_step, MAP_PAGES
     +wrap_sub .own_screen_lo, .own_screen_hi, .screen_span*.char_delta, 4
     +wrap_sub .own_pixel_lo, .own_pixel_hi, 8*.screen_span*.char_delta, 8*4
 
@@ -495,10 +506,7 @@ DECREMENT_HARD_Y !zone {
 } else {
     bne +           ; already going this way
 
-    clc
-    lda .own_map
-    adc #.screen_span/.tile_modulus
-    sta .own_map
+    +wrap_add .own_map_lo, .own_map_hi, (.screen_span/.tile_modulus)*.map_step, MAP_PAGES
     +wrap_add .own_screen_lo, .own_screen_hi, .screen_span*.char_delta, 4
     +wrap_add .own_pixel_lo, .own_pixel_hi, 8*.screen_span*.char_delta, 8*4
 

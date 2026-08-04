@@ -117,7 +117,10 @@ CODE_START  = $0885; - $1fff,  6k
 SONG_DATA   = $2000; - $2fff,  4k
 ;---------------------------------12k
 
-TILE_MAP    = $3000; - $8fff, 24k
+; One area of AREA_COLS x AREA_ROWS tile indices, row major with an AREA_COLS byte stride.
+; engine.acme asserts map.bin is exactly that size.
+TILE_MAP    = $3000; - $33ff,  1k
+;             $3400 - $8fff, 23k  free
 TILE_COLOR  = $9000; - $95ff,  1.5k
 TILE_SCREEN = $9600; - $9bff,  1.5k
 TILE_PIXELS = $9c00; - $bfff,  9k

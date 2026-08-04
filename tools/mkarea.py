@@ -1,55 +1,53 @@
 #!/usr/bin/env python3
-"""Cut a 32x32 tile area out of the big world map and build map.bin from it.
+"""Cut an area out of the world atlas and write it as map.bin.
 
-map.bin is addressed by the engine as TILE_MAP + row*256 + col -- the map cursor
-packs the row in the high byte and the column in the low byte -- so the row stride
-is fixed at 256 whatever the area size is.  An area therefore lives as a 32x32
-window inside that address space, which leaves room for an 8x3 grid of areas in
-the same 24k.  Everything outside the area is filled with PAD so the camera
-running past the bounds shows impassable undergrowth rather than stray tiles.
+map.bin is the map: exactly AREA_COLS x AREA_ROWS tile indices, one byte each, row
+major with an AREA_COLS byte stride, which the engine reads at
+TILE_MAP + row*AREA_COLS + col.  engine.acme asserts that size, so a file of the
+wrong shape fails the build rather than scrolling garbage.
 
-  tools/mkarea.py --src map-world.bin -o map.bin --cut 40,2 --at 96,32
+map-world.bin is a 256x96 atlas to cut areas out of -- an authoring convenience,
+nothing the engine knows about.  map.bin is checked in, so the build never runs
+this.
+
+  tools/mkarea.py --src map-world.bin -o map.bin --cut 40,2
+  tools/mkarea.py -o map.bin --fill 136          # uniform map, for camera-bound checks
 """
 import argparse
 
-# Shape of map-world.bin, and of the map.bin written out: one page per row, filling
-# the 24k the engine reserves for TILE_MAP.  The engine itself has no such constant
-# -- the area is the only world dimension it knows about -- so this pair lives here.
-MAP_W, MAP_H = 256, 96
-AREA = 32                       # area edge, in tiles
-PAD = 0                         # tile 0: dense undergrowth, see the atlas
+SRC_W, SRC_H = 256, 96          # shape of the atlas file, not of the map
+AREA = 32                       # AREA_COLS / AREA_ROWS in engine.acme
 
 
 def main():
     p = argparse.ArgumentParser()
-    p.add_argument("--src", default="map-world.bin", help="256x96 source world map")
+    p.add_argument("--src", default="map-world.bin", help=f"{SRC_W}x{SRC_H} source world map")
     p.add_argument("-o", "--out", default="map.bin")
     p.add_argument("--cut", default="40,2", help="col,row of the area in the source")
-    p.add_argument("--at", default="96,32", help="col,row to place the area at")
-    p.add_argument("--size", type=int, default=AREA)
-    p.add_argument("--pad", type=int, default=PAD)
+    p.add_argument("--size", type=int, default=AREA, help="area edge, in tiles")
+    p.add_argument("--fill", type=int, default=None,
+                   help="ignore --cut and fill the whole map with this tile index")
     a = p.parse_args()
 
-    cut_c, cut_r = (int(v) for v in a.cut.split(","))
-    at_c, at_r = (int(v) for v in a.at.split(","))
-    if at_c + a.size > MAP_W or at_r + a.size > MAP_H:
-        p.error(f"area at {at_c},{at_r} of size {a.size} does not fit in {MAP_W}x{MAP_H}")
+    if a.fill is not None:
+        out = bytearray([a.fill]) * (a.size * a.size)
+        what = f"filled with tile {a.fill}"
+    else:
+        cut_c, cut_r = (int(v) for v in a.cut.split(","))
+        with open(a.src, "rb") as f:
+            src = f.read()
+        if len(src) != SRC_W * SRC_H:
+            p.error(f"{a.src} is {len(src)} bytes, expected {SRC_W}x{SRC_H} = {SRC_W * SRC_H}")
 
-    with open(a.src, "rb") as f:
-        src = f.read()
-    if len(src) != MAP_W * MAP_H:
-        p.error(f"{a.src} is {len(src)} bytes, expected {MAP_W * MAP_H}")
-
-    out = bytearray([a.pad]) * (MAP_W * MAP_H)
-    for r in range(a.size):
-        for c in range(a.size):
-            t = src[((cut_r + r) % MAP_H) * MAP_W + ((cut_c + c) % MAP_W)]
-            out[(at_r + r) * MAP_W + (at_c + c)] = t
+        out = bytearray(a.size * a.size)
+        for r in range(a.size):
+            for c in range(a.size):
+                out[r * a.size + c] = src[((cut_r + r) % SRC_H) * SRC_W + ((cut_c + c) % SRC_W)]
+        what = f"cut from ({cut_c},{cut_r}) of {a.src}"
 
     with open(a.out, "wb") as f:
         f.write(out)
-    print(f"{a.out}: {a.size}x{a.size} area from ({cut_c},{cut_r}) placed at "
-          f"({at_c},{at_r}), rest = tile {a.pad}")
+    print(f"{a.out}: {a.size}x{a.size} tiles ({len(out)} bytes), {what}")
 
 
 if __name__ == "__main__":

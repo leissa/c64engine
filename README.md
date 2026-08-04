@@ -79,18 +79,16 @@ VICE otherwise writes the cartridge image back on exit, which rewrites the name 
   because a whole column or row does not fit in one frame's raster budget.
   - `map.bin`: one byte per map position, each a tile index into the three files below.
 
-    The map cursor packs the tile row in its high byte and the tile column in its low byte, so the address is
-    `TILE_MAP + row*256 + col` and a map row is exactly one page.
-    `map.bin` is therefore 24k, covering all of `TILE_MAP`.
+    The map is a single **area** of `AREA_COLS` x `AREA_ROWS` = 32 x 32 tiles — about 2.4 by 2.6 screens — and that is
+    the whole world: `map.bin` is exactly 1024 bytes, row major with a 32 byte stride, and a tile index lives at
+    `TILE_MAP + row*AREA_COLS + col`.
+    The camera is clamped to it, so the scroll stops at the edges.
 
-    The playable world is an **area** of `AREA_COLS` x `AREA_ROWS` = 32 x 32 tiles inside that — about 2.4 by 2.6
-    screens — which leaves room for an 8x3 grid of areas in the same 24k.
-    This file is generated rather than authored: `tools/mkarea.py` cuts one area out of `map-world.bin`, places it
-    at `AREA_ORIGIN_COL`/`AREA_ORIGIN_ROW` and fills the rest with tile 0, so the camera running past the area
-    bounds shows impassable undergrowth rather than stray tiles.
+    This file is generated rather than authored — `map-world.bin` is a 256 x 96 atlas to cut areas out of, which the
+    engine knows nothing about:
 
     ```bash
-    tools/mkarea.py --src map-world.bin -o map.bin --cut 40,2 --at 96,32
+    tools/mkarea.py --src map-world.bin -o map.bin --cut 40,2
     ```
 
   The other three files are indexed **by char position first and by tile second**, not tile by tile.

@@ -152,7 +152,8 @@ the theory that the four slots fill in sequence and the last one needs room; tha
 constraint (see the sprite-placement measurement under _Testing_), and it is now `3 * SCROLL_SPEED`. What stops it going
 lower is the off-screen budget, not placement: at 2 the frozen autopilot frames at stops 60 and 90 sit right on the
 limit — they jam with the `SPRITE_DROPPED` tracking compiled in and pass without it. One raster line is not worth being
-unable to instrument the frame, so 3 it is. So `SPRITE_WRAP_TOP` is 85, one line better than the 86 it was. It is a pop,
+unable to instrument the frame, so 3 it is. So `SPRITE_WRAP_TOP` is `SPRITE_MULTIPLEX_START + 3*SCROLL_SPEED` — 85 at
+speed 1, 88 at speed 2. It is a pop,
 not a slide, and it stays one: the sprite is 21 rows tall, so its body covers the top of the map whatever its top row is
 doing. Hiding it needs the mask below, and lowering it further needs `SPRITE_MULTIPLEX_START` to move, which it cannot —
 see stage 5 of the IRQ chain.
@@ -161,44 +162,64 @@ The tunable constraints that used to be comments are now `!error` assertions at 
 `(SCROLL_ROWS-1) % TILE_ROWS` and `(SCROLL_COLS-1) % TILE_COLS` must be zero, because the direction-reversal cursor
 jump is expressed in tiles and ACME's division truncates.
 
-### World layout and the camera
+### The map is one area — and the camera
 
-The world is built from **areas of `AREA_COLS`×`AREA_ROWS` = 32×32 tiles**, which at 24×16 pixels a tile is about
+**The map is a single Zelda-style area of `AREA_COLS`×`AREA_ROWS` = 32×32 tiles**, which at 24×16 pixels a tile is about
 2.4 by 2.6 screens.
+That is the whole world model: there is no larger address space the area sits inside, and no world dimension other than
+`AREA_COLS`/`AREA_ROWS`.
+Several areas, and moving between them, is a later problem — nothing in the tree knows about more than this one.
 
-The map cursor packs the map **row in its high byte and the column in its low byte**, and the address is
-`TILE_MAP + row*256 + col` — so **a map row is exactly one page, whatever the area size is**.
-Do not try to make the map 32 bytes wide; an area is a 32×32 _window_ into that address space instead.
-The upside is that the same 24k holds an **8×3 grid of areas** for free, with `AREA_ORIGIN_COL`/`AREA_ORIGIN_ROW`
-selecting which one the demo uses; adding neighbours later is a matter of filling more of the grid and moving the
-origin.
-There is deliberately **no `MAP_WIDTH`/`MAP_HEIGHT`** — the area is the only world dimension the engine has.
-The two `!error` bounds in `engine.acme` derive the map's extent from `TILE_MAP`/`TILE_COLOR` in `lib/mem.acme`, so a
-segment move cannot leave a stale copy of it behind.
+`map.bin` **is** the map: `AREA_COLS*AREA_ROWS` = 1024 bytes at `TILE_MAP`, row major with an `AREA_COLS` byte
+stride, so a tile index lives at `TILE_MAP + row*AREA_COLS + col`.
+`engine.acme` asserts the file's size against `AREA_COLS*AREA_ROWS`, because a map of the wrong shape assembles happily
+and then scrolls garbage.
+It also asserts that the map is a power-of-two number of whole pages, which is what lets `wrap_add`/`wrap_sub` confine a
+cursor to it with a single `and` — see below.
 
-`map.bin` is generated, not authored: `map-world.bin` is the original 256×96 world and `tools/mkarea.py` cuts an area
-out of it, places it at the origin, and fills everything else with tile 0 (dense undergrowth), so the camera running
-past its bounds would show impassable growth rather than stray tiles.
+Two consequences worth having in mind before touching the copy or scroll code:
+
+- **The map cursor is a plain 16-bit offset**, not a (row, column) byte pair. `COL_MAP_POS_LO`/`_HI` and
+  `ROW_MAP_POS_LO`/`_HI` hold `row*AREA_COLS + col`, and `init_ptrs` adds `TILE_MAP` to produce the absolute address the
+  copy loop self-modifies into `.map_loop`. Because `TILE_MAP` is page-aligned and the offset is under 1024, that add is
+  still just `adc #>TILE_MAP` on the high byte.
+- **A tile step is not an `inc`.** Along the map that is ±1 with a carry, down it is ±`AREA_COLS` with a carry.
+  `scroll.acme` does it with `wrap_add`/`wrap_sub` and a `MAP_PAGES` mask, so a cursor physically cannot address outside
+  the map; `tiles.acme`'s `+step_map_ptr` does it unmasked inside a single copy, which is safe because the camera clamp
+  below bounds how far a copy can walk. Verified: instrument `MAP_POS_HI_TMP` against `TILE_MAP .. TILE_MAP+MAP_PAGES`
+  in the copy epilogue and it never fires, over the autopilot and over ~9000 frames of constant down+right and up+left.
+
+`map.bin` is generated, not authored — `map-world.bin` is a 256×96 atlas to cut areas out of, an authoring convenience
+that the engine knows nothing about:
 
 ```bash
-tools/mkarea.py --src map-world.bin -o map.bin --cut 40,2 --at 96,32   # the village
+tools/mkarea.py --src map-world.bin -o map.bin --cut 40,2   # the village
+tools/mkarea.py -o map.bin --fill 136                       # uniform, for the camera-bound check below
 ```
 
-**The camera is real state now**: `CAMERA_X_*`/`CAMERA_Y_*` in `lib/mem.acme`, 16-bit, in pixels into the area. It only
+**The camera is real state**: `CAMERA_X_*`/`CAMERA_Y_*` in `lib/mem.acme`, 16-bit, in pixels into the map. It only
 exists to clamp the scroll — `JOYSTICK` guards each of its four `SCROLL_*` calls with `+scroll_towards_max` /
-`+scroll_towards_zero`, which skip the scroll at the bound and otherwise step the camera by `SCROLL_SPEED`. Three things
-about it that are not obvious:
+`+scroll_towards_zero`, which skip the scroll at the bound and otherwise step the camera by `SCROLL_SPEED`.
+
+**The clamp is now the only thing keeping reads inside the map**, since there is nothing outside it — walk past the edge
+and you read whatever follows `TILE_MAP`. It is exact rather than approximate, which is why that works: at
+`CAMERA_X_MAX` the window covers chars 53-92 of the map's 96, and `COPY_TILES`' one-tile read-ahead reaches char 95, the
+map's last. The vertical bound lands on the last row the same way. Four things about it that are not obvious:
 
 - **`init_screen` deliberately bypasses it**, calling `SCROLL_L` directly. The startup fill scrolls a whole
   screen width and must not be clamped; `CAMERA_*_INIT` is then written after the fill to match where it left the
   camera.
 - **The bounds deduct a whole tile** beyond the screen size, because `COPY_TILES` works one tile ahead of the window.
-  Without that the trailing edge shows the first tile outside the area — a sliver a few pixels wide at the very edge
-  of the screen, easy to miss.
-- **`CAMERA_*_INIT` is measured, not derived.** Rebuild with `tools/mkarea.py --pad 136` (solid blue instead of
-  undergrowth), force one stick direction the way _Measuring the off-screen budget_ describes, run to the bound and
-  screenshot: blue anywhere means the bound is too generous, an early stop means it is too tight. All four
-  directions, since the horizontal and vertical read-ahead differ.
+  Without that the trailing edge shows the tile past the map — a sliver a few pixels wide at the very edge of the
+  screen, easy to miss.
+- **`CAMERA_*_INIT` is measured, not derived**, and `MAP_INIT_COL`/`MAP_INIT_ROW` do not give it to you: the
+  sub-tile offsets `TILE_COL`/`TILE_ROW` come into it too. To re-check a bound, build a uniform map with
+  `tools/mkarea.py -o map.bin --fill 136`, force one stick direction the way _Measuring the off-screen budget_
+  describes, run to the bound and screenshot. Anything other than the fill tile means the bound is too generous and
+  the read-ahead left the map; an early stop means it is too tight. All four directions, since the horizontal and
+  vertical read-ahead differ.
+- **`MAP_INIT_*` is what the camera is calibrated against.** Moving the initial cursor invalidates `CAMERA_*_INIT`, so
+  re-measure both together.
 
 ### Sprites
 
@@ -447,17 +468,28 @@ _not_ jam is the raster line `last_irq` finishes on. `LINE_0-1 = 47` is the limi
 
 Do this over **thousands** of frames with a constant direction, not over the autopilot — the worst case is rare.
 Measuring the diagonal phase of one `AUTOPILOT_TBL` pass reported line 18 for a build whose true worst case was 36.
-Reference points, all diagonal:
 
-| build                                      | frame ends on |
-| ------------------------------------------ | ------------- |
-| before world-fixed sprites                 | < line 6      |
-| sprites, wrap left to the sort             | line 36       |
-| sprites, wrap fixing `SPRITE_ORDER` itself | line 20       |
-| 16 world + 8 panel, scheduled              | line 12       |
+**The reading depends on `SCROLL_SPEED`**, and heavily: doubling it halves `COPY_*_FRAMES`, so every copy does twice the
+chars per frame. Reference points, all diagonal:
+
+| build                                      | `SCROLL_SPEED` | frame ends on |
+| ------------------------------------------ | -------------- | ------------- |
+| before world-fixed sprites                 | 1              | < line 6      |
+| sprites, wrap left to the sort             | 1              | line 36       |
+| sprites, wrap fixing `SPRITE_ORDER` itself | 1              | line 20       |
+| 16 world + 8 panel, scheduled              | 1              | line 12       |
+| the same build                             | 2              | ~line 40      |
+| the map as one flat 32×32 area             | 2              | ~line 43      |
+
+So at `SCROLL_SPEED` 2 there are only about **four raster lines of headroom left**, and the flat-map cursor arithmetic
+(`+step_map_ptr`, a 16-bit `+AREA_COLS` per tile instead of an `inc` of a row byte) accounts for roughly three of the
+lines that went. Anything else added to `last_irq` at this speed needs measuring, not guessing.
 
 Beware a **spurious jam**: one sweep of this reported line 40 for a build whose real worst case is 12, and a rerun of
-the identical tree gave 10. Confirm any surprising reading with a repeat before acting on it.
+the identical tree gave 10. Confirm any surprising reading with a repeat before acting on it — and note the readings can
+be *non-monotonic*, which is the giveaway: a sweep that passes at threshold 16 and jams at 20 cannot both be true, since
+a higher threshold is strictly more permissive. That happened while measuring the row above; the repeat jammed at 16
+too.
 
 The same technique works for any other invariant that should hold every frame — stash the value in a spare zero-page
 byte inside the cycle-exact code (there is documented slack before the soft-scroll wait), then compare and `jam` in
@@ -503,6 +535,13 @@ Which is also the warning — **this harness perturbs what it measures.**
 Confirm any budget-adjacent result with the tracking compiled out.
 
 ### What headless screenshots cannot tell you
+
+**A whole-image mismatch usually means VICE had not finished autostarting.** `make regress` gives the `.prg` a fixed
+`-limitcycles` to load and run under true drive emulation, and that occasionally is not enough: the capture then shows
+the light blue BASIC border instead of the engine's black one, every row differs, and it reads like a total rendering
+change. Seen three stops out of eight fail this way on a tree whose next two runs were both 8/8. Check a failing
+capture's border colour before believing it — `7385ff` in the border means the engine never started. Re-run first; only
+a *stable* mismatch across runs is a real one.
 
 `-exitscreenshot` stops the emulator at a cycle count, not at a frame boundary, and the capture is **not reproducible
 at frame granularity** — the same binary at the same `-limitcycles` has been observed to produce a 24-row and a 25-row

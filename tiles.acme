@@ -196,6 +196,32 @@ COPY_TILE_CHAR_SIZE = copy_tile_char1 - copy_tile_char0
 ;   reached as .slots + n*SLOT_SIZE; both are asserted below.
 ;-------------------------------------------------------------------------------
 
+; Step the self-modified map read on to the next tile.
+;
+; The map is AREA_COLS x AREA_ROWS with an AREA_COLS byte row stride, so neither
+; step is a single inc of a separate row or column byte any more: along a column
+; copy (walking a map row) it is +1, along a row copy (walking a map column) it is
+; +AREA_COLS, and both need the carry.
+;
+; Clobbers a in the row-copy case, which is free at both call sites: .slots_end
+; falls into .map_loop and .finish_tile into .finish, and both reload it.
+!macro step_map_ptr .stride, .operand {
+!if .stride = 1 {
+    inc .operand+1
+    bne +
+    inc .operand+2
++
+} else {
+    lda .operand+1
+    clc
+    adc #AREA_COLS
+    sta .operand+1
+    bcc +
+    inc .operand+2
++
+}
+}
+
 ; one unrolled slot of a tile
 !macro tile_slot .stride, .char, .next_exit {
     +jsr_copy_tile_char .char
@@ -251,8 +277,8 @@ COPY_TILE_CHAR_SIZE = copy_tile_char1 - copy_tile_char0
         +tile_slot .stride, .char, .exits + ((.s+1) % .period) * (.exit1 - .exits)
     }
 .slots_end
-    ; tile done, step to the next map byte
-!if .stride = 1 { inc .map_loop+1 } else { inc .map_loop+2 }
+    ; tile done, step to the next one
+    +step_map_ptr .stride, .map_loop
     jmp .tile_loop
 
 .exits
@@ -268,7 +294,7 @@ COPY_TILE_CHAR_SIZE = copy_tile_char1 - copy_tile_char0
 
 .finish_tile
     ; the tile was completed, so the next frame starts on the following one
-!if .stride = 1 { inc .map_loop+1 } else { inc .map_loop+2 }
+    +step_map_ptr .stride, .map_loop
 .finish
     lda .map_loop+1
     sta MAP_POS_LO_TMP
