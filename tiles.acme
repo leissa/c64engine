@@ -101,37 +101,37 @@ COPY_TILE_CHAR_SIZE = copy_tile_char1 - copy_tile_char0
 
 !macro init_ptrs .stride {
 !if .stride = 1 {
-    !set .tile_col = COL_TILE_COL
-    !set .tile_row = COL_TILE_ROW
-    !set .map_pos_lo = COL_MAP_POS_LO
-    !set .map_pos_hi = COL_MAP_POS_HI
-    !set .pixel_pos_lo = COL_PIXEL_POS_LO
-    !set .pixel_pos_hi = COL_PIXEL_POS_HI
-    !set .screen_pos_lo = COL_SCREEN_POS_LO
-    !set .screen_pos_hi = COL_SCREEN_POS_HI
-    !set .map_pos_lo_tmp = COL_MAP_POS_LO_TMP
-    !set .map_pos_hi_tmp = COL_MAP_POS_HI_TMP
-    !set .pixel_pos_lo_tmp = COL_PIXEL_POS_LO_TMP
-    !set .pixel_pos_hi_tmp = COL_PIXEL_POS_HI_TMP
+    !set .tile_col          = COL_TILE_COL
+    !set .tile_row          = COL_TILE_ROW
+    !set .map_pos_lo        = COL_MAP_POS_LO
+    !set .map_pos_hi        = COL_MAP_POS_HI
+    !set .pixel_pos_lo      = COL_PIXEL_POS_LO
+    !set .pixel_pos_hi      = COL_PIXEL_POS_HI
+    !set .screen_pos_lo     = COL_SCREEN_POS_LO
+    !set .screen_pos_hi     = COL_SCREEN_POS_HI
+    !set .map_pos_lo_tmp    = COL_MAP_POS_LO_TMP
+    !set .map_pos_hi_tmp    = COL_MAP_POS_HI_TMP
+    !set .pixel_pos_lo_tmp  = COL_PIXEL_POS_LO_TMP
+    !set .pixel_pos_hi_tmp  = COL_PIXEL_POS_HI_TMP
     !set .screen_pos_lo_tmp = COL_SCREEN_POS_LO_TMP
     !set .screen_pos_hi_tmp = COL_SCREEN_POS_HI_TMP
-    !set .color_pos_hi_tmp = COL_COLOR_POS_HI_TMP
+    !set .color_pos_hi_tmp  = COL_COLOR_POS_HI_TMP
 } else {
-    !set .tile_col = ROW_TILE_COL
-    !set .tile_row = ROW_TILE_ROW
-    !set .map_pos_lo = ROW_MAP_POS_LO
-    !set .map_pos_hi = ROW_MAP_POS_HI
-    !set .pixel_pos_lo = ROW_PIXEL_POS_LO
-    !set .pixel_pos_hi = ROW_PIXEL_POS_HI
-    !set .screen_pos_lo = ROW_SCREEN_POS_LO
-    !set .screen_pos_hi = ROW_SCREEN_POS_HI
-    !set .map_pos_lo_tmp = ROW_MAP_POS_LO_TMP
-    !set .map_pos_hi_tmp = ROW_MAP_POS_HI_TMP
-    !set .pixel_pos_lo_tmp = ROW_PIXEL_POS_LO_TMP
-    !set .pixel_pos_hi_tmp = ROW_PIXEL_POS_HI_TMP
+    !set .tile_col          = ROW_TILE_COL
+    !set .tile_row          = ROW_TILE_ROW
+    !set .map_pos_lo        = ROW_MAP_POS_LO
+    !set .map_pos_hi        = ROW_MAP_POS_HI
+    !set .pixel_pos_lo      = ROW_PIXEL_POS_LO
+    !set .pixel_pos_hi      = ROW_PIXEL_POS_HI
+    !set .screen_pos_lo     = ROW_SCREEN_POS_LO
+    !set .screen_pos_hi     = ROW_SCREEN_POS_HI
+    !set .map_pos_lo_tmp    = ROW_MAP_POS_LO_TMP
+    !set .map_pos_hi_tmp    = ROW_MAP_POS_HI_TMP
+    !set .pixel_pos_lo_tmp  = ROW_PIXEL_POS_LO_TMP
+    !set .pixel_pos_hi_tmp  = ROW_PIXEL_POS_HI_TMP
     !set .screen_pos_lo_tmp = ROW_SCREEN_POS_LO_TMP
     !set .screen_pos_hi_tmp = ROW_SCREEN_POS_HI_TMP
-    !set .color_pos_hi_tmp = ROW_COLOR_POS_HI_TMP
+    !set .color_pos_hi_tmp  = ROW_COLOR_POS_HI_TMP
 }
     lda TILE_COL
     sta .tile_col
@@ -289,32 +289,32 @@ COPY_TILE_CHAR_SIZE = copy_tile_char1 - copy_tile_char0
 ; once per entry point costs about 900 bytes of the code segment for nothing.
 !macro copy_tile_chars .stride {
 !if .stride = 1 {
-    !set .tile_col_tmp = COL_TILE_COL
-    !set .tile_row_tmp = COL_TILE_ROW
-    !set .map_pos_lo_tmp = COL_MAP_POS_LO_TMP
-    !set .map_pos_hi_tmp = COL_MAP_POS_HI_TMP
-    !set .pixel_pos_lo_tmp = COL_PIXEL_POS_LO_TMP
-    !set .pixel_pos_hi_tmp = COL_PIXEL_POS_HI_TMP
+    !set .tile_col_tmp      = COL_TILE_COL
+    !set .tile_row_tmp      = COL_TILE_ROW
+    !set .map_pos_lo_tmp    = COL_MAP_POS_LO_TMP
+    !set .map_pos_hi_tmp    = COL_MAP_POS_HI_TMP
+    !set .pixel_pos_lo_tmp  = COL_PIXEL_POS_LO_TMP
+    !set .pixel_pos_hi_tmp  = COL_PIXEL_POS_HI_TMP
     !set .screen_pos_lo_tmp = COL_SCREEN_POS_LO_TMP
     !set .screen_pos_hi_tmp = COL_SCREEN_POS_HI_TMP
-    !set .color_pos_hi_tmp = COL_COLOR_POS_HI_TMP
+    !set .color_pos_hi_tmp  = COL_COLOR_POS_HI_TMP
 } else {
-    !set .tile_col_tmp = ROW_TILE_COL
-    !set .tile_row_tmp = ROW_TILE_ROW
-    !set .map_pos_lo_tmp = ROW_MAP_POS_LO_TMP
-    !set .map_pos_hi_tmp = ROW_MAP_POS_HI_TMP
-    !set .pixel_pos_lo_tmp = ROW_PIXEL_POS_LO_TMP
-    !set .pixel_pos_hi_tmp = ROW_PIXEL_POS_HI_TMP
+    !set .tile_col_tmp      = ROW_TILE_COL
+    !set .tile_row_tmp      = ROW_TILE_ROW
+    !set .map_pos_lo_tmp    = ROW_MAP_POS_LO_TMP
+    !set .map_pos_hi_tmp    = ROW_MAP_POS_HI_TMP
+    !set .pixel_pos_lo_tmp  = ROW_PIXEL_POS_LO_TMP
+    !set .pixel_pos_hi_tmp  = ROW_PIXEL_POS_HI_TMP
     !set .screen_pos_lo_tmp = ROW_SCREEN_POS_LO_TMP
     !set .screen_pos_hi_tmp = ROW_SCREEN_POS_HI_TMP
-    !set .color_pos_hi_tmp = ROW_COLOR_POS_HI_TMP
+    !set .color_pos_hi_tmp  = ROW_COLOR_POS_HI_TMP
 }
 !if .stride = 1 {
     !set .fixed_coordinate  = .tile_row_tmp  ; tile row is fixed along a column copy
-    !set .variant_count = TILE_ROWS
+    !set .variant_count     = TILE_ROWS
 } else {
     !set .fixed_coordinate  = .tile_col_tmp  ; tile column is fixed along a row copy
-    !set .variant_count = TILE_COLS
+    !set .variant_count     = TILE_COLS
 }
     lda .map_pos_lo_tmp
     sta MAP_POS_LO_TMP
