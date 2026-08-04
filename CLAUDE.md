@@ -49,8 +49,8 @@ one that `make` then considers up to date.
 `cartconv -c` validates the result).
 Tile data is `!bin`'d into the image at the `TILE_*` addresses, so there is no separate asset pipeline — adding a
 tile-data file means only picking an address in `lib/mem.acme` and a `!bin` in `engine.acme`.
-The one generated asset is `map.bin`, cut out of `map-world.bin` by `tools/mkarea.py`; it is checked in, so the build
-does not depend on the tool — see _World layout and the camera_.
+The four generated assets are `map.bin` and the area's tileset (`colors.bin`, `screen.bin`, `pixels.bin`), all cut out of the world-indexed `*-world.bin` masters by one run of `tools/mkarea.py`.
+They are checked in, so the build does not depend on the tool — see _The map is one area_.
 
 Everything about the layout follows the [EasyFlash Programmer's
 Guide](http://skoe.de/easyflash/files/devdocs/EasyFlash-ProgRef.pdf);
@@ -74,9 +74,9 @@ Highlights:
   page except `$00`/`$01` is free.
 - VIC uses bank 3 (`$c000-$ffff`): bitmap at `$c000`, screen at `$e000`, sprite frames at `$e400`.
   Sprite pointers live at `SPRITE_PTR = SCREEN+$0400-8`.
-- `TILE_PIXELS` (`$9c00-$bfff`) is 9k of tile pixel data;
-  the 4k of RAM under the I/O area is part of the bitmap, so `tiles.acme` toggles `RAM_ROM_SELECTION` to `ALL_RAM`
-  around pixel writes.
+- The area's tileset is `TILE_COLOR`/`TILE_SCREEN` (768 bytes each) and `TILE_PIXELS` (`$9600-$adff`, 6k), each base a multiple of `TILES` — see _Tile copying_ for why that alignment is worth raster lines.
+  `$ae00-$bfff` is free and so is `$3400-$8fff`, so RAM is not the constraint here; the code segment's ~1k against `SONG_DATA` is.
+  The 4k of RAM under the I/O area is part of the bitmap, so `tiles.acme` toggles `RAM_ROM_SELECTION` to `ALL_RAM` around pixel writes.
 - `$0200-$07ff` belongs to the cartridge boot: `EF_COPIER` (the relocated copier), `EF_TBL_RAM` (the chunk table,
   lifted out of bank 1 because the copier switches banks as it walks), `EAPI_RAM` (reserved, see below) and `EF_BUFFER`
   (staging page).
@@ -189,13 +189,25 @@ Two consequences worth having in mind before touching the copy or scroll code:
   below bounds how far a copy can walk. Verified: instrument `MAP_POS_HI_TMP` against `TILE_MAP .. TILE_MAP+MAP_PAGES`
   in the copy epilogue and it never fires, over the autopilot and over ~9000 frames of constant down+right and up+left.
 
-`map.bin` is generated, not authored — `map-world.bin` is a 256×96 atlas to cut areas out of, an authoring convenience
-that the engine knows nothing about:
+**An area is four generated files, and `tools/mkarea.py` writes all four in one run**:
+`map.bin` plus the tileset the map indexes into (`colors.bin`, `screen.bin`, `pixels.bin`).
+The authored sources are world-indexed and the engine knows nothing about them — `map-world.bin` is a 256×96 atlas to cut areas out of, and `colors-world.bin`/`screen-world.bin`/`pixels-world.bin` are the 185-tile master set its indices refer to.
 
 ```bash
-tools/mkarea.py --src map-world.bin -o map.bin --cut 40,2   # the village
-tools/mkarea.py -o map.bin --fill 136                       # uniform, for the camera-bound check below
+tools/mkarea.py --cut 40,2   # the village: map.bin + its tileset
+tools/mkarea.py --fill 136   # uniform map of *world* tile 136, for the camera-bound check below
 ```
+
+**The tileset is per area, not global**, which is what lets `TILES` be 128 while the master set has 185 and the atlas uses every one of them:
+an area references only some of them (the village uses 95), so the cut is renumbered to a dense `0..n-1` and its tileset re-cut at the `TILES` stride.
+A megabyte of flash makes a tileset per area free, and areas that share a look can share one.
+Two things follow:
+
+- **A map index means nothing outside its own area.**
+  `map.bin`'s bytes are area indices, `map-world.bin`'s are world indices.
+  Anything comparing the two, or a `--fill` index against `map.bin`, has to know which it is holding.
+- **Editing an area means regenerating it**, because adding a tile to the map changes the tileset and renumbers everything after it.
+  The renumbering is in world order, so regenerating an unchanged area is a no-op.
 
 **The camera is real state**: `CAMERA_X_*`/`CAMERA_Y_*` in `lib/mem.acme`, 16-bit, in pixels into the map. It only
 exists to clamp the scroll — `JOYSTICK` guards each of its four `SCROLL_*` calls with `+scroll_towards_max` /
@@ -214,7 +226,7 @@ map's last. The vertical bound lands on the last row the same way. Four things a
   screen, easy to miss.
 - **`CAMERA_*_INIT` is measured, not derived**, and `MAP_INIT_COL`/`MAP_INIT_ROW` do not give it to you: the
   sub-tile offsets `TILE_COL`/`TILE_ROW` come into it too. To re-check a bound, build a uniform map with
-  `tools/mkarea.py -o map.bin --fill 136`, force one stick direction the way _Measuring the off-screen budget_
+  `tools/mkarea.py --fill 136`, force one stick direction the way _Measuring the off-screen budget_
   describes, run to the bound and screenshot. Anything other than the fill tile means the bound is too generous and
   the read-ahead left the map; an early stop means it is too tight. All four directions, since the horizontal and
   vertical read-ahead differ.
@@ -349,6 +361,12 @@ recording where to resume; the invariant is that the saved map pointer addresses
 which is why the slot-0 exit (meaning "tile finished") steps it on. Slot, exit and variant bodies must stay
 equal-sized so they can be reached by `base + n*SIZE` — all three are asserted.
 
+**`TILES` = 128 is a timing constant, not just a capacity.**
+`copy_tile_char` reads ten planes with `abs,x` indexed by the tile, and `abs,x` costs an extra cycle when `base_lo + X` crosses a page — so with the old `TILES` = 185 the planes sat at arbitrary offsets and most of those reads paid it.
+Every plane base being a multiple of a power-of-two `TILES` ≤ 128 makes the crossing impossible instead of merely unlikely.
+Measured, sustained diagonal, `SCROLL_SPEED` 2: the frame ended on raster line **46 before and 44 after**, i.e. two of the three lines of headroom that now exist.
+`engine.acme` asserts the alignment per plane, because getting it wrong costs cycles silently in code whose `; N` comments still look right.
+
 Keep an eye on the code segment. It runs `$0885-$1bf5` against `SONG_DATA` at `$2000` — about 1k of headroom — and
 unrolling here eats that margin fast: expanding the loop per entry point instead of sharing it cost ~900 bytes. ACME
 only _warns_ when the next segment starts inside this one, so an overflow silently gets the tail of the code overwritten
@@ -421,6 +439,10 @@ Its `petscii()` reproduces the `EF-Name:` magic from section 6 as a plain case s
 `raster.acme` and `tiles.acme` that generate structurally different code — e.g. `SPRITES = 0` inlines
 `increment_vic_ctrl_y` as a macro, otherwise it becomes a `jsr`-able routine with different cycle budgets.
 
+`TILES` is the least free of the lot despite looking like a pure size:
+it is the plane stride of the tile bins, so changing it means rerunning `tools/mkarea.py` with the same value — the bin sizes are asserted.
+It also wants to stay a power of two with `TILE_COLOR`/`TILE_SCREEN`/`TILE_PIXELS` aligned to it; see _Tile copying_ for the two raster lines that hangs on.
+
 The sprite three are less free than they look, and the assertions in `engine.acme` say so: `SPRITES` must be **0 or
 exactly `4 * SPRITE_SLOTS`** (so 16 today) because the 4/2/1 thinning chain assumes `SPRITE_ZONES_MAX` is 4, and
 `PANEL_SPRITES` must be exactly `2 * SPRITE_SLOTS`, i.e. cover all eight hardware sprites. `SPRITES = 4` assembles as
@@ -462,12 +484,24 @@ serialise — `COPY_TILES` finishes `COL_COPY` before touching `ROW_COPY`) is ab
 ### Measuring the off-screen budget
 
 `make regress` only tells you whether the budget was blown. To measure how much is left, temporarily parameterise the
-`-DDEVELOP` overrun check's `cmp #LINE_0-1`, force a constant stick direction (`sed` the `lda CIA1_DATA_PORT_A` in
-`joystick.acme` to `lda #$f5` for down+right), and bisect the threshold over a long run: the lowest value that does
-_not_ jam is the raster line `last_irq` finishes on. `LINE_0-1 = 47` is the limit.
+`-DDEVELOP` overrun check's `cmp #LINE_0-1`, force the stick (`sed` the `lda CIA1_DATA_PORT_A` in `joystick.acme`), and
+bisect the threshold over a long run: the lowest value that does _not_ jam is the raster line `last_irq` finishes on.
+`LINE_0-1 = 47` is the limit.
 
-Do this over **thousands** of frames with a constant direction, not over the autopilot — the worst case is rare.
-Measuring the diagonal phase of one `AUTOPILOT_TBL` pass reported line 18 for a build whose true worst case was 36.
+Do this over **thousands** of frames, not over the autopilot — the worst case is rare. Measuring the diagonal phase of
+one `AUTOPILOT_TBL` pass reported line 18 for a build whose true worst case was 36.
+
+Two ways to get a confidently wrong answer here, both learned the hard way:
+
+- **A constant direction no longer works — the camera clamp stops it.**
+  `lda #$f5` (down+right) runs into the bound after ~19 tiles and then scrolls nothing at all, so the rest of the run measures a static screen:
+  a build whose real answer is 46 read as "finishes before line 5".
+  Alternate instead, e.g. `inc $3400` / `lda $3400` / `and #$40` to choose between `#$f5` (down+right) and `#$fa` (up+left) every 64 frames.
+  That is a sustained diagonal with a direction reversal thrown in, and it keeps copying forever inside the clamp.
+  Give the inserted code named labels rather than ACME's anonymous `+`/`-`, or it captures the surrounding branches.
+- **A jam does not suppress the exit screenshot**, so presence of the `.png` is not a pass.
+  `tools/regress.sh` greps the run log for `Main CPU: JAM`, and anything bisecting the budget has to do the same.
+  Detecting by screenshot makes every threshold "pass", so the bisect bottoms out at whatever floor it was given — which looks exactly like a build with enormous headroom.
 
 **The reading depends on `SCROLL_SPEED`**, and heavily: doubling it halves `COPY_*_FRAMES`, so every copy does twice the
 chars per frame. Reference points, all diagonal:
@@ -480,8 +514,13 @@ chars per frame. Reference points, all diagonal:
 | 16 world + 8 panel, scheduled              | 1              | line 12       |
 | the same build                             | 2              | ~line 40      |
 | the map as one flat 32×32 area             | 2              | ~line 43      |
+| ... re-measured with the alternating stick  | 2              | line 46       |
+| `TILES` 185 → 128, planes page-aligned     | 2              | line 44       |
 
-So at `SCROLL_SPEED` 2 there are only about **four raster lines of headroom left**, and the flat-map cursor arithmetic
+The last two rows are one build apart and were each confirmed by a repeat pass, so they also calibrate the two workloads against each other:
+the alternating stick is the harsher of the two, and the old ~43 reading was optimistic.
+
+So at `SCROLL_SPEED` 2 there are **three raster lines of headroom left**, and the flat-map cursor arithmetic
 (`+step_map_ptr`, a 16-bit `+AREA_COLS` per tile instead of an `inc` of a row byte) accounts for roughly three of the
 lines that went. Anything else added to `last_irq` at this speed needs measuring, not guessing.
 

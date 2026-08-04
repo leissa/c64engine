@@ -122,7 +122,34 @@ SPRITE_FLOOR  = SPRITES_TOP_Y + SPRITE_HEIGHT + 1 ; first line a world sprite ca
 DISPLAY_BOT      = VERTICAL_BORDER_BOT - 1 ; last line before the bottom border
 LAST_IRQ_LINE    = 242 ; last_irq takes the hardware back here for the panel row
 SPRITES_MAX_Y    = 229 ; multiplexer gives up past this line
-TILES            = 185 ; TODO: calculate this with pixels.bin size / 8 / TILE_COLS / TILE_ROWS
+; The tileset is per area: tools/mkarea.py cuts colors/screen/pixels.bin to exactly TILES tiles out of the world masters,
+; so this is the area's capacity and not how many tiles are drawn (the village uses 95).
+; It is also the stride of every plane in those files, and that is the reason for 128 rather than a number that merely fits:
+; a tile index reaches TILES-1, so aligning each plane to TILES keeps it inside one page and the copy_tile_char loads
+; never pay the abs,x page-crossing cycle.
+TILES            = 128
+
+; copy_tile_char reads one byte per plane with abs,x and x is the tile index, so a plane that straddles a page boundary
+; costs an extra cycle on every read past the boundary -- ten such reads per char.
+; Measured at ~50 cycles a frame on the village's tile mix, and 2 raster lines on the worst frame of a sustained diagonal.
+; Every plane base being a multiple of TILES rules it out.
+; Check it rather than trust the layout: getting it wrong costs cycles silently, in code whose timing comments still look right.
+!set TILE_PLANE_CROSSINGS = 0
+!macro check_tile_plane .base {
+    !if ((.base) & $ff) + TILES-1 > $ff {
+        !set TILE_PLANE_CROSSINGS = TILE_PLANE_CROSSINGS + 1
+    }
+}
+!for .char, 0, TILE_COLS*TILE_ROWS-1 {
+    +check_tile_plane TILE_COLOR  + .char*TILES
+    +check_tile_plane TILE_SCREEN + .char*TILES
+    !for .row, 0, 7 {
+        +check_tile_plane TILE_PIXELS + (.char*8 + .row)*TILES
+    }
+}
+!if TILE_PLANE_CROSSINGS != 0 {
+    !error TILE_PLANE_CROSSINGS, " of the ", TILE_COLS*TILE_ROWS*10, " tileset planes cross a page boundary; TILES (", TILES, ") must be a power of two and TILE_COLOR/TILE_SCREEN/TILE_PIXELS multiples of it"
+}
 ; must split SCROLL_ROWS/SCROLL_COLS exactly and fit in the 4/SCROLL_SPEED frames
 ; a soft scroll leaves before the hard step; both asserted in tiles.acme
 ; The multiplexer degrades in powers of two: SPRITE_ZONES_MAX sprites per slot when
@@ -427,14 +454,26 @@ init_screen !zone {
     !error "map.bin is ", *-TILE_MAP, " bytes; AREA_COLS*AREA_ROWS is ", AREA_COLS*AREA_ROWS, " -- rerun tools/mkarea.py"
 }
 
+; The tileset, one plane of TILES bytes per char and -- for the pixels -- per char and pixel row.
+; Like map.bin these are generated, so their size is not a free parameter:
+; a plane set cut at the wrong stride assembles happily and then draws garbage.
 *=TILE_COLOR
 !bin "colors.bin"
+!if * - TILE_COLOR != TILE_COLS*TILE_ROWS*TILES {
+    !error "colors.bin is ", *-TILE_COLOR, " bytes; TILE_COLS*TILE_ROWS*TILES is ", TILE_COLS*TILE_ROWS*TILES, " -- rerun tools/mkarea.py"
+}
 
 *=TILE_SCREEN
 !bin "screen.bin"
+!if * - TILE_SCREEN != TILE_COLS*TILE_ROWS*TILES {
+    !error "screen.bin is ", *-TILE_SCREEN, " bytes; TILE_COLS*TILE_ROWS*TILES is ", TILE_COLS*TILE_ROWS*TILES, " -- rerun tools/mkarea.py"
+}
 
 *=TILE_PIXELS
 !bin "pixels.bin"
+!if * - TILE_PIXELS != TILE_COLS*TILE_ROWS*8*TILES {
+    !error "pixels.bin is ", *-TILE_PIXELS, " bytes; TILE_COLS*TILE_ROWS*8*TILES is ", TILE_COLS*TILE_ROWS*8*TILES, " -- rerun tools/mkarea.py"
+}
 
 *=SPRITE_FRAMES
 !bin "spr/hero.raw", 64*4

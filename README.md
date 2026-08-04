@@ -34,7 +34,7 @@ make run
 Use joystick in port 2 to run the demo.
 Hold `RUN/STOP` while the machine resets to switch the cartridge off and drop to BASIC.
 
-The cartridge does not fit in ROM: the tile data at `$3000-$bfff` lies straight through both cartridge windows, so a
+The cartridge does not fit in ROM: the tile data at `$3000-$adff` lies straight through both cartridge windows, so a
 small boot stub in bank 0 copies everything into RAM, switches the cartridge off and jumps to the engine.
 See `easyflash.acme` and `tools/mkcart.py`.
 
@@ -74,7 +74,7 @@ VICE otherwise writes the cartridge image back on exit, which rewrites the name 
 
 - Tile-Copying
 
-  A tile is `TILE_COLS` x `TILE_ROWS` = 3 x 2 chars, i.e. 24 x 16 pixels, and there are `TILES` = 185 of them.
+  A tile is `TILE_COLS` x `TILE_ROWS` = 3 x 2 chars, i.e. 24 x 16 pixels, and an area's tileset holds `TILES` = 128 of them.
   Tiles are streamed into the bitmap a column or a row at a time as the camera moves, spread over several frames
   because a whole column or row does not fit in one frame's raster budget.
   - `map.bin`: one byte per map position, each a tile index into the three files below.
@@ -84,16 +84,21 @@ VICE otherwise writes the cartridge image back on exit, which rewrites the name 
     `TILE_MAP + row*AREA_COLS + col`.
     The camera is clamped to it, so the scroll stops at the edges.
 
-    This file is generated rather than authored — `map-world.bin` is a 256 x 96 atlas to cut areas out of, which the
-    engine knows nothing about:
+  All four files are generated rather than authored, out of a world-indexed set the engine knows nothing about:
+  `map-world.bin` is a 256 x 96 atlas to cut areas out of, and `colors-world.bin` / `screen-world.bin` / `pixels-world.bin` are the master tileset its indices refer to.
+  One command makes an area out of them:
 
-    ```bash
-    tools/mkarea.py --src map-world.bin -o map.bin --cut 40,2
-    ```
+  ```bash
+  tools/mkarea.py --cut 40,2
+  ```
+
+  An area uses only some of the master tiles — the village uses 95 — so its cut is renumbered to a dense 0..n-1 and its tileset re-cut at the `TILES` stride.
+  A tileset per area costs nothing on a 1 MiB cartridge, and areas that share a look can share one.
 
   The other three files are indexed **by char position first and by tile second**, not tile by tile.
-  The copy loop reads `TILE_<what> + char*TILES + tile`, so all 185 bytes for char 0 come first, then all of char 1,
-  and so on up to char 5.
+  The copy loop reads `TILE_<what> + char*TILES + tile`, so all 128 bytes for char 0 come first, then all of char 1, and so on up to char 5.
+  `TILES` = 128 is what makes that fast: the copy reads a plane with `abs,x` indexed by the tile, so each plane is aligned to 128 bytes and never straddles a page.
+  That is worth two raster lines a frame in page-crossing penalties.
   - `pixels.bin`: `char*8*TILES + row*TILES + tile`, so 8 rows per char and 48 bytes per tile.
 
     Each bit pair in a byte is a color number `%00`-`%11` (multicolor bitmap mode).

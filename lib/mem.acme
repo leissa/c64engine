@@ -121,9 +121,14 @@ SONG_DATA   = $2000; - $2fff,  4k
 ; engine.acme asserts map.bin is exactly that size.
 TILE_MAP    = $3000; - $33ff,  1k
 ;             $3400 - $8fff, 23k  free
-TILE_COLOR  = $9000; - $95ff,  1.5k
-TILE_SCREEN = $9600; - $9bff,  1.5k
-TILE_PIXELS = $9c00; - $bfff,  9k
+; The area's tileset: TILES tiles of TILE_CHARS chars, one plane per char (per char and pixel row for the pixels),
+; so char c of tile t is at TILE_COLOR + c*TILES + t.
+; Each base is a multiple of TILES, which puts every plane inside a single page.
+; That is what keeps the abs,x loads in copy_tile_char off the page-crossing penalty; engine.acme asserts it per plane.
+TILE_COLOR  = $9000; - $92ff,  768b
+TILE_SCREEN = $9300; - $95ff,  768b
+TILE_PIXELS = $9600; - $adff,  6k
+;             $ae00 - $bfff, 4.5k free
 ;---------------------------------36k
 
 VIC_BANK      = $c000;
