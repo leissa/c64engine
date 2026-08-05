@@ -61,8 +61,8 @@ one that `make` then considers up to date.
 `cartconv -c` validates the result).
 Tile data is `!bin`'d into the image at the `TILE_*` addresses, so there is no separate asset pipeline — adding a
 tile-data file means only picking an address in `lib/mem.acme` and a `!bin` in `engine.acme`.
-The four generated assets are `map.bin` and the area's tileset (`colors.bin`, `screen.bin`, `pixels.bin`), all cut out of the world-indexed `*-world.bin` masters by one run of `tools/mkarea.py`.
-They are checked in, so the build does not depend on the tool — see _The map is one area_.
+The area's four files — `map.bin` plus the `colors.bin`/`screen.bin`/`pixels.bin` tileset — are authored assets with no
+generator behind them, so there is nothing to run before a build; see _The map is one area_.
 
 Everything about the layout follows the [EasyFlash Programmer's
 Guide](http://skoe.de/easyflash/files/devdocs/EasyFlash-ProgRef.pdf);
@@ -201,25 +201,20 @@ Two consequences worth having in mind before touching the copy or scroll code:
   below bounds how far a copy can walk. Verified: instrument `MAP_POS_HI_TMP` against `TILE_MAP .. TILE_MAP+MAP_PAGES`
   in the copy epilogue and it never fires, over the autopilot and over ~9000 frames of constant down+right and up+left.
 
-**An area is four generated files, and `tools/mkarea.py` writes all four in one run**:
-`map.bin` plus the tileset the map indexes into (`colors.bin`, `screen.bin`, `pixels.bin`).
-The authored sources are world-indexed and the engine knows nothing about them — `map-world.bin` is a 256×96 atlas to cut areas out of, and `colors-world.bin`/`screen-world.bin`/`pixels-world.bin` are the 185-tile master set its indices refer to.
+**An area _is_ four files**: `map.bin` plus the tileset it indexes into — `colors.bin`, `screen.bin`, `pixels.bin`.
+They are authored assets, checked in, with no generator behind them and no other representation anywhere:
+what is in the repo is what the engine loads.
+There is exactly one area, the demo one, and it uses 95 of the `TILES` = 128 slots.
 
-```bash
-tools/mkarea.py --cut 40,2   # the village: map.bin + its tileset
-tools/mkarea.py --fill 136   # uniform map of *world* tile 136, for the camera-bound check below
-```
+The `.bin` files were originally cut out of a larger world atlas by a throwaway script, and both are gone: keeping a
+one-shot authoring artifact in the tree made it read like a live pipeline, which is worse than not having it.
+If a second area ever needs cutting, `git log -- map-world.bin tools/mkarea.py` has the atlas and the script.
 
-**The tileset is per area, not global**, which is what lets `TILES` be 128 while the master set has 185 and the atlas uses every one of them:
-an area references only some of them (the village uses 95), so the cut is renumbered to a dense `0..n-1` and its tileset re-cut at the `TILES` stride.
+**The tileset is per area, not global.** That is what lets `TILES` be 128: an area only references its own tiles, so
+their indices are dense `0..n-1` and each plane is `TILES` bytes wide regardless of how many are actually drawn.
 A megabyte of flash makes a tileset per area free, and areas that share a look can share one.
-Two things follow:
-
-- **A map index means nothing outside its own area.**
-  `map.bin`'s bytes are area indices, `map-world.bin`'s are world indices.
-  Anything comparing the two, or a `--fill` index against `map.bin`, has to know which it is holding.
-- **Editing an area means regenerating it**, because adding a tile to the map changes the tileset and renumbers everything after it.
-  The renumbering is in world order, so regenerating an unchanged area is a no-op.
+One thing follows: **a map index means nothing outside its own area**, so nothing may compare an index in one area's
+`map.bin` against another's.
 
 **The camera is real state**: `CAMERA_X_*`/`CAMERA_Y_*` in `lib/mem.acme`, 16-bit, in pixels into the map. It only
 exists to clamp the scroll — `JOYSTICK` guards each of its four `SCROLL_*` calls with `+scroll_towards_max` /
@@ -237,11 +232,16 @@ map's last. The vertical bound lands on the last row the same way. Four things a
   Without that the trailing edge shows the tile past the map — a sliver a few pixels wide at the very edge of the
   screen, easy to miss.
 - **`CAMERA_*_INIT` is measured, not derived**, and `MAP_INIT_COL`/`MAP_INIT_ROW` do not give it to you: the
-  sub-tile offsets `TILE_COL`/`TILE_ROW` come into it too. To re-check a bound, build a uniform map with
-  `tools/mkarea.py --fill 136`, force one stick direction the way _Measuring the off-screen budget_
-  describes, run to the bound and screenshot. Anything other than the fill tile means the bound is too generous and
-  the read-ahead left the map; an early stop means it is too tight. All four directions, since the horizontal and
-  vertical read-ahead differ.
+  sub-tile offsets `TILE_COL`/`TILE_ROW` come into it too. To re-check a bound, replace `map.bin` with a uniform one,
+  force one stick direction the way _Measuring the off-screen budget_ describes, run to the bound and screenshot.
+  Tile 1 is solid (all `%11`), which makes any intruding tile obvious:
+
+  ```bash
+  python3 -c "open('map.bin','wb').write(bytes([1])*1024)"   # and git checkout map.bin afterwards
+  ```
+
+  Anything other than the fill tile means the bound is too generous and the read-ahead left the map; an early stop means
+  it is too tight. All four directions, since the horizontal and vertical read-ahead differ.
 - **`MAP_INIT_*` is what the camera is calibrated against.** Moving the initial cursor invalidates `CAMERA_*_INIT`, so
   re-measure both together.
 
@@ -525,7 +525,7 @@ visible part, and `PANEL_Y` is an alias for it — see _Sprites_.
 ring_.
 
 `TILES` is the least free of the lot despite looking like a pure size:
-it is the plane stride of the tile bins, so changing it means rerunning `tools/mkarea.py` with the same value — the bin sizes are asserted.
+it is the plane stride of the tile bins, so changing it means re-striding all three of them by hand — the sizes are asserted, so the build stops you rather than the screen.
 It also wants to stay a power of two with `TILE_COLOR`/`TILE_SCREEN`/`TILE_PIXELS` aligned to it; see _Tile copying_ for the two raster lines that hangs on.
 
 The sprite three are less free than they look, and the assertions in `engine.acme` say so: `SPRITES` must be **0 or

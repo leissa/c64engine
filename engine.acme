@@ -167,16 +167,16 @@ SPRITE_FLOOR  = SPRITES_TOP_Y + SPRITE_HEIGHT + 1 ; first line a world sprite ca
 DISPLAY_BOT      = VERTICAL_BORDER_BOT - 1 ; last line before the bottom border
 LAST_IRQ_LINE    = 242 ; last_irq takes the hardware back here for the panel row
 SPRITES_MAX_Y    = 229 ; multiplexer gives up past this line
-; The tileset is per area: tools/mkarea.py cuts colors/screen/pixels.bin to exactly TILES tiles out of the world masters,
-; so this is the area's capacity and not how many tiles are drawn (the village uses 95).
-; It is also the stride of every plane in those files, and that is the reason for 128 rather than a number that merely fits:
+; The tileset is per area, so this is the area's capacity and not how many tiles are drawn: the demo area uses 95 of it.
+; It is also the stride of every plane in colors/screen/pixels.bin, which is why 128 rather than a number that merely fits:
 ; a tile index reaches TILES-1, so aligning each plane to TILES keeps it inside one page and the copy_tile_char loads
 ; never pay the abs,x page-crossing cycle.
+; Changing it means re-striding all three files, which the assertions further down will catch you forgetting.
 TILES            = 128
 
 ; copy_tile_char reads one byte per plane with abs,x and x is the tile index, so a plane that straddles a page boundary
 ; costs an extra cycle on every read past the boundary -- ten such reads per char.
-; Measured at ~50 cycles a frame on the village's tile mix, and 2 raster lines on the worst frame of a sustained diagonal.
+; Measured at ~50 cycles a frame on the demo area's tile mix, and 2 raster lines on the worst frame of a sustained diagonal.
 ; Every plane base being a multiple of TILES rules it out.
 ; Check it rather than trust the layout: getting it wrong costs cycles silently, in code whose timing comments still look right.
 !set TILE_PLANE_CROSSINGS = 0
@@ -541,31 +541,31 @@ init_screen !zone {
 
 *=TILE_MAP
 !bin "map.bin"
-; map.bin is the map, so its size is not a free parameter: a file of the wrong shape
-; assembles happily and then scrolls garbage, which is slow to diagnose.
+; These four files *are* the area: map.bin plus the tileset it indexes into, authored assets with no
+; generator behind them.  Their shape is therefore not a free parameter -- a file of the wrong one
+; assembles happily and then scrolls garbage, which is slow to diagnose -- so check each against the
+; constants it has to agree with.
 !if * - TILE_MAP != AREA_COLS*AREA_ROWS {
-    !error "map.bin is ", *-TILE_MAP, " bytes; AREA_COLS*AREA_ROWS is ", AREA_COLS*AREA_ROWS, " -- rerun tools/mkarea.py"
+    !error "map.bin is ", *-TILE_MAP, " bytes but AREA_COLS*AREA_ROWS is ", AREA_COLS*AREA_ROWS, "; the file and the area size disagree"
 }
 
-; The tileset, one plane of TILES bytes per char and -- for the pixels -- per char and pixel row.
-; Like map.bin these are generated, so their size is not a free parameter:
-; a plane set cut at the wrong stride assembles happily and then draws garbage.
+; The tileset: one plane of TILES bytes per char, and -- for the pixels -- per char and pixel row.
 *=TILE_COLOR
 !bin "colors.bin"
 !if * - TILE_COLOR != TILE_COLS*TILE_ROWS*TILES {
-    !error "colors.bin is ", *-TILE_COLOR, " bytes; TILE_COLS*TILE_ROWS*TILES is ", TILE_COLS*TILE_ROWS*TILES, " -- rerun tools/mkarea.py"
+    !error "colors.bin is ", *-TILE_COLOR, " bytes but TILE_COLS*TILE_ROWS*TILES is ", TILE_COLS*TILE_ROWS*TILES, "; the file and TILES disagree"
 }
 
 *=TILE_SCREEN
 !bin "screen.bin"
 !if * - TILE_SCREEN != TILE_COLS*TILE_ROWS*TILES {
-    !error "screen.bin is ", *-TILE_SCREEN, " bytes; TILE_COLS*TILE_ROWS*TILES is ", TILE_COLS*TILE_ROWS*TILES, " -- rerun tools/mkarea.py"
+    !error "screen.bin is ", *-TILE_SCREEN, " bytes but TILE_COLS*TILE_ROWS*TILES is ", TILE_COLS*TILE_ROWS*TILES, "; the file and TILES disagree"
 }
 
 *=TILE_PIXELS
 !bin "pixels.bin"
 !if * - TILE_PIXELS != TILE_COLS*TILE_ROWS*8*TILES {
-    !error "pixels.bin is ", *-TILE_PIXELS, " bytes; TILE_COLS*TILE_ROWS*8*TILES is ", TILE_COLS*TILE_ROWS*8*TILES, " -- rerun tools/mkarea.py"
+    !error "pixels.bin is ", *-TILE_PIXELS, " bytes but TILE_COLS*TILE_ROWS*8*TILES is ", TILE_COLS*TILE_ROWS*8*TILES, "; the file and TILES disagree"
 }
 
 *=SPRITE_FRAMES

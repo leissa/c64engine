@@ -86,16 +86,10 @@ VICE otherwise writes the cartridge image back on exit, which rewrites the name 
     `TILE_MAP + row*AREA_COLS + col`.
     The camera is clamped to it, so the scroll stops at the edges.
 
-  All four files are generated rather than authored, out of a world-indexed set the engine knows nothing about:
-  `map-world.bin` is a 256 x 96 atlas to cut areas out of, and `colors-world.bin` / `screen-world.bin` / `pixels-world.bin` are the master tileset its indices refer to.
-  One command makes an area out of them:
-
-  ```bash
-  tools/mkarea.py --cut 40,2
-  ```
-
-  An area uses only some of the master tiles — the village uses 95 — so its cut is renumbered to a dense 0..n-1 and its tileset re-cut at the `TILES` stride.
-  A tileset per area costs nothing on a 1 MiB cartridge, and areas that share a look can share one.
+  These four files *are* the area — authored assets, checked in, with no generator behind them.
+  The tileset is per area rather than global, which is why its indices are dense: the demo area uses 95 of the `TILES` =
+  128 slots, and a tileset per area costs nothing on a 1 MiB cartridge.
+  Areas that share a look can share one.
 
   The other three files are indexed **by char position first and by tile second**, not tile by tile.
   The copy loop reads `TILE_<what> + char*TILES + tile`, so all 128 bytes for char 0 come first, then all of char 1, and so on up to char 5.
@@ -143,8 +137,8 @@ VICE otherwise writes the cartridge image back on exit, which rewrites the name 
   show them.
   Within a run the cells are hardware sprites `0` to `7` from left to right: a cell's `%01` color is the high nibble of
   that sprite's pointer byte, `%10` the low nibble.
-  The four visible runs are exactly where a tile drawn with only `%00` and `%11` pays off, and on the current village
-  map 9 of those 32 cells already are.
+  The four visible runs are exactly where a tile drawn with only `%00` and `%11` pays off, and on the demo area's art
+  9 of those 32 cells already are.
 
   The coordinates follow from `(RING_PHASE + col + SCREEN_COLS*row) mod 1024` landing in the eight pointer bytes, so
   regenerate the table after changing `RING_PHASE`, the area size or the camera clamp:
