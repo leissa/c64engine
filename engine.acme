@@ -137,17 +137,26 @@ SPRITES       = 16 ; world sprites; must be SPRITE_SLOTS * 4, see SPRITE_ZONES_M
 PANEL_SPRITES = 8  ; one per hardware sprite, so all of them
 SPRITE_SLOTS  = 4  ; hardware sprite pairs available to the multiplexer
 SPRITE_HEIGHT = 21 ; raster lines a sprite covers; a slot is busy this long
-; Lowering this frees the sprite hardware earlier, and 54 is as low as it can go:
-; a sprite at y displays y+1 .. y+21, so below 54 the panel's first line falls
-; inside the top border (VERTICAL_BORDER_TOP) and its last line stops short of AGSP_END,
-; leaving band lines with no sprites on them that the 44 cycle path in raster.acme
-; assumes are full.  Both bounds are asserted below.
+AGSP_END = 75 ; last line of the 25 line AGSP region; measured, see CLAUDE.md
+
+; The panel row fills the visible part of the FLD/crunch band exactly, and there is only one y
+; that does it.  A sprite at y displays y+1 .. y+21, so:
 ;
-; It stays at 60 anyway, because freeing the hardware earlier buys nothing on its
-; own: what actually gates the world sprites is SPRITE_MULTIPLEX_START, the soft scroll
-; release, and that cannot move -- see the note in scroll.acme.
-SPRITES_TOP_Y = 60 ; panel row, inside the FLD/crunch band
-AGSP_END      = 75 ; last line of the 25 line AGSP region; measured, see CLAUDE.md
+;   y = AGSP_END - SPRITE_HEIGHT     its last line is the band's last line -- one line higher and
+;                                    the 44 cycle path in raster.acme would be timing band lines
+;                                    that have no sprites on them
+;   y = VERTICAL_BORDER_TOP - 1      its first line is the first line that is visible at all -- one
+;                                    line lower and the top of the panel is eaten by the border
+;
+; Both give 54, because the band's visible part (VERTICAL_BORDER_TOP .. AGSP_END) is 21 lines and a
+; sprite is 21 lines: it fits with no margin either side.  Asserted below, since the equality is
+; what the alignment means and drifts silently otherwise.
+;
+; This is also as low as the panel can go, but going low buys no world sprite travel: what gates
+; the world sprites is SPRITE_MULTIPLEX_START, the soft scroll release, and that cannot move -- see
+; the note in scroll.acme.  What it does buy is the panel no longer hanging six lines into the map.
+SPRITES_TOP_Y = AGSP_END - SPRITE_HEIGHT ; 54, the panel row, inside the FLD/crunch band
+PANEL_Y       = SPRITES_TOP_Y ; compile time, so all eight panel sprites cannot help but share it
 SPRITE_FLOOR  = SPRITES_TOP_Y + SPRITE_HEIGHT + 1 ; first line a world sprite can use
 
 ; A sprite must still be placeable at the very bottom of the window or it pops
@@ -210,6 +219,14 @@ SPRITE_ZONES_MAX = SPRITES / SPRITE_SLOTS
     !if SPRITES_TOP_Y + 1 < VERTICAL_BORDER_TOP {
         !error "SPRITES_TOP_Y (", SPRITES_TOP_Y, ") puts the panel's first line above the first visible line (", VERTICAL_BORDER_TOP, ")"
     }
+    ; The panel is meant to fill the band's visible part exactly, so the bound above should be met
+    ; with equality.  Only in the shipped display: the debug build runs RSEL set and a taller window,
+    ; where the border opens four lines earlier and nothing lines up.
+    !if (CTRL_Y_INVALID & VIC_RSEL) = 0 {
+        !if SPRITES_TOP_Y + 1 != VERTICAL_BORDER_TOP {
+            !error "the panel's first line is ", SPRITES_TOP_Y+1, " but the first visible line is ", VERTICAL_BORDER_TOP, "; the band's visible part is ", AGSP_END-VERTICAL_BORDER_TOP+1, " lines and a sprite is ", SPRITE_HEIGHT
+        }
+    }
     ; A world sprite going DMA-active inside the band would make the per-line steal
     ; vary and mistime the whole AGSP, so the floor has to sit below the band ...
     !if SPRITE_FLOOR <= AGSP_END {
@@ -258,19 +275,44 @@ SPRITE_FRAME
     !by SPRITE_FRAMES_BASE+$04, SPRITE_FRAMES_BASE+$04, SPRITE_FRAMES_BASE+$04, SPRITE_FRAMES_BASE+$06
 
 ; ---- panel row, PANEL_SPRITES entries each -----------------------------------
-; One hardware sprite each, all on PANEL_Y, so they are written straight out by
-; last_irq and never take part in the sort or the multiplexer.  X is full 9 bit
-; here (PANEL_X plus one bit per sprite in PANEL_X_MSB) because these are placed by
-; hand, not scrolled.
-PANEL_Y
-    !by SPRITES_TOP_Y
-PANEL_X
-    !by 24, 48, 72, 96, 180, 204, 228, 252
-PANEL_X_MSB
-    !by %00000000
+; One hardware sprite each, all on PANEL_Y -- which is a constant, not a table, so they cannot
+; help but share it.  They are written straight out by last_irq and never take part in the sort or
+; the multiplexer.  Only the colours and frames are tables; the X positions are the list below,
+; which the assembler splits into $d000 low bytes and the $d010 msb byte.
+; The X positions are a list, not a table: both the low byte that goes to $d000+2i and the 9th bit
+; that goes to $d010 come out of it here, at assembly time.  Same split the multiplexer does for
+; SPRITE_X -- asl and take the msb from the carry -- except SPRITE_X moves every frame and the panel
+; does not, so there is no reason to pay for the shift 8 times a frame.  Doing it here also means
+; there is no second table to keep in sync, and an immediate is 2 cycles against 4 for a load.
+;
+; A second panel layout goes here: one !if, two +panel_x_row bodies.
+!macro panel_x .i, .x {
+    !if .x > 511 {
+        !error "panel sprite ", .i, " sits at x ", .x, ", outside the 9 bits the VIC has"
+    }
+    !set PANEL_X_MSB = PANEL_X_MSB | ((.x >> 8) << .i)
+    lda #<.x
+    sta VIC_SPRITE_0_X + 2*.i
+}
+
+!macro panel_x_row {
+    !set PANEL_X_MSB = 0
+    +panel_x 0, 24
+    +panel_x 1, 48
+    +panel_x 2, 72
+    +panel_x 3, 96
+    +panel_x 4, 180
+    +panel_x 5, 204
+    +panel_x 6, 228
+    +panel_x 7, 252
+}
+
 PANEL_COLOR
     !by $02, $02, $02, $07, $01, $01, $0d, $0d
-PANEL_FRAME
+; The frames are the panel's live content -- the hitpoint or glyph each slot shows -- so they are the
+; one panel table last_irq has to read every frame.  That is why they live in zero page, seeded from
+; here the way sprite_y_init seeds SPRITE_Y.
+panel_frame_init
     !by SPRITE_FRAMES_BASE+$00, SPRITE_FRAMES_BASE+$00, SPRITE_FRAMES_BASE+$00, SPRITE_FRAMES_BASE+$02
     !by SPRITE_FRAMES_BASE+$04, SPRITE_FRAMES_BASE+$04, SPRITE_FRAMES_BASE+$06, SPRITE_FRAMES_BASE+$06
 
@@ -345,6 +387,11 @@ PANEL_FRAME
             sta SPRITE_Y + .i
             lda #.i
             sta SPRITE_ORDER + .i
+        }
+        ; the panel's frames live in zero page; the rest of its tables are read in place
+        !for .i, 0, PANEL_SPRITES-1 {
+            lda panel_frame_init + .i
+            sta PANEL_FRAME + .i
         }
         lda #0
         sta SPRITE_PHASE

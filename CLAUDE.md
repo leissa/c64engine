@@ -249,35 +249,56 @@ map's last. The vertical bound lands on the last row the same way. Four things a
 
 Two disjoint sets share the eight hardware sprites, and the split is what keeps the crunch band's timing honest.
 
-`PANEL_SPRITES` (8) all share one Y — `PANEL_Y` = `SPRITES_TOP_Y` = 60 — one hardware sprite each, single colour, meant
-for hitpoints, weapons, text. `last_irq` writes them straight out from `PANEL_X`/`PANEL_COLOR`/`PANEL_FRAME` (X is full
-9-bit, with `PANEL_X_MSB`); they take no part in the sort or the multiplexer. **Sharing one Y is mandatory**: the
+`PANEL_SPRITES` (8) all share one Y — `PANEL_Y` = `SPRITES_TOP_Y` = **54** — one hardware sprite each, single colour,
+meant for hitpoints, weapons, text. `last_irq` writes them straight out and they take no part in the sort or the
+multiplexer. **Sharing one Y is mandatory**: the
 44-cycle crunch path is `63-19`, i.e. all eight sprites DMA-active across the whole band, so staggering them would need
 the FLD/crunch loop to carry a per-line cycle count.
+`PANEL_Y` is a compile-time constant rather than a table byte, which is what makes staggering them impossible rather
+than merely wrong — and saves the `lda` a cycle, since an immediate is 2 and an absolute load 4.
+**The X positions are a compile-time list, not a table.** `+panel_x_row` in `engine.acme` names one 9-bit X per sprite
+and the assembler splits each into the `$d000+2i` immediate and its bit of the `$d010` msb byte — the same
+asl-and-take-the-carry split the multiplexer does for `SPRITE_X`, except `SPRITE_X` moves every frame and the panel does
+not, so there is no reason to pay for the shift eight times a frame. Doing it at runtime instead would cost **+48
+cycles**, because accumulating the carries needs a `rol` into a zero-page byte per sprite. It also removes the second
+table: nothing can now disagree with `PANEL_X_MSB`, and a position outside 9 bits is an `!error`.
 
-They are not confined to the band. A sprite at `y` displays `y+1 .. y+21`, so the panel row occupies raster lines
-**61-81**: it starts inside the band, and its bottom six rows overlap the first lines of the map. Ending at 81 is what
-matters — one line above the soft-scroll release at 82, so the hardware is free exactly when the multiplexer wants it.
+`PANEL_FRAME` is the only panel table in zero page, because it is the only one that is live content — the icon or glyph
+each slot shows — so `last_irq` has to read all eight every frame; `panel_frame_init` seeds it the way `sprite_y_init`
+seeds `SPRITE_Y`.
 
-**`SPRITES_TOP_Y` cannot go below 54, and 60 is the value that costs nothing.** Two `!error` assertions bracket it from
-below: at 53 the panel's first displayed line (54) falls inside the top border (`VERTICAL_BORDER_TOP` = 55), and its
-last (74) stops short of `AGSP_END` = 75, leaving band lines that the 44-cycle path believes have eight sprites on them.
-The bound from above is `SPRITE_FLOOR > AGSP_END` — but the _useful_ limit is tighter than that assertion, and it is
-where 60 comes from:
+The whole panel block is **214 cycles**, 3.4 raster lines of the off-screen budget, so it is the biggest single item
+there after `COPY_TILES`. It was 242 before `PANEL_Y` became an immediate (−2), `PANEL_FRAME` moved to zero page (−8) and
+the X list stopped being a table (−18). `PANEL_COLOR` is the only one left; folding it in the same way is worth ~16 more
+once the panel's two configurations are fixed.
 
-`SPRITE_FLOOR` = `SPRITES_TOP_Y + SPRITE_HEIGHT + 1` = **82** is the first line a world sprite can use, because that is
-where the panel gives the hardware back. At `SPRITES_TOP_Y` = 60 it lands exactly on `SPRITE_MULTIPLEX_START` = 82, the
-soft-scroll release — which cannot move, see stage 5 of the IRQ chain. So the panel is free for nothing: any higher and
-`SPRITE_FLOOR` would push past the release and cost world-sprite travel; any lower and the release still gates at 82, so
-the freed lines are unusable. That is why 54 buys nothing even though it assembles.
+**The panel fills the visible part of the band exactly, and only one Y does that.** A sprite at `y` displays
+`y+1 .. y+21`, so:
 
-The assertion `SPRITE_FLOOR > AGSP_END` is still the one that guards correctness rather than screen area: a world sprite
+| derivation                            | value | what breaks one line off it                                            |
+| ------------------------------------- | ----- | ---------------------------------------------------------------------- |
+| `AGSP_END - SPRITE_HEIGHT`            | 54    | higher: band lines with no sprites that the 44-cycle path times as full |
+| `VERTICAL_BORDER_TOP - 1`             | 54    | lower: the top of the panel is eaten by the border                     |
+
+Both give 54 because the band's visible part — `VERTICAL_BORDER_TOP` (55) through `AGSP_END` (75) — is 21 lines and a
+sprite is 21 lines: it fits with no margin either side. `engine.acme` asserts the equality, guarded on RSEL, because the
+alignment is the intent and would drift silently otherwise; the debug build runs RSEL set, opens the border four lines
+earlier and lines up with nothing.
+
+The panel used to sit at 60, where its bottom six rows hung over the first lines of the map. Moving it up costs no
+world-sprite travel: `SPRITE_FLOOR` = `SPRITES_TOP_Y + SPRITE_HEIGHT + 1` is where the panel gives the hardware back, and
+at 54 that is **76** — but the multiplexer cannot start before `SPRITE_MULTIPLEX_START` = 82 whatever the panel does, and
+that line cannot move (stage 5 of the IRQ chain). So lines 76-81 show map with no sprites on them either way.
+Verified: moving the panel changes nothing below the band, pixel for pixel — the removed sprite steal on 76-81 does not
+reach the VSP or the soft-scroll release, which polls for a fixed line rather than counting cycles.
+
+The assertion `SPRITE_FLOOR > AGSP_END` is the one that guards correctness rather than screen area: a world sprite
 going DMA-active _inside_ the band would make the per-line steal vary and mistime the whole AGSP.
 
 `SPRITES` (16) are the world sprites below that, two hardware sprites each — a hires overlay over a multicolour one —
 multiplexed over `SPRITE_SLOTS` (4) pairs. `VIC_SPRITE_MULTICOLOR` is flipped between the two: `last_irq` clears it for
-the panel row, the multiplexer sets `%10101010` when it takes over (safe, because the panel row ends at
-`SPRITES_TOP_Y + SPRITE_HEIGHT`, just above the soft-scroll release line).
+the panel row, the multiplexer sets `%10101010` when it takes over (safe, because the panel row ends at `AGSP_END`, well
+above the soft-scroll release line).
 
 Which half of a pair is which follows from that `%10101010` and from sprite priority, and it is what the otherwise
 opaque `SPRITE_COLOR_A`/`SPRITE_COLOR_B` naming rests on. Pair _r_ owns hardware sprites `2r` and `2r+1`:
@@ -491,10 +512,13 @@ Its `petscii()` reproduces the `EF-Name:` magic from section 6 as a plain case s
 
 ### Tunables — top of `engine.acme`
 
-`SCROLL_SPEED` (1 or 2), `SPRITES`, `PANEL_SPRITES`, `SPRITE_SLOTS`, `TILE_COLS`/`TILE_ROWS`,
-`SPRITES_TOP_Y`/`SPRITES_MAX_Y`, `TILES`, `COPY_*_FRAMES`. These feed `!if`/`!for` conditionals throughout
-`raster.acme` and `tiles.acme` that generate structurally different code — e.g. `SPRITES = 0` inlines
-`increment_vic_ctrl_y` as a macro, otherwise it becomes a `jsr`-able routine with different cycle budgets.
+`SCROLL_SPEED` (1 or 2), `SPRITES`, `PANEL_SPRITES`, `SPRITE_SLOTS`, `TILE_COLS`/`TILE_ROWS`, `SPRITES_MAX_Y`, `TILES`,
+`COPY_*_FRAMES`. These feed `!if`/`!for` conditionals throughout `raster.acme` and `tiles.acme` that generate
+structurally different code — e.g. `SPRITES = 0` inlines `increment_vic_ctrl_y` as a macro, otherwise it becomes a
+`jsr`-able routine with different cycle budgets.
+
+`SPRITES_TOP_Y` is **not** in that list any more: it is `AGSP_END - SPRITE_HEIGHT`, the only value that fills the band's
+visible part, and `PANEL_Y` is an alias for it — see _Sprites_.
 
 `RING_PHASE` looks like a free constant and is one, but it is not independent: `RING_INIT`, `PIXEL_INIT` and the
 `HARD_X`/`HARD_Y` start values all derive from it and have to stay derived — see _The sprite pointers sit in the screen
@@ -606,9 +630,10 @@ jams once the stashed line reaches the limit.
 acme -DSYSTEM=64 -DDEVELOP=1 -DAGSP_LIMIT=76 -f cbm -o ap.prg engine.acme
 ```
 
-The answer is **75**, constant over a long vertical-scrolling run, as "always 25 raster lines" requires. Everything
-about the panel row's position, `SPRITE_FLOOR` and the soft-scroll release derives from it, so it should not need
-measuring again — but the recipe is here if the band's line count ever changes.
+The answer is **75**, constant over a long vertical-scrolling run, as "always 25 raster lines" requires. It is now a
+literal dependency rather than a documented one — `SPRITES_TOP_Y` is `AGSP_END - SPRITE_HEIGHT`, so the panel row, and
+with it `PANEL_Y` and `SPRITE_FLOOR`, moves if this number does. Re-measure with the recipe above if the band's line
+count ever changes.
 
 ### Measuring sprite placement
 

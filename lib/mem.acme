@@ -90,6 +90,11 @@ SPRITE_Y        = $50; - $5f, screen y per sprite id
 SPRITE_QUEUE    = $60; - $6f, the subset the multiplexer shows this frame, in y order
 SPRITE_Y_SORTED = $70; - $7f, SPRITE_Y read out in sorted order, for the zone check
 
+; The panel row's live content, one frame per panel sprite, seeded from panel_frame_init.
+; Here rather than beside the other panel tables because last_irq reads all PANEL_SPRITES of them
+; every frame with plain absolute loads, and zero page makes each one a cycle cheaper.
+PANEL_FRAME     = $80; - $87
+
 ; zero page: $0000 - $00ff
 ; cpu stack: $0100 - $01ff
 

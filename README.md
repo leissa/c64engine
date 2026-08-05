@@ -68,6 +68,8 @@ VICE otherwise writes the cartridge image back on exit, which rewrites the name 
   **8 panel sprites** on top of that, all sharing one raster line inside the black AGSP band: one hardware sprite
   each, single color, meant for hitpoints, weapons or text.
   They are written straight out every frame and take no part in the multiplexer.
+  Their row fills the visible part of the band exactly — the band shows 21 raster lines and a sprite is 21 lines tall —
+  so the panel neither loses its top edge to the border nor hangs down into the map.
 
   The two sets share the same 8 hardware sprites — the panel owns them across the band, the multiplexer takes over
   below it.

@@ -467,20 +467,21 @@ last_irq
 ;-------------------------------------------------------------------------------
 
 !if SPRITES != 0 {
-    lda PANEL_Y
+    lda #PANEL_Y
     !for .i, 0, PANEL_SPRITES-1 {
         sta VIC_SPRITE_0_Y + 2*.i
     }
+    ; the x positions and their 9th bits are immediates, split out of one list in engine.acme
+    +panel_x_row
+    lda #PANEL_X_MSB
+    sta VIC_SPRITE_X_MSB
+
     !for .i, 0, PANEL_SPRITES-1 {
-        lda PANEL_X + .i
-        sta VIC_SPRITE_0_X + 2*.i
         lda PANEL_COLOR + .i
         sta VIC_SPRITE_0_COLOR + .i
         lda PANEL_FRAME + .i
         sta SPRITE_PTR + .i
     }
-    lda PANEL_X_MSB
-    sta VIC_SPRITE_X_MSB
     lda #0
     sta VIC_SPRITE_MULTICOLOR
 }
